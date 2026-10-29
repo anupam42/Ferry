@@ -1,0 +1,93 @@
+# GoReleaser config: builds binaries for 6 platforms, publishes a GitHub
+# release, and updates Homebrew, Scoop and winget on every tag.
+# Docs: https://goreleaser.com   Test locally: goreleaser release --snapshot --clean
+version: 2
+project_name: ferry
+
+builds:
+  - main: .
+    binary: ferry
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath, -mod=vendor]
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}} -X main.date={{.Date}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [README.md, LICENSE, ferry.example.yaml]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^ci:"]
+
+# Linux packages: .deb / .rpm / .apk
+nfpms:
+  - package_name: ferry
+    vendor: anupam42
+    homepage: https://github.com/anupam42/Ferry
+    maintainer: Anupam Udupi <anupam.udupi@gmail.com>
+    description: Mirror a working folder into a git repo (and back) from any terminal.
+    license: MIT
+    formats: [deb, rpm, apk]
+
+# Homebrew: brew install anupam42/tap/ferry
+# Needs a public repo github.com/anupam42/homebrew-tap and a HOMEBREW_TAP_TOKEN secret.
+brews:
+  - name: ferry
+    repository:
+      owner: anupam42
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/anupam42/Ferry
+    description: Mirror a working folder into a git repo (and back) from any terminal.
+    license: MIT
+    install: |
+      bin.install "ferry"
+    test: |
+      system "#{bin}/ferry", "version"
+
+# Scoop: scoop bucket add anupam42 https://github.com/anupam42/scoop-bucket ; scoop install ferry
+scoops:
+  - name: ferry
+    repository:
+      owner: anupam42
+      name: scoop-bucket
+      token: "{{ .Env.SCOOP_BUCKET_TOKEN }}"
+    homepage: https://github.com/anupam42/Ferry
+    description: Mirror a working folder into a git repo (and back) from any terminal.
+    license: MIT
+
+# winget: opens a PR against microsoft/winget-pkgs from your fork.
+# Needs a fork github.com/anupam42/winget-pkgs and a WINGET_TOKEN secret.
+winget:
+  - name: ferry
+    publisher: anupam42
+    package_identifier: anupam42.ferry
+    short_description: Mirror a working folder into a git repo (and back) from any terminal.
+    license: MIT
+    homepage: https://github.com/anupam42/Ferry
+    publisher_url: https://github.com/anupam42
+    tags: [git, sync, cli, developer-tools]
+    repository:
+      owner: anupam42
+      name: winget-pkgs
+      branch: "ferry-{{ .Version }}"
+      token: "{{ .Env.WINGET_TOKEN }}"
+      pull_request:
+        enabled: true
+        draft: false
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master

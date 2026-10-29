@@ -1,0 +1,42 @@
+# ferry configuration
+# Run with:  ferry --config ferry.yaml   (or just "ferry" in this folder)
+
+notify: true            # desktop notifications on conflicts and errors
+
+defaults:               # applies to every pair below; any key can be overridden per pair
+  mode: one-way         # one-way (source -> target) | two-way
+  on_delete: keep       # file deleted on one side: keep (leave the other copy alone)
+                        #   | restore (two-way: copy it back) | propagate (delete it on the other side too)
+  conflict: ask         # two-way, when you can be asked (dashboard / terminal):
+                        #   ask | hold | source | target | newer | keep-both
+  headless_conflict: hold   # when nobody can be asked (service, --json, piped):
+                            #   hold (leave both files, notify, resolve later with "ferry resolve")
+                            #   | keep-both | source | target | newer
+  use_gitignore: true   # honor .gitignore files in source and target
+  ignore: [dist, coverage, "*.log"]
+  git_guard: true       # pause while the target repo is merging/rebasing
+  check_upstream: 0     # e.g. 5m: fetch and pause while target is behind its upstream
+  max_size: 50MB        # skip bigger files
+  binary: warn          # allow | warn | skip
+  batch_limit: 200      # batches bigger than this wait for activity to settle
+  batch_action: apply   # apply | confirm (ask in the dashboard first)
+  max_ops_per_sec: 0    # throttle file operations, 0 = unlimited
+  backups: 5            # versions kept before overwrite/delete, 0 = off
+  watcher: auto         # auto (native events + safety poll) | native | poll
+  auto_commit:
+    enabled: false
+    interval: 10m
+    message: "sync: {count} file(s) from {source} at {datetime}"
+    push: false
+
+pairs:
+  - name: web-app
+    source: ~/scratch/web-app
+    target: ~/code/web-app
+    branch: feature/sync      # optional: switch/create this branch in the target first
+
+  - name: notes
+    source: ./notes-draft
+    target: ./notes-repo
+    mode: two-way
+    on_delete: propagate
