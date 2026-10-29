@@ -7,8 +7,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +25,7 @@ import (
 	"github.com/anupam42/Ferry/internal/gitx"
 	"github.com/anupam42/Ferry/internal/ignore"
 	"github.com/anupam42/Ferry/internal/notify"
+	"github.com/anupam42/Ferry/internal/remote"
 )
 
 type side int
@@ -55,6 +60,8 @@ const (
 	opDropBase               // forget rel
 	opConflict               // hold rel for the user
 	opOrphan                 // deleted on one side, keep the copy on `side` (on_delete: keep)
+	opMerge                  // write merged content (data) to both sides
+	opChmod                  // copy permissions only (content already equal)
 )
 
 type op struct {
@@ -63,7 +70,9 @@ type op struct {
 	to      string
 	side    side // side being written
 	isNew   bool
-	restore bool // copy back to the side where the file was deleted
+	restore bool   // copy back to the side where the file was deleted
+	data    []byte // opMerge: merged content
+	markers int    // opMerge: conflict blocks left in data
 }
 
 // base is the last-synced state of a file in two-way mode.
@@ -72,6 +81,10 @@ type base struct {
 	Size   int64  `json:"s"`
 	SrcMod int64  `json:"sm"`
 	DstMod int64  `json:"dm"`
+	// SrcHash/SrcSize are set when the source copy legitimately differs from
+	// the target copy (eol conversion); otherwise Hash/Size describe both.
+	SrcHash string `json:"sh,omitempty"`
+	SrcSize int64  `json:"ss,omitempty"`
 	// Orphan != 0 means the file was deleted on one side and deliberately kept
 	// on the other (1 = kept in source, 2 = kept in target). It is not copied
 	// back unless the kept copy is edited again.
@@ -80,20 +93,39 @@ type base struct {
 
 func (b base) survivor() side { return side(b.Orphan - 1) }
 
+func (b base) sizeOf(s side) int64 {
+	if s == src && b.SrcHash != "" {
+		return b.SrcSize
+	}
+	return b.Size
+}
+
+func (b base) hashOf(s side) string {
+	if s == src && b.SrcHash != "" {
+		return b.SrcHash
+	}
+	return b.Hash
+}
+
 // Engine syncs one pair. All state is owned by the Run goroutine; other
 // goroutines talk to it through Do().
 type Engine struct {
-	cfg     config.Pair
-	emitFn  func(Event)
-	dataDir string
-	id      string
-	twoWay  bool
-	matcher atomic.Pointer[ignore.Matcher] // rebuilt each scan so .gitignore edits apply live
+	cfg         config.Pair
+	emitFn      func(Event)
+	dataDir     string
+	id          string
+	twoWay      bool
+	gitTarget   string                          // where git runs: the target, or the ssh spec of a remote pair
+	matcher     atomic.Pointer[ignore.Matcher] // rebuilt each scan so .gitignore edits apply live
+	only        *ignore.Matcher                 // include filter (nil = everything)
+	secretAllow *ignore.Matcher
+	hashes      *hashCache
 
 	cmds chan func()
 	wake chan struct{}
 
 	// loop-owned state
+	running      bool
 	prevSrc      Snapshot
 	state        map[string]base
 	lastS        Snapshot
@@ -108,10 +140,17 @@ type Engine struct {
 	conflicts    map[string]bool
 	mirrorList   []string
 	skipped      map[string]FileStat // files skipped for size/binary, so we warn once per change
+	secretSeen   map[string]FileStat // files flagged as secrets, so we warn once per change
+	lfsTracked   map[string]bool
 	watcherKind  string
 	isGit        bool
 	retryTimer   *time.Timer
 	pendingBatch int
+	remoteAdd    map[string]bool
+	remoteDel    map[string]bool
+	remoteFull   bool
+	journalN     int
+	lastStatus   time.Time
 
 	// published snapshot
 	mu      sync.Mutex
@@ -122,25 +161,45 @@ type Engine struct {
 // New creates an engine. emit receives every event (must not block for long).
 func New(cfg config.Pair, emit func(Event)) *Engine {
 	e := &Engine{
-		cfg:       cfg,
-		emitFn:    emit,
-		dataDir:   config.DataDir(),
-		id:        cfg.ID(),
-		twoWay:    cfg.Mode == "two-way",
-		cmds:      make(chan func(), 32),
-		wake:      make(chan struct{}, 1),
-		state:     map[string]base{},
-		conflicts: map[string]bool{},
-		skipped:   map[string]FileStat{},
-		changed:   map[string]ChangedFile{},
+		cfg:        cfg,
+		emitFn:     emit,
+		dataDir:    config.DataDir(),
+		id:         cfg.ID(),
+		twoWay:     cfg.Mode == "two-way",
+		gitTarget:  cfg.Target,
+		hashes:     newHashCache(),
+		cmds:       make(chan func(), 32),
+		wake:       make(chan struct{}, 1),
+		state:      map[string]base{},
+		conflicts:  map[string]bool{},
+		skipped:    map[string]FileStat{},
+		secretSeen: map[string]FileStat{},
+		lfsTracked: map[string]bool{},
+		remoteAdd:  map[string]bool{},
+		remoteDel:  map[string]bool{},
+		changed:    map[string]ChangedFile{},
 	}
-	e.status = Status{Name: cfg.Name, Source: cfg.Source, Target: cfg.Target, Mode: cfg.Mode}
+	if cfg.Remote != "" {
+		e.gitTarget = cfg.Remote
+	}
+	if len(cfg.Only) > 0 {
+		e.only = ignore.New(cfg.Only...)
+	}
+	if len(cfg.SecretAllow) > 0 {
+		e.secretAllow = ignore.New(cfg.SecretAllow...)
+	}
+	e.status = Status{Name: cfg.Name, Source: cfg.Source, Target: cfg.Target, Remote: cfg.Remote, Mode: cfg.Mode}
 	e.matcher.Store(e.buildMatcher())
 	return e
 }
 
 func (e *Engine) Name() string        { return e.cfg.Name }
 func (e *Engine) Config() config.Pair { return e.cfg }
+
+// SourcePath and TargetPath turn a pair-relative path into a real path. For
+// remote pairs the target path is the local shadow copy.
+func (e *Engine) SourcePath(rel string) string { return e.abs(src, rel) }
+func (e *Engine) TargetPath(rel string) string { return e.abs(dst, rel) }
 
 func (e *Engine) emit(ev Event) {
 	ev.Time = time.Now()
@@ -181,6 +240,10 @@ func (e *Engine) buildMatcher() *ignore.Matcher {
 		m.AddFile(filepath.Join(e.cfg.Target, ".gitignore"), "")
 	}
 	return m
+}
+
+func (e *Engine) scan(root string, m *ignore.Matcher) (Snapshot, error) {
+	return scanDir(root, m, e.cfg.UseGitignore, e.only, e.cfg.Symlinks)
 }
 
 func (e *Engine) root(s side) string {
@@ -237,10 +300,15 @@ func (e *Engine) SetPaused(p bool) {
 
 func (e *Engine) TogglePause() { e.Do(func() { go e.SetPaused(!e.userPaused) }) }
 
-// Resync forces a full comparison (content-hash) of both folders.
+// Resync forces a full comparison (content-hash) of both folders. Remote
+// pairs also re-send every file.
 func (e *Engine) Resync() {
 	e.Do(func() {
 		e.prevSrc = nil
+		e.hashes.clear()
+		if e.cfg.Remote != "" {
+			e.remoteFull = true
+		}
 		e.emit(Event{Kind: KInfo, Msg: "full resync"})
 		e.cycle(true, true)
 	})
@@ -270,7 +338,21 @@ func (e *Engine) Resolve(rel string, c Choice) {
 
 // Commit stages and commits everything under the target.
 func (e *Engine) Commit(msg string, push bool) {
-	e.Do(func() { e.commit(msg, push, false) })
+	e.Do(func() { e.doCommit(msg, push, false, false) })
+}
+
+// CommitStaged commits only what is already staged in the target.
+func (e *Engine) CommitStaged(msg string, push bool) {
+	e.Do(func() { e.doCommit(msg, push, false, true) })
+}
+
+// ToggleStage stages rel in the target repo, or unstages it if it is staged.
+// It returns whether the file is staged afterwards.
+func (e *Engine) ToggleStage(rel string) (bool, error) {
+	if gitx.IsStaged(e.gitTarget, rel) {
+		return false, gitx.Unstage(e.gitTarget, rel)
+	}
+	return true, gitx.Stage(e.gitTarget, rel)
 }
 
 // ---------- run loop ----------
@@ -280,11 +362,17 @@ func (e *Engine) Run(ctx context.Context, once bool) error {
 	if err := os.MkdirAll(e.cfg.Target, 0o755); err != nil {
 		return err
 	}
-	e.isGit = gitx.IsRepo(e.cfg.Target)
+	e.running = true
+	defer func() {
+		e.running = false
+		e.writeStatus(false)
+	}()
+	e.hashes.load(e.hashPath())
+	e.isGit = gitx.IsRepo(e.gitTarget)
 	if e.cfg.Branch != "" {
 		if !e.isGit {
 			e.warn("branch " + e.cfg.Branch + " requested but target is not a git repo")
-		} else if created, err := gitx.EnsureBranch(e.cfg.Target, e.cfg.Branch); err != nil {
+		} else if created, err := gitx.EnsureBranch(e.gitTarget, e.cfg.Branch); err != nil {
 			e.branchErr = "can't switch to branch " + e.cfg.Branch + ": " + firstLine(err.Error())
 			e.errorf("", fmt.Errorf("%s", e.branchErr))
 		} else if created {
@@ -305,6 +393,7 @@ func (e *Engine) Run(ctx context.Context, once bool) error {
 		}
 		e.processRequests()
 	}
+	e.pruneBackups()
 	e.checkGuard()
 	if len(e.mirrorList) > 0 {
 		e.applyMirror()
@@ -316,25 +405,35 @@ func (e *Engine) Run(ctx context.Context, once bool) error {
 		return nil
 	}
 
-	roots := []string{e.cfg.Source}
-	if e.twoWay {
-		roots = append(roots, e.cfg.Target)
-	}
-	w := newWatcher(e.cfg.Watcher, roots, e.cfg.Interval.D(), func(root, rel string, isDir bool) bool {
-		return e.matcher.Load().Match(rel, isDir)
-	}, e.warn)
-	defer w.Close()
-	e.watcherKind = w.kind
-	e.publish()
-
-	settle := e.cfg.Settle.D()
-	if settle <= 0 {
-		settle = 300 * time.Millisecond
-	}
+	settle := e.settle()
 	debounce := time.NewTimer(time.Hour)
 	debounce.Stop()
 	guard := time.NewTicker(2 * time.Second)
 	defer guard.Stop()
+
+	// either a file watcher, or a plain timer with every:
+	var wakeC <-chan struct{}
+	var everyC <-chan time.Time
+	pollMode := false
+	if d := e.cfg.Every.D(); d > 0 {
+		t := time.NewTicker(d)
+		defer t.Stop()
+		everyC = t.C
+		e.watcherKind = "every " + d.String()
+	} else {
+		roots := []string{e.cfg.Source}
+		if e.twoWay {
+			roots = append(roots, e.cfg.Target)
+		}
+		w := newWatcher(e.cfg.Watcher, roots, e.cfg.Interval.D(), func(root, rel string, isDir bool) bool {
+			return e.matcher.Load().Match(rel, isDir)
+		}, e.warn)
+		defer w.Close()
+		wakeC = w.c
+		pollMode = w.kind == "poll"
+		e.watcherKind = w.kind
+	}
+	e.publish()
 
 	var upstream <-chan time.Time
 	if e.cfg.CheckUpstream > 0 && e.isGit {
@@ -349,18 +448,26 @@ func (e *Engine) Run(ctx context.Context, once bool) error {
 		defer t.Stop()
 		autoCommit = t.C
 	}
+	var prune <-chan time.Time
+	if e.cfg.BackupMaxAge > 0 || e.cfg.BackupMaxSize > 0 {
+		t := time.NewTicker(time.Hour)
+		defer t.Stop()
+		prune = t.C
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			e.saveState()
 			return nil
-		case <-w.c:
-			if w.kind == "poll" {
+		case <-wakeC:
+			if pollMode {
 				e.cycle(false, false) // polling already spaces scans out
 			} else {
 				debounce.Reset(settle)
 			}
+		case <-everyC:
+			e.cycle(false, true)
 		case <-e.wake:
 			e.cycle(false, false)
 		case <-debounce.C:
@@ -373,10 +480,13 @@ func (e *Engine) Run(ctx context.Context, once bool) error {
 			}
 			e.checkGuard()
 			e.refreshGit(false)
+			e.publish()
 		case <-upstream:
 			e.checkUpstream()
 		case <-autoCommit:
-			e.commit(e.cfg.AutoCommit.Message, e.cfg.AutoCommit.Push, true)
+			e.doCommit(e.cfg.AutoCommit.Message, e.cfg.AutoCommit.Push, true, false)
+		case <-prune:
+			e.pruneBackups()
 		}
 	}
 }
@@ -403,14 +513,14 @@ func (e *Engine) cycle(initial, force bool) {
 	}
 	m := e.buildMatcher()
 	e.matcher.Store(m)
-	S, err := scanDir(e.cfg.Source, m, e.cfg.UseGitignore)
+	S, err := e.scan(e.cfg.Source, m)
 	if err != nil {
 		e.errorf("", fmt.Errorf("scan source: %w", err))
 		return
 	}
 	var T Snapshot
 	if e.twoWay {
-		if T, err = scanDir(e.cfg.Target, m, e.cfg.UseGitignore); err != nil {
+		if T, err = e.scan(e.cfg.Target, m); err != nil {
 			e.errorf("", fmt.Errorf("scan target: %w", err))
 			return
 		}
@@ -481,6 +591,11 @@ func (e *Engine) cycle(initial, force bool) {
 		e.needsApply = true
 		e.scheduleWake(5 * time.Second)
 	}
+	if err := e.pushRemote(); err != nil {
+		e.errorf("", err)
+		e.needsApply = true
+		e.scheduleWake(15 * time.Second)
+	}
 	e.saveState()
 	if countWrites(ops) > 0 {
 		e.refreshGit(true)
@@ -502,7 +617,8 @@ func (e *Engine) paused() bool {
 func countWrites(ops []op) int {
 	n := 0
 	for _, o := range ops {
-		if o.kind == opCopy || o.kind == opDelete || o.kind == opRename || o.kind == opDup {
+		switch o.kind {
+		case opCopy, opDelete, opRename, opDup, opMerge:
 			n++
 		}
 	}
@@ -517,12 +633,18 @@ func (e *Engine) planOneWay(S Snapshot) []op {
 	for _, rel := range keys {
 		s := S[rel]
 		if p, ok := e.prevSrc[rel]; ok && p.Size == s.Size && p.Mod == s.Mod {
+			if p.Mode != s.Mode && s.Mode&fs.ModeSymlink == 0 {
+				ops = append(ops, op{kind: opChmod, rel: rel, side: dst})
+			}
 			continue
 		}
 		d := e.abs(dst, rel)
-		_, err := os.Stat(d)
+		di, err := os.Lstat(d)
 		exists := err == nil
-		if exists && sameContent(e.abs(src, rel), d) {
+		if exists && e.same(e.abs(src, rel), d) {
+			if s.Mode&fs.ModeSymlink == 0 && di.Mode()&fs.ModeSymlink == 0 && di.Mode().Perm() != s.Mode.Perm() {
+				ops = append(ops, op{kind: opChmod, rel: rel, side: dst})
+			}
 			continue
 		}
 		ops = append(ops, op{kind: opCopy, rel: rel, side: dst, isNew: !exists})
@@ -532,7 +654,7 @@ func (e *Engine) planOneWay(S Snapshot) []op {
 			if _, ok := S[rel]; ok {
 				continue
 			}
-			if _, err := os.Stat(e.abs(dst, rel)); err == nil {
+			if _, err := os.Lstat(e.abs(dst, rel)); err == nil {
 				ops = append(ops, op{kind: opDelete, rel: rel, side: dst})
 			}
 		}
@@ -552,18 +674,19 @@ func (e *Engine) changedSince(s side, st FileStat, ok bool, b base, bok bool, re
 	if s == dst {
 		mod = b.DstMod
 	}
-	if st.Size == b.Size && st.Mod == mod {
+	size := b.sizeOf(s)
+	if st.Size == size && st.Mod == mod {
 		return false
 	}
-	if st.Size != b.Size {
+	if st.Size != size {
 		return true
 	}
 	// same size, new mtime: compare content (touch, checkout, editor re-save)
-	h, err := hashFile(e.abs(s, rel))
+	h, err := e.hash(e.abs(s, rel))
 	if err != nil {
 		return true
 	}
-	if h == b.Hash {
+	if h == b.hashOf(s) {
 		if s == src {
 			b.SrcMod = st.Mod
 		} else {
@@ -593,7 +716,7 @@ func (e *Engine) planTwoWay(S, T Snapshot) []op {
 		b, bok := e.state[rel]
 
 		if e.conflicts[rel] {
-			if sok && tok && sameContent(e.abs(src, rel), e.abs(dst, rel)) {
+			if sok && tok && e.same(e.abs(src, rel), e.abs(dst, rel)) {
 				delete(e.conflicts, rel)
 				ops = append(ops, op{kind: opBase, rel: rel})
 				e.emit(Event{Kind: KResolved, Path: rel, Msg: "both sides now match"})
@@ -627,9 +750,15 @@ func (e *Engine) planTwoWay(S, T Snapshot) []op {
 			switch {
 			case !sok && !tok:
 				ops = append(ops, op{kind: opDropBase, rel: rel})
-			case sok && tok && sameContent(e.abs(src, rel), e.abs(dst, rel)):
+			case sok && tok && e.same(e.abs(src, rel), e.abs(dst, rel)):
 				ops = append(ops, op{kind: opBase, rel: rel})
 			default:
+				if e.cfg.Merge && sok && tok {
+					if o, ok := e.mergeOp(rel, true); ok {
+						ops = append(ops, o)
+						continue
+					}
+				}
 				ops = append(ops, e.conflictOps(rel)...)
 			}
 		}
@@ -674,11 +803,11 @@ func (e *Engine) orphanOps(rel string, b base, s FileStat, sok bool, t FileStat,
 	case !survOK:
 		return []op{{kind: opDropBase, rel: rel}}, true
 	}
-	if survSt.Size == b.Size && survSt.Mod == mod {
+	if survSt.Size == b.sizeOf(surv) && survSt.Mod == mod {
 		return nil, true
 	}
-	if survSt.Size == b.Size {
-		if h, err := hashFile(e.abs(surv, rel)); err == nil && h == b.Hash {
+	if survSt.Size == b.sizeOf(surv) {
+		if h, err := e.hash(e.abs(surv, rel)); err == nil && h == b.hashOf(surv) {
 			if surv == src {
 				b.SrcMod = survSt.Mod
 			} else {
@@ -730,7 +859,7 @@ func (e *Engine) resolveOps(rel string, c Choice) []op {
 		if c == UseTarget {
 			return winner(dst)
 		}
-		// newer / keep-both: a surviving edit beats a deletion
+		// newer / keep-both / merge: a surviving edit beats a deletion
 		if sok {
 			return winner(src)
 		}
@@ -746,6 +875,12 @@ func (e *Engine) resolveOps(rel string, c Choice) []op {
 			return winner(src)
 		}
 		return winner(dst)
+	case Merge:
+		if o, ok := e.mergeOp(rel, false); ok {
+			return []op{o}
+		}
+		e.warn(rel + ": can't merge (no saved common version, or not a text file); keeping both instead")
+		fallthrough
 	default: // keep-both: target version keeps the name, source version saved alongside
 		cp := conflictName(rel, "source")
 		return []op{
@@ -808,7 +943,7 @@ func (e *Engine) detectRenames(ops []op) []op {
 			if drop[c.idx] {
 				continue
 			}
-			if sameContent(e.abs(o.side.other(), o.rel), e.abs(c.side, ops[c.idx].rel)) {
+			if e.same(e.abs(o.side.other(), o.rel), e.abs(c.side, ops[c.idx].rel)) {
 				ops[i] = op{kind: opRename, rel: ops[c.idx].rel, to: o.rel, side: o.side}
 				drop[c.idx] = true
 				break
@@ -836,9 +971,20 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 	}
 	var added, updated, deleted, renamed, skipped, errs int
 	bdir := BackupDir(e.dataDir, e.id)
+	var journal []JournalEntry
+	note := func(kind string, s side, rel, to, backup string) {
+		journal = append(journal, JournalEntry{Op: kind, Side: s.String(), Path: rel, To: to, Backup: backup})
+	}
+	count := func(isNew bool) {
+		if isNew {
+			added++
+		} else {
+			updated++
+		}
+	}
 
 	for _, o := range ops {
-		if tick != nil && (o.kind == opCopy || o.kind == opDelete || o.kind == opRename || o.kind == opDup) {
+		if tick != nil && countWrites([]op{o}) > 0 {
 			<-tick
 		}
 		switch o.kind {
@@ -846,6 +992,7 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 			e.recordBase(o.rel)
 		case opDropBase:
 			delete(e.state, o.rel)
+			e.dropBaseCopy(o.rel)
 		case opOrphan:
 			if e.cfg.DryRun {
 				e.emit(Event{Kind: KKept, Path: o.rel, Msg: "deleted in " + o.side.other().String() + "; kept in " + o.side.String()})
@@ -853,7 +1000,7 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 			}
 			p := e.abs(o.side, o.rel)
 			fi, err := os.Stat(p)
-			h, herr := hashFile(p)
+			h, herr := e.hash(p)
 			if err != nil || herr != nil {
 				delete(e.state, o.rel)
 				continue
@@ -872,22 +1019,69 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 				e.conflicts[o.rel] = true
 				msg := "changed on both sides; choose a version"
 				if e.cfg.Conflict == "hold" {
-					msg = "changed on both sides; both files left as they are. Resolve with: ferry resolve " + o.rel + " --keep source|target|newer|both"
+					msg = "changed on both sides; both files left as they are. Resolve with: ferry resolve " + o.rel + " --keep source|target|newer|both|merge"
 				}
 				e.emit(Event{Kind: KConflict, Path: o.rel, Msg: msg, Held: true})
 				e.track(o.rel, KConflict, "")
 				notify.Send(e.cfg.Name+"/conflict", "ferry: conflict in "+e.cfg.Name, o.rel+" changed on both sides")
 			}
+		case opChmod:
+			if e.cfg.DryRun {
+				continue
+			}
+			fi, err := os.Stat(e.abs(src, o.rel))
+			if err != nil {
+				continue
+			}
+			if err := os.Chmod(e.abs(dst, o.rel), fi.Mode().Perm()); err == nil {
+				e.emit(Event{Kind: KInfo, Path: o.rel, Msg: "permissions updated (" + fi.Mode().Perm().String() + ")"})
+				e.remoteQueue(o.rel, false)
+			}
 		case opCopy:
 			from := o.side.other()
 			fp := e.abs(from, o.rel)
+			tp := e.abs(o.side, o.rel)
+			kind := KUpdate
+			if o.isNew {
+				kind = KAdd
+			}
+			if e.cfg.Symlinks == "link" && isSymlink(fp) {
+				if e.cfg.DryRun {
+					e.emit(Event{Kind: kind, Path: o.rel, Dir: o.side.arrow(), Msg: "symlink"})
+					count(o.isNew)
+					continue
+				}
+				var bk string
+				if !o.isNew {
+					bk, _ = backupFile(bdir, o.side.String(), o.rel, tp, e.cfg.Backups)
+				}
+				if err := copyLink(fp, tp); err != nil {
+					failed[o.rel] = true
+					errs++
+					e.errorf(o.rel, err)
+					continue
+				}
+				note(string(kind), o.side, o.rel, "", bk)
+				e.recordBase(o.rel)
+				e.emit(Event{Kind: kind, Path: o.rel, Dir: o.side.arrow(), Msg: "symlink"})
+				e.track(o.rel, kind, o.side.arrow())
+				e.remoteQueue(o.rel, false)
+				count(o.isNew)
+				continue
+			}
 			fi, err := os.Stat(fp)
 			if err != nil {
 				failed[o.rel] = true
 				continue
 			}
 			stat := FileStat{fi.Size(), fi.ModTime().UnixNano(), fi.Mode()}
-			if e.cfg.MaxSize > 0 && fi.Size() > int64(e.cfg.MaxSize) {
+			binary := isBinaryFile(fp)
+			tooBig := e.cfg.MaxSize > 0 && fi.Size() > int64(e.cfg.MaxSize)
+			viaLFS := false
+			if e.cfg.LFS && o.side == dst && e.isGit && (tooBig || (binary && e.cfg.Binary != "allow")) {
+				viaLFS = e.ensureLFS(o.rel)
+			}
+			if tooBig && !viaLFS {
 				if e.skipped[o.rel] != stat {
 					e.emit(Event{Kind: KSkip, Path: o.rel, Msg: fmt.Sprintf("too large (%s > %s)", config.HumanSize(fi.Size()), config.HumanSize(int64(e.cfg.MaxSize)))})
 					e.skipped[o.rel] = stat
@@ -895,7 +1089,7 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 				skipped++
 				continue
 			}
-			if e.cfg.Binary != "allow" && isBinaryFile(fp) {
+			if binary && e.cfg.Binary != "allow" && !viaLFS {
 				if e.cfg.Binary == "skip" {
 					if e.skipped[o.rel] != stat {
 						e.emit(Event{Kind: KSkip, Path: o.rel, Msg: "binary file"})
@@ -908,38 +1102,52 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 					e.emit(Event{Kind: KWarn, Path: o.rel, Msg: fmt.Sprintf("binary file (%s) — are you sure it belongs in git?", config.HumanSize(fi.Size()))})
 				}
 			}
-			delete(e.skipped, o.rel)
-			kind := KUpdate
-			if o.isNew {
-				kind = KAdd
+			if o.side == dst && e.cfg.Secrets != "off" && !binary {
+				if hits := e.checkSecrets(o.rel, fp); len(hits) > 0 {
+					msg := "possible secret: " + strings.Join(hits, ", ")
+					if e.cfg.Secrets == "block" {
+						if e.secretSeen[o.rel] != stat {
+							e.emit(Event{Kind: KSkip, Path: o.rel, Msg: msg + " — not copied (secrets: block; allow it with secret_allow)"})
+							notify.Send(e.cfg.Name+"/secret", "ferry: blocked a possible secret", o.rel)
+							e.secretSeen[o.rel] = stat
+						}
+						skipped++
+						continue
+					}
+					if e.secretSeen[o.rel] != stat {
+						e.emit(Event{Kind: KWarn, Path: o.rel, Msg: msg + " — check before committing"})
+						notify.Send(e.cfg.Name+"/secret", "ferry: possible secret in "+e.cfg.Name, o.rel)
+						e.secretSeen[o.rel] = stat
+					}
+				}
 			}
+			delete(e.skipped, o.rel)
 			if e.cfg.DryRun {
 				e.emit(Event{Kind: kind, Path: o.rel, Dir: o.side.arrow()})
-				if o.isNew {
-					added++
-				} else {
-					updated++
-				}
+				count(o.isNew)
 				continue
 			}
-			tp := e.abs(o.side, o.rel)
+			var bk string
 			if !o.isNew {
-				_ = backupFile(bdir, o.side.String(), o.rel, tp, e.cfg.Backups)
+				bk, _ = backupFile(bdir, o.side.String(), o.rel, tp, e.cfg.Backups)
 			}
-			if _, err := copyFile(fp, tp); err != nil {
+			if o.side == dst && e.cfg.EOL != "keep" && !binary {
+				err = copyFileEOL(fp, tp, e.cfg.EOL)
+			} else {
+				_, err = copyFile(fp, tp)
+			}
+			if err != nil {
 				failed[o.rel] = true
 				errs++
 				e.errorf(o.rel, err)
 				continue
 			}
+			note(string(kind), o.side, o.rel, "", bk)
 			e.recordBase(o.rel)
 			e.emit(Event{Kind: kind, Path: o.rel, Dir: o.side.arrow()})
 			e.track(o.rel, kind, o.side.arrow())
-			if o.isNew {
-				added++
-			} else {
-				updated++
-			}
+			e.remoteQueue(o.rel, false)
+			count(o.isNew)
 		case opDelete:
 			if e.cfg.DryRun {
 				e.emit(Event{Kind: KDelete, Path: o.rel, Dir: o.side.arrow()})
@@ -947,8 +1155,16 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 				continue
 			}
 			p := e.abs(o.side, o.rel)
-			_ = backupFile(bdir, o.side.String(), o.rel, p, e.cfg.Backups)
-			if err := removeWithRetry(p); err != nil {
+			bk, _ := backupFile(bdir, o.side.String(), o.rel, p, e.cfg.Backups)
+			var err error
+			if e.cfg.Trash {
+				if err = moveToTrash(p); err != nil {
+					err = removeWithRetry(p)
+				}
+			} else {
+				err = removeWithRetry(p)
+			}
+			if err != nil {
 				failed[o.rel] = true
 				errs++
 				e.errorf(o.rel, err)
@@ -956,8 +1172,11 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 			}
 			removeEmptyParents(e.root(o.side), p)
 			delete(e.state, o.rel)
+			e.dropBaseCopy(o.rel)
+			note("delete", o.side, o.rel, "", bk)
 			e.emit(Event{Kind: KDelete, Path: o.rel, Dir: o.side.arrow()})
 			e.track(o.rel, KDelete, o.side.arrow())
+			e.remoteQueue(o.rel, true)
 			deleted++
 		case opRename:
 			if e.cfg.DryRun {
@@ -977,10 +1196,14 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 			}
 			removeEmptyParents(e.root(o.side), from)
 			delete(e.state, o.rel)
+			e.dropBaseCopy(o.rel)
 			e.recordBase(o.to)
+			note("rename", o.side, o.rel, o.to, "")
 			e.emit(Event{Kind: KRename, Path: o.rel, To: o.to, Dir: o.side.arrow()})
 			e.untrack(o.rel)
 			e.track(o.to, KRename, o.side.arrow())
+			e.remoteQueue(o.rel, true)
+			e.remoteQueue(o.to, false)
 			renamed++
 		case opDup:
 			if e.cfg.DryRun {
@@ -992,8 +1215,47 @@ func (e *Engine) apply(ops []op) (failed map[string]bool) {
 				e.errorf(o.to, err)
 				continue
 			}
+			note("add", o.side, o.to, "", "")
 			e.emit(Event{Kind: KInfo, Path: o.to, Msg: "kept " + o.side.String() + " version of " + o.rel})
+		case opMerge:
+			if e.cfg.DryRun {
+				e.emit(Event{Kind: KUpdate, Path: o.rel, Dir: "⇄", Msg: "three-way merge"})
+				updated++
+				continue
+			}
+			ok := true
+			for _, s := range []side{src, dst} {
+				p := e.abs(s, o.rel)
+				var perm fs.FileMode
+				if fi, err := os.Stat(p); err == nil {
+					perm = fi.Mode().Perm()
+				}
+				bk, _ := backupFile(bdir, s.String(), o.rel, p, e.cfg.Backups)
+				if err := writeFileAtomic(p, o.data, perm, time.Time{}); err != nil {
+					failed[o.rel] = true
+					errs++
+					e.errorf(o.rel, err)
+					ok = false
+					break
+				}
+				note("update", s, o.rel, "", bk)
+			}
+			if !ok {
+				continue
+			}
+			delete(e.conflicts, o.rel)
+			e.recordBase(o.rel)
+			if o.markers > 0 {
+				e.emit(Event{Kind: KWarn, Path: o.rel, Dir: "⇄", Msg: fmt.Sprintf("merged with %d conflict block(s); fix the <<<<<<< markers on either side", o.markers)})
+			} else {
+				e.emit(Event{Kind: KResolved, Path: o.rel, Dir: "⇄", Msg: "merged edits from both sides"})
+			}
+			e.track(o.rel, KUpdate, "⇄")
+			updated++
 		}
+	}
+	if len(journal) > 0 && !e.cfg.DryRun {
+		e.appendJournal(journal)
 	}
 	if added+updated+deleted+renamed+skipped+errs > 0 {
 		e.mu.Lock()
@@ -1018,17 +1280,52 @@ func (e *Engine) recordBase(rel string) {
 	if !e.twoWay || e.cfg.DryRun {
 		return
 	}
-	si, err1 := os.Stat(e.abs(src, rel))
-	ti, err2 := os.Stat(e.abs(dst, rel))
+	sp, tp := e.abs(src, rel), e.abs(dst, rel)
+	si, err1 := os.Stat(sp)
+	ti, err2 := os.Stat(tp)
 	if err1 != nil || err2 != nil {
 		delete(e.state, rel)
+		e.dropBaseCopy(rel)
 		return
 	}
-	h, err := hashFile(e.abs(dst, rel))
+	h, err := e.hash(tp)
 	if err != nil {
 		return
 	}
-	e.state[rel] = base{Hash: h, Size: ti.Size(), SrcMod: si.ModTime().UnixNano(), DstMod: ti.ModTime().UnixNano()}
+	b := base{Hash: h, Size: ti.Size(), SrcMod: si.ModTime().UnixNano(), DstMod: ti.ModTime().UnixNano()}
+	if si.Size() != ti.Size() || e.cfg.EOL != "keep" {
+		if sh, err := e.hash(sp); err == nil && sh != h {
+			b.SrcHash, b.SrcSize = sh, si.Size()
+		}
+	}
+	e.state[rel] = b
+	if e.cfg.Merge {
+		e.saveBaseCopy(rel, tp, ti.Size())
+	}
+}
+
+// ensureLFS makes sure files like rel are tracked by git LFS in the target.
+func (e *Engine) ensureLFS(rel string) bool {
+	pattern := "*" + path.Ext(rel)
+	if path.Ext(rel) == "" {
+		pattern = "/" + rel
+	}
+	if ok, done := e.lfsTracked[pattern]; done {
+		return ok
+	}
+	if !gitx.LFSAvailable(e.gitTarget) {
+		e.warn("lfs: true, but git-lfs is not installed; large and binary files are handled as usual")
+		e.lfsTracked[pattern] = false
+		return false
+	}
+	if err := gitx.LFSTrack(e.gitTarget, pattern); err != nil {
+		e.warn("git lfs track " + pattern + ": " + firstLine(err.Error()))
+		e.lfsTracked[pattern] = false
+		return false
+	}
+	e.emit(Event{Kind: KInfo, Msg: "tracking " + pattern + " with git LFS"})
+	e.lfsTracked[pattern] = true
+	return true
 }
 
 func (e *Engine) track(rel string, k Kind, dir string) {
@@ -1051,11 +1348,11 @@ func (e *Engine) untrack(rel string) {
 // PlanMirror lists target files that don't exist in source (respecting ignores).
 func (e *Engine) PlanMirror() ([]string, error) {
 	m := e.buildMatcher()
-	S, err := scanDir(e.cfg.Source, m, e.cfg.UseGitignore)
+	S, err := e.scan(e.cfg.Source, m)
 	if err != nil {
 		return nil, err
 	}
-	T, err := scanDir(e.cfg.Target, m, e.cfg.UseGitignore)
+	T, err := e.scan(e.cfg.Target, m)
 	if err != nil {
 		return nil, err
 	}
@@ -1081,18 +1378,32 @@ func (e *Engine) applyMirror() {
 	e.mirrorList = nil
 }
 
+// ---------- backups ----------
+
+func (e *Engine) pruneBackups() {
+	if e.cfg.DryRun || (e.cfg.BackupMaxAge <= 0 && e.cfg.BackupMaxSize <= 0) {
+		return
+	}
+	n, freed, err := PruneBackups(e.dataDir, e.id, e.cfg.BackupMaxAge.D(), int64(e.cfg.BackupMaxSize))
+	if err == nil && n > 0 {
+		e.emit(Event{Kind: KInfo, Msg: fmt.Sprintf("pruned %d old backup(s), freed %s", n, config.HumanSize(freed))})
+	}
+}
+
 // ---------- git ----------
 
 func (e *Engine) checkGuard() {
-	if !e.isGit {
-		return
-	}
 	reason := e.branchErr
-	if reason == "" && e.cfg.GitGuard {
-		reason = gitx.InProgress(e.cfg.Target)
+	if reason == "" && e.isGit && e.cfg.GitGuard {
+		reason = gitx.InProgress(e.gitTarget)
 	}
-	if reason == "" && e.behind > 0 {
+	if reason == "" && e.isGit && e.behind > 0 {
 		reason = fmt.Sprintf("target is %d commit(s) behind upstream — pull first", e.behind)
+	}
+	windowed := false
+	if reason == "" && !e.cfg.InWindow(time.Now()) {
+		reason = "outside the sync window (" + e.cfg.WindowLabel() + ")"
+		windowed = true
 	}
 	if reason == e.guardReason {
 		return
@@ -1101,10 +1412,12 @@ func (e *Engine) checkGuard() {
 	e.guardReason = reason
 	if reason != "" {
 		e.emit(Event{Kind: KPaused, Msg: reason})
-		notify.Send(e.cfg.Name+"/guard", "ferry paused: "+e.cfg.Name, reason)
+		if !windowed {
+			notify.Send(e.cfg.Name+"/guard", "ferry paused: "+e.cfg.Name, reason)
+		}
 	} else if was != "" {
-		e.emit(Event{Kind: KResumed, Msg: "git is clear again; resuming"})
-		if e.needsApply {
+		e.emit(Event{Kind: KResumed, Msg: "clear again; resuming"})
+		if e.needsApply || strings.HasPrefix(was, "outside the sync window") {
 			e.cycle(false, true)
 		}
 	}
@@ -1112,11 +1425,19 @@ func (e *Engine) checkGuard() {
 }
 
 func (e *Engine) checkUpstream() {
-	if err := gitx.Fetch(e.cfg.Target); err != nil {
+	if err := gitx.Fetch(e.gitTarget); err != nil {
 		e.warn("fetch failed: " + firstLine(err.Error()))
 		return
 	}
-	e.behind = gitx.Behind(e.cfg.Target)
+	e.behind = gitx.Behind(e.gitTarget)
+	if e.behind > 0 && e.cfg.AutoPull && gitx.InProgress(e.gitTarget) == "" {
+		if err := gitx.PullRebase(e.gitTarget); err != nil {
+			e.warn("auto pull failed, pausing instead: " + firstLine(err.Error()))
+		} else {
+			e.emit(Event{Kind: KInfo, Msg: fmt.Sprintf("pulled %d commit(s) from upstream", e.behind)})
+			e.behind = 0
+		}
+	}
 	e.checkGuard()
 }
 
@@ -1124,11 +1445,11 @@ func (e *Engine) refreshGit(emit bool) {
 	if !e.isGit {
 		return
 	}
-	lines, err := gitx.Status(e.cfg.Target)
+	lines, err := gitx.Status(e.gitTarget)
 	if err != nil {
 		return
 	}
-	branch := gitx.CurrentBranch(e.cfg.Target)
+	branch := gitx.CurrentBranch(e.gitTarget)
 	e.mu.Lock()
 	e.status.GitStatus = lines
 	e.status.Branch = branch
@@ -1138,26 +1459,40 @@ func (e *Engine) refreshGit(emit bool) {
 	}
 }
 
-func (e *Engine) commit(tmpl string, push, auto bool) {
+func (e *Engine) doCommit(tmpl string, push, auto, stagedOnly bool) {
 	if !e.isGit {
 		e.warn("target is not a git repo; nothing to commit")
 		return
 	}
-	if r := gitx.InProgress(e.cfg.Target); r != "" {
+	if r := gitx.InProgress(e.gitTarget); r != "" {
 		if !auto {
 			e.warn("not committing: " + r)
 		}
 		return
 	}
-	lines, _ := gitx.Status(e.cfg.Target)
-	if len(lines) == 0 {
+	lines, _ := gitx.Status(e.gitTarget)
+	if len(lines) == 0 || (stagedOnly && gitx.StagedCount(lines) == 0) {
 		if !auto {
 			e.emit(Event{Kind: KInfo, Msg: "nothing to commit"})
 		}
 		return
 	}
+	if e.cfg.BeforeCommit != "" {
+		e.emit(Event{Kind: KInfo, Msg: "running before_commit: " + e.cfg.BeforeCommit})
+		if out, err := e.runHook(e.cfg.BeforeCommit); err != nil {
+			e.errorf("", fmt.Errorf("not committing: before_commit failed (%v): %s", err, lastLines(out, 3)))
+			return
+		}
+	}
 	msg := expandMessage(tmpl, e.cfg, lines)
-	hash, err := gitx.CommitAll(e.cfg.Target, msg)
+	opts := gitx.CommitOptions{Author: e.cfg.CommitAuthor, Sign: e.cfg.SignCommits}
+	var hash string
+	var err error
+	if stagedOnly {
+		hash, err = gitx.CommitStaged(e.gitTarget, msg, opts)
+	} else {
+		hash, err = gitx.CommitAll(e.gitTarget, msg, opts)
+	}
 	if err != nil {
 		e.errorf("", fmt.Errorf("commit failed: %s", firstLine(err.Error())))
 		return
@@ -1167,14 +1502,68 @@ func (e *Engine) commit(tmpl string, push, auto bool) {
 	}
 	e.emit(Event{Kind: KCommit, Msg: fmt.Sprintf("%s %s", hash, firstLine(msg))})
 	if push {
-		if err := gitx.Push(e.cfg.Target); err != nil {
-			e.errorf("", fmt.Errorf("push failed: %s", firstLine(err.Error())))
-		} else {
-			e.emit(Event{Kind: KCommit, Msg: "pushed " + gitx.CurrentBranch(e.cfg.Target)})
-		}
+		e.push()
 	}
 	e.refreshGit(true)
 	e.publish()
+}
+
+func (e *Engine) push() {
+	if e.cfg.PullRebase {
+		if err := gitx.PullRebase(e.gitTarget); err != nil {
+			e.errorf("", fmt.Errorf("pull --rebase failed, not pushing: %s", firstLine(err.Error())))
+			return
+		}
+	}
+	if err := gitx.Push(e.gitTarget); err != nil {
+		e.errorf("", fmt.Errorf("push failed: %s", firstLine(err.Error())))
+		return
+	}
+	e.emit(Event{Kind: KCommit, Msg: "pushed " + gitx.CurrentBranch(e.gitTarget)})
+	if e.cfg.PR {
+		url, created, err := gitx.EnsurePR(e.gitTarget, e.cfg.PRBase)
+		switch {
+		case err != nil:
+			e.warn("pull request: " + firstLine(err.Error()))
+		case created:
+			e.emit(Event{Kind: KCommit, Msg: "opened pull request " + url})
+		default:
+			e.emit(Event{Kind: KInfo, Msg: "pull request already open: " + url})
+		}
+	}
+}
+
+// runHook runs a shell command in the target folder (on the host for remote
+// pairs), with a 10 minute limit.
+func (e *Engine) runHook(command string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	var cmd *exec.Cmd
+	switch {
+	case e.cfg.Remote != "":
+		sp, err := remote.Parse(e.cfg.Remote)
+		if err != nil {
+			return "", err
+		}
+		cmd = sp.Command(ctx, "cd "+sp.Dir()+" && "+command)
+	case runtime.GOOS == "windows":
+		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
+		cmd.Dir = e.cfg.Target
+	default:
+		cmd = exec.CommandContext(ctx, "sh", "-c", command)
+		cmd.Dir = e.cfg.Target
+	}
+	hideWindow(cmd)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func lastLines(s string, n int) string {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, " | ")
 }
 
 func expandMessage(tmpl string, p config.Pair, lines []string) string {
@@ -1189,17 +1578,75 @@ func expandMessage(tmpl string, p config.Pair, lines []string) string {
 	if len(shown) > 5 {
 		shown = append(append([]string{}, shown[:5]...), fmt.Sprintf("+%d more", len(files)-5))
 	}
+	target := filepath.Base(p.Target)
+	if p.Remote != "" {
+		target = p.Remote
+	}
 	r := strings.NewReplacer(
 		"{count}", fmt.Sprint(len(files)),
 		"{files}", strings.Join(shown, ", "),
+		"{summary}", SummarizeStatus(lines),
 		"{source}", filepath.Base(p.Source),
-		"{target}", filepath.Base(p.Target),
+		"{target}", target,
 		"{pair}", p.Name,
 		"{date}", now.Format("2006-01-02"),
 		"{time}", now.Format("15:04"),
 		"{datetime}", now.Format("2006-01-02 15:04"),
 	)
 	return r.Replace(tmpl)
+}
+
+// SummarizeStatus turns git status lines into a short commit message such as
+// "update 3 files in src/api; add README.md".
+func SummarizeStatus(lines []string) string {
+	byVerb := map[string][]string{}
+	for _, l := range lines {
+		if len(l) < 4 {
+			continue
+		}
+		code, file := l[:2], l[3:]
+		verb := "update"
+		switch {
+		case code == "??" || strings.Contains(code, "A"):
+			verb = "add"
+		case strings.Contains(code, "D"):
+			verb = "delete"
+		case strings.Contains(code, "R"):
+			verb = "rename"
+			if i := strings.Index(file, " -> "); i >= 0 {
+				file = file[i+4:]
+			}
+		}
+		byVerb[verb] = append(byVerb[verb], strings.Trim(file, `"`))
+	}
+	var parts []string
+	for _, v := range []string{"add", "update", "delete", "rename"} {
+		files := byVerb[v]
+		switch len(files) {
+		case 0:
+		case 1:
+			parts = append(parts, v+" "+files[0])
+		default:
+			parts = append(parts, fmt.Sprintf("%s %d files%s", v, len(files), commonDir(files)))
+		}
+	}
+	if len(parts) == 0 {
+		return "no changes"
+	}
+	return strings.Join(parts, "; ")
+}
+
+func commonDir(files []string) string {
+	dir := path.Dir(files[0])
+	for _, f := range files[1:] {
+		for dir != "." && dir != "/" && !strings.HasPrefix(f, dir+"/") {
+			dir = path.Dir(dir)
+		}
+	}
+	if dir == "." || dir == "/" {
+		return ""
+	}
+	return " in " + dir
 }
 
 // ---------- diff ----------
@@ -1210,10 +1657,10 @@ func expandMessage(tmpl string, p config.Pair, lines []string) string {
 func (e *Engine) Diff(rel string, conflict bool) (string, []difftext.Line) {
 	read := func(p string) []byte { b, _ := os.ReadFile(p); return b }
 	tpath, spath := e.abs(dst, rel), e.abs(src, rel)
-	if conflict || !gitx.IsRepo(e.cfg.Target) {
+	if conflict || !gitx.IsRepo(e.gitTarget) {
 		return "target ↔ source: " + rel, difftext.Diff(read(tpath), read(spath), 3)
 	}
-	head, ok := gitx.ShowHead(e.cfg.Target, rel)
+	head, ok := gitx.ShowHead(e.gitTarget, rel)
 	title := "HEAD ↔ working copy: " + rel
 	if !ok {
 		title = "new file (not in HEAD): " + rel
@@ -1263,7 +1710,11 @@ func (e *Engine) loadState() {
 }
 
 func (e *Engine) saveState() {
-	if !e.twoWay || e.cfg.DryRun {
+	if e.cfg.DryRun {
+		return
+	}
+	e.hashes.save(e.hashPath())
+	if !e.twoWay {
 		return
 	}
 	p := e.statePath()
@@ -1434,6 +1885,7 @@ func (e *Engine) publish() {
 	e.status.Pending = e.needsApply
 	e.status.PendingBatch = e.pendingBatch
 	e.mu.Unlock()
+	e.maybeWriteStatus()
 }
 
 func sortedKeys[V any](m map[string]V) []string {

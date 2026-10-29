@@ -2,6 +2,11 @@
 # Run with:  ferry --config ferry.yaml   (or just "ferry" in this folder)
 
 notify: true            # desktop notifications on conflicts and errors
+# theme: auto           # dashboard colors: auto | dark | light | mono
+# serve: 127.0.0.1:7878 # local HTTP API for editors and scripts (see README)
+# webhooks:             # post conflicts, errors, pauses and commits to chat
+#   - url: https://hooks.slack.com/services/XXX
+#     events: [conflict, error, paused, commit]
 
 defaults:               # applies to every pair below; any key can be overridden per pair
   mode: one-way         # one-way (source -> target) | two-way
@@ -12,21 +17,40 @@ defaults:               # applies to every pair below; any key can be overridden
   headless_conflict: hold   # when nobody can be asked (service, --json, piped):
                             #   hold (leave both files, notify, resolve later with "ferry resolve")
                             #   | keep-both | source | target | newer
+  merge: false          # two-way: try a three-way merge of text files before calling it a conflict
   use_gitignore: true   # honor .gitignore files in source and target
   ignore: [dist, coverage, "*.log"]
+  # only: ["src/**", "docs/**"]   # sync just these paths (gitignore syntax)
   git_guard: true       # pause while the target repo is merging/rebasing
   check_upstream: 0     # e.g. 5m: fetch and pause while target is behind its upstream
+  auto_pull: false      # with check_upstream: pull --rebase instead of pausing
   max_size: 50MB        # skip bigger files
   binary: warn          # allow | warn | skip
+  lfs: false            # track large or binary files with git LFS instead of skipping them
+  secrets: warn         # files that look like credentials: warn | block | off
+  secret_allow: []      # globs never flagged as secrets, e.g. ["test/fixtures/**"]
+  eol: keep             # line endings of text files written to the target: keep | lf | crlf
+  symlinks: skip        # skip | follow (copy what they point to) | link (recreate the link)
   batch_limit: 200      # batches bigger than this wait for activity to settle
   batch_action: apply   # apply | confirm (ask in the dashboard first)
   max_ops_per_sec: 0    # throttle file operations, 0 = unlimited
   backups: 5            # versions kept before overwrite/delete, 0 = off
+  backup_max_age: 0     # e.g. 30d: prune older versions
+  backup_max_size: 0    # e.g. 1GB: prune the oldest versions past this total
+  trash: false          # also send deleted files to the OS trash / recycle bin
   watcher: auto         # auto (native events + safety poll) | native | poll
+  every: 0              # e.g. 15m: sync on a timer instead of watching
+  # window: "09:00-18:00"   # only sync during these hours
+  # days: [mon-fri]         # only sync on these days
+  before_commit: ""     # e.g. "npm run lint": must pass before ferry commits
+  pull_rebase: false    # pull --rebase before pushing
+  pr: false             # open a pull request after pushing (needs the gh CLI)
+  sign_commits: false   # git commit -S
+  commit_author: ""     # e.g. "Sync Bot <bot@example.com>"
   auto_commit:
     enabled: false
     interval: 10m
-    message: "sync: {count} file(s) from {source} at {datetime}"
+    message: "sync: {summary}"   # also {count} {files} {source} {target} {pair} {date} {time} {datetime}
     push: false
 
 pairs:
@@ -40,3 +64,12 @@ pairs:
     target: ./notes-repo
     mode: two-way
     on_delete: propagate
+
+  # - name: monorepo
+  #   source: ~/scratch
+  #   target: ~/code/monorepo
+  #   map: {app: packages/app, docs: docs}   # one pair per mapped subfolder
+
+  # - name: server
+  #   source: ./site
+  #   target: deploy@example.com:/srv/site   # ssh target (one-way)

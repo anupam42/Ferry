@@ -86,6 +86,26 @@ func newWatcher(mode string, roots []string, interval time.Duration,
 	return w
 }
 
+// ProbeWatcher checks whether native file events work for root (used by
+// "ferry doctor"). It returns the number of folders that would be watched.
+func ProbeWatcher(root string) (int, error) {
+	fsw, err := fsnotify.NewWatcher()
+	if err != nil {
+		return 0, err
+	}
+	defer fsw.Close()
+	dirs := 0
+	err = addTree(fsw, root, func(_, rel string, _ bool) bool {
+		base := rel[strings.LastIndexByte(rel, '/')+1:]
+		if base == ".git" || base == "node_modules" {
+			return true
+		}
+		dirs++
+		return false
+	})
+	return dirs + 1, err
+}
+
 func addTree(fsw *fsnotify.Watcher, root string, skip func(root, rel string, isDir bool) bool) error {
 	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {

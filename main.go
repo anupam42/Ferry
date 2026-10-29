@@ -21,6 +21,7 @@ import (
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 
+	"github.com/anupam42/Ferry/internal/api"
 	"github.com/anupam42/Ferry/internal/config"
 	"github.com/anupam42/Ferry/internal/difftext"
 	"github.com/anupam42/Ferry/internal/engine"
@@ -29,11 +30,12 @@ import (
 	"github.com/anupam42/Ferry/internal/service"
 	"github.com/anupam42/Ferry/internal/tui"
 	"github.com/anupam42/Ferry/internal/ui"
+	"github.com/anupam42/Ferry/internal/webhook"
 )
 
 // set by -ldflags at release time
 var (
-	version = "1.1.0"
+	version = "1.2.0"
 	commit  = "dev"
 	date    = ""
 )
@@ -45,6 +47,11 @@ func paint(code, s string) string {
 		return s
 	}
 	return "\033[" + code + "m" + s + "\033[0m"
+}
+
+var subcommands = []string{
+	"run", "init", "status", "commit", "diff", "plan", "conflicts", "resolve", "history", "undo",
+	"backups", "doctor", "service", "completion", "version", "help",
 }
 
 func main() {
@@ -61,12 +68,17 @@ func main() {
 	cmd := "run"
 	if len(args) > 0 {
 		switch args[0] {
-		case "run", "init", "commit", "diff", "backups", "service", "version", "help", "conflicts", "resolve":
-			cmd, args = args[0], args[1:]
 		case "-h", "--help":
 			cmd, args = "help", nil
 		case "-v", "--version":
 			cmd, args = "version", nil
+		default:
+			for _, c := range subcommands {
+				if args[0] == c {
+					cmd, args = args[0], args[1:]
+					break
+				}
+			}
 		}
 	}
 	var err error
@@ -75,18 +87,30 @@ func main() {
 		err = cmdRun(args)
 	case "init":
 		err = cmdInit(args)
+	case "status":
+		err = cmdStatus(args)
 	case "commit":
 		err = cmdCommit(args)
 	case "diff":
 		err = cmdDiff(args)
+	case "plan":
+		err = cmdPlan(args)
 	case "backups":
 		err = cmdBackups(args)
 	case "conflicts":
 		err = cmdConflicts(args)
 	case "resolve":
 		err = cmdResolve(args)
+	case "history":
+		err = cmdHistory(args)
+	case "undo":
+		err = cmdUndo(args)
+	case "doctor":
+		err = cmdDoctor(args)
 	case "service":
 		err = cmdService(args)
+	case "completion":
+		err = cmdCompletion(args)
 	case "version":
 		fmt.Printf("ferry %s (%s) %s\n", version, commit, date)
 	case "help":
@@ -110,26 +134,38 @@ func usage() {
 	fmt.Print(`ferry ` + version + ` — mirror a working folder into your git repo (and back)
 
 Usage:
-  ferry [run] [flags] <source> <target>      sync one pair and watch (dashboard in a terminal)
-  ferry [run] [flags] --config ferry.yaml  sync every pair in a config file
-  ferry                                       uses ./ferry.yaml if present
-  ferry init [file]                           write a sample config
-  ferry commit [-m msg] [--push] [dir]        commit everything in a target repo
-  ferry diff [--sides] <source> <target> <file>  diff target file vs HEAD (or vs source)
-  ferry conflicts [--diff]                    list conflicts waiting for a decision
-  ferry resolve <file>... --keep source|target|newer|both [--all] [--pair NAME]
+  ferry [run] [flags] <source> <target>        sync one pair and watch (dashboard in a terminal)
+  ferry [run] [flags] --config ferry.yaml      sync every pair in a config file
+  ferry                                        uses ./ferry.yaml if present
+  ferry init [file]                            write a sample config
+  ferry status [--json]                        what every pair is doing right now
+  ferry plan [--diff] [--format text|markdown|json] <source> <target> | --config file
+  ferry commit [-m msg] [--push] [--sign] [--author A] [dir]
+  ferry diff [--sides] <source> <target> <file>   diff target file vs HEAD (or vs source)
+  ferry conflicts [--diff]                     list conflicts waiting for a decision
+  ferry resolve <file>... --keep source|target|newer|both|merge [--all] [--pair NAME]
+  ferry history [--pair NAME] [-n 20]          recent sync batches
+  ferry undo [--pair NAME] [--batch ID] [--yes]   undo the last sync batch
   ferry backups list    <source> <target> [file]
   ferry backups restore <source> <target> <file> [--version N] [--to path]
+  ferry backups prune   [--older-than 30d] [--max-size 1GB] [<source> <target>]
+  ferry doctor [--config file | <source> <target>]   check git, watchers, service and config
   ferry service install|uninstall|start|stop|status|logs [--config file | <source> <target>]
+  ferry completion bash|zsh|fish|powershell
   ferry version
 
+Targets can be local folders or ssh: user@host:path or ssh://user@host:port/path
+
 Common flags (run "ferry run -h" for all):
-  --two-way          sync both directions with conflict detection
+  --two-way          sync both directions with conflict detection (--merge tries a 3-way merge)
   --on-delete keep|restore|propagate   what a deletion does to the other side (--delete = propagate)
-  --headless-conflict hold|keep-both|source|target|newer   when nobody can be asked
+  --only GLOB        sync only matching paths (repeatable)
   --mirror           make target match source on start
   --branch NAME      switch/create a branch in the target first
-  --auto-commit MSG  commit on a timer (--auto-commit-interval 10m, --push)
+  --auto-commit MSG  commit on a timer (--auto-commit-interval 10m, --push, --pr)
+  --secrets warn|block|off   flag files that look like credentials
+  --every 15m / --window 09:00-18:00 --days mon-fri   sync on a schedule
+  --serve 127.0.0.1:7878   local HTTP API     --webhook URL   chat notifications
   --once --dry-run   one pass / preview only        --ui tui|plain|json
 `)
 }
@@ -174,6 +210,14 @@ type runFlags struct {
 	autoInterval, checkUpstream, interval, settle   time.Duration
 	batchSettle                                     time.Duration
 	batchLimit, maxOps, backups                     int
+
+	// added in 1.2
+	only, secretAllow, webhooks                       multiFlag
+	eol, symlinks, secrets, window, days              string
+	beforeCommit, prBase, author, every               string
+	backupMaxAge, backupMaxSize                       string
+	serve, serveToken, theme                          string
+	merge, lfs, trash, pullRebase, autoPull, pr, sign bool
 }
 
 func newRunFlags() *runFlags {
@@ -190,27 +234,51 @@ func newRunFlags() *runFlags {
 	fs.BoolVar(&f.mirror, "mirror", false, "on start, delete target files that aren't in source (asks first)")
 	fs.BoolVar(&f.yes, "yes", false, "don't ask for confirmation (mirror)")
 	fs.StringVar(&f.conflict, "conflict", d.Conflict, "two-way conflicts: ask | hold | source | target | newer | keep-both")
+	fs.BoolVar(&f.merge, "merge", false, "two-way: try a three-way merge of text files before calling it a conflict")
 	fs.Var(&f.ignores, "ignore", "glob to ignore, gitignore syntax (repeatable)")
+	fs.Var(&f.only, "only", "sync only paths matching this glob, gitignore syntax (repeatable)")
 	fs.BoolVar(&f.noGitignore, "no-gitignore", false, "don't read .gitignore files")
 	fs.BoolVar(&f.noDefIgn, "no-default-ignores", false, "don't apply the built-in ignore list")
 	fs.StringVar(&f.branch, "branch", "", "switch to (or create) this branch in the target first")
-	fs.StringVar(&f.autoCommit, "auto-commit", "", "enable auto-commit with this message template ({count} {files} {source} {datetime})")
+	fs.StringVar(&f.autoCommit, "auto-commit", "", "enable auto-commit with this message template ({summary} {count} {files} {source} {datetime})")
 	fs.DurationVar(&f.autoInterval, "auto-commit-interval", d.AutoCommit.Interval.D(), "auto-commit interval")
 	fs.BoolVar(&f.push, "push", false, "push after auto-commit")
+	fs.BoolVar(&f.pullRebase, "pull-rebase", false, "pull --rebase before pushing")
+	fs.BoolVar(&f.pr, "pr", false, "open a pull request after pushing (needs the gh CLI)")
+	fs.StringVar(&f.prBase, "pr-base", "", "base branch for --pr")
+	fs.StringVar(&f.beforeCommit, "before-commit", "", "command that must pass before ferry commits (e.g. \"npm test\")")
+	fs.BoolVar(&f.sign, "sign", false, "sign commits (git commit -S)")
+	fs.StringVar(&f.author, "author", "", "author for commits made by ferry, \"Name <email>\"")
 	fs.DurationVar(&f.checkUpstream, "check-upstream", 0, "fetch every interval and pause while target is behind upstream (e.g. 5m)")
+	fs.BoolVar(&f.autoPull, "auto-pull", false, "with --check-upstream: pull --rebase instead of pausing")
 	fs.BoolVar(&f.noGuard, "no-guard", false, "don't pause while the target is mid merge/rebase")
 	fs.StringVar(&f.maxSize, "max-size", "50MB", "skip files larger than this (0 = no limit)")
 	fs.StringVar(&f.binary, "binary", d.Binary, "binary files: allow | warn | skip")
+	fs.BoolVar(&f.lfs, "lfs", false, "track large and binary files with git LFS instead of skipping them")
+	fs.StringVar(&f.secrets, "secrets", d.Secrets, "files that look like credentials: warn | block | off")
+	fs.Var(&f.secretAllow, "secret-allow", "glob never flagged as a secret (repeatable)")
+	fs.StringVar(&f.eol, "eol", d.EOL, "line endings of text files written to the target: keep | lf | crlf")
+	fs.StringVar(&f.symlinks, "symlinks", d.Symlinks, "skip | follow | link")
 	fs.IntVar(&f.batchLimit, "batch-limit", d.BatchLimit, "batches bigger than this wait for activity to settle")
 	fs.StringVar(&f.batchAction, "batch-action", d.BatchAction, "large batches: apply | confirm")
 	fs.DurationVar(&f.batchSettle, "batch-settle", d.BatchSettle.D(), "quiet time required before applying a large batch")
 	fs.IntVar(&f.maxOps, "max-ops", 0, "max file operations per second (0 = unlimited)")
 	fs.IntVar(&f.backups, "backups", d.Backups, "versions to keep before overwrite/delete (0 = off)")
+	fs.StringVar(&f.backupMaxAge, "backup-max-age", "", "prune backups older than this (e.g. 30d)")
+	fs.StringVar(&f.backupMaxSize, "backup-max-size", "", "prune the oldest backups past this total (e.g. 1GB)")
+	fs.BoolVar(&f.trash, "trash", false, "also send deleted files to the OS trash / recycle bin")
 	fs.StringVar(&f.watcher, "watcher", d.Watcher, "auto | native | poll")
 	fs.DurationVar(&f.interval, "interval", d.Interval.D(), "poll interval")
 	fs.DurationVar(&f.settle, "settle", d.Settle.D(), "quiet time before applying changes")
+	fs.StringVar(&f.every, "every", "", "sync on a timer instead of watching (e.g. 15m)")
+	fs.StringVar(&f.window, "window", "", "only sync between these times, e.g. 09:00-18:00")
+	fs.StringVar(&f.days, "days", "", "only sync on these days, e.g. mon-fri or sat,sun")
 	fs.StringVar(&f.uiMode, "ui", "auto", "auto | tui | plain | json")
 	fs.BoolVar(&f.jsonOut, "json", false, "shorthand for --ui json (NDJSON events on stdout)")
+	fs.StringVar(&f.theme, "theme", "", "dashboard colors: auto | dark | light | mono")
+	fs.StringVar(&f.serve, "serve", "", "serve the local HTTP API on this address (e.g. 127.0.0.1:7878)")
+	fs.StringVar(&f.serveToken, "serve-token", "", "bearer token required by the HTTP API")
+	fs.Var(&f.webhooks, "webhook", "post conflicts, errors, pauses and commits to this URL (repeatable)")
 	fs.BoolVar(&f.once, "once", false, "sync once and exit")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "show what would change without writing")
 	fs.BoolVar(&f.quiet, "quiet", false, "plain mode: only summaries, warnings and errors")
@@ -225,6 +293,11 @@ func newRunFlags() *runFlags {
 // apply copies explicitly-set flags onto p, so config file values win otherwise.
 func (f *runFlags) apply(p *config.Pair) error {
 	var err error
+	setErr := func(e error) {
+		if e != nil && err == nil {
+			err = e
+		}
+	}
 	f.fs.Visit(func(fl *flag.Flag) {
 		switch fl.Name {
 		case "mode":
@@ -248,8 +321,12 @@ func (f *runFlags) apply(p *config.Pair) error {
 			p.Mirror = f.mirror
 		case "conflict":
 			p.Conflict = f.conflict
+		case "merge":
+			p.Merge = f.merge
 		case "ignore":
 			p.Ignore = append(p.Ignore, f.ignores...)
+		case "only":
+			p.Only = append([]string{}, f.only...)
 		case "no-gitignore":
 			p.UseGitignore = !f.noGitignore
 		case "no-default-ignores":
@@ -263,17 +340,40 @@ func (f *runFlags) apply(p *config.Pair) error {
 			p.AutoCommit.Interval = config.Duration(f.autoInterval)
 		case "push":
 			p.AutoCommit.Push = f.push
+		case "pull-rebase":
+			p.PullRebase = f.pullRebase
+		case "pr":
+			p.PR = f.pr
+		case "pr-base":
+			p.PRBase = f.prBase
+		case "before-commit":
+			p.BeforeCommit = f.beforeCommit
+		case "sign":
+			p.SignCommits = f.sign
+		case "author":
+			p.CommitAuthor = f.author
 		case "check-upstream":
 			p.CheckUpstream = config.Duration(f.checkUpstream)
+		case "auto-pull":
+			p.AutoPull = f.autoPull
 		case "no-guard":
 			p.GitGuard = !f.noGuard
 		case "max-size":
-			var s config.Size
-			if s, err = config.ParseSize(f.maxSize); err == nil {
-				p.MaxSize = s
-			}
+			s, e := config.ParseSize(f.maxSize)
+			setErr(e)
+			p.MaxSize = s
 		case "binary":
 			p.Binary = f.binary
+		case "lfs":
+			p.LFS = f.lfs
+		case "secrets":
+			p.Secrets = f.secrets
+		case "secret-allow":
+			p.SecretAllow = append(p.SecretAllow, f.secretAllow...)
+		case "eol":
+			p.EOL = f.eol
+		case "symlinks":
+			p.Symlinks = f.symlinks
 		case "batch-limit":
 			p.BatchLimit = f.batchLimit
 		case "batch-action":
@@ -284,21 +384,59 @@ func (f *runFlags) apply(p *config.Pair) error {
 			p.MaxOpsPerSec = f.maxOps
 		case "backups":
 			p.Backups = f.backups
+		case "backup-max-age":
+			d, e := config.ParseDuration(f.backupMaxAge)
+			setErr(e)
+			p.BackupMaxAge = config.Duration(d)
+		case "backup-max-size":
+			s, e := config.ParseSize(f.backupMaxSize)
+			setErr(e)
+			p.BackupMaxSize = s
+		case "trash":
+			p.Trash = f.trash
 		case "watcher":
 			p.Watcher = f.watcher
 		case "interval":
 			p.Interval = config.Duration(f.interval)
 		case "settle":
 			p.Settle = config.Duration(f.settle)
+		case "every":
+			d, e := config.ParseDuration(f.every)
+			setErr(e)
+			p.Every = config.Duration(d)
+		case "window":
+			p.Window = f.window
+		case "days":
+			p.Days = strings.Split(f.days, ",")
 		}
 	})
 	p.DryRun = f.dryRun
 	return err
 }
 
-func loadPairs(f *runFlags, pos []string) ([]config.Pair, *bool, error) {
+// settings merges top-level flags over the config file's settings.
+func (f *runFlags) settings(s config.Settings) config.Settings {
+	if f.serve != "" {
+		s.Serve = f.serve
+	}
+	if f.serveToken != "" {
+		s.ServeToken = f.serveToken
+	}
+	if f.theme != "" {
+		s.Theme = f.theme
+	}
+	for _, u := range f.webhooks {
+		s.Webhooks = append(s.Webhooks, config.Webhook{URL: u})
+	}
+	if s.ServeToken == "" {
+		s.ServeToken = os.Getenv("FERRY_TOKEN")
+	}
+	return s
+}
+
+func loadPairs(f *runFlags, pos []string) ([]config.Pair, config.Settings, error) {
 	var pairs []config.Pair
-	var notifyCfg *bool
+	var settings config.Settings
 	cfgPath := f.configPath
 	if cfgPath == "" && len(pos) == 0 {
 		for _, c := range []string{"ferry.yaml", "ferry.yml", ".ferry.yaml"} {
@@ -309,16 +447,16 @@ func loadPairs(f *runFlags, pos []string) ([]config.Pair, *bool, error) {
 		}
 		if cfgPath == "" {
 			usage()
-			return nil, nil, exitErr(2)
+			return nil, settings, exitErr(2)
 		}
 	}
 	if cfgPath != "" {
 		if len(pos) > 0 {
-			return nil, nil, errors.New("use either --config or <source> <target>, not both")
+			return nil, settings, errors.New("use either --config or <source> <target>, not both")
 		}
 		var err error
-		if pairs, notifyCfg, err = config.Load(cfgPath); err != nil {
-			return nil, nil, err
+		if pairs, settings, err = config.LoadFile(cfgPath); err != nil {
+			return nil, settings, err
 		}
 		if f.pairName != "" {
 			var keep []config.Pair
@@ -328,13 +466,13 @@ func loadPairs(f *runFlags, pos []string) ([]config.Pair, *bool, error) {
 				}
 			}
 			if len(keep) == 0 {
-				return nil, nil, fmt.Errorf("no pair named %q in %s", f.pairName, cfgPath)
+				return nil, settings, fmt.Errorf("no pair named %q in %s", f.pairName, cfgPath)
 			}
 			pairs = keep
 		}
 	} else {
 		if len(pos) != 2 {
-			return nil, nil, errors.New("expected <source> <target>")
+			return nil, settings, errors.New("expected <source> <target>")
 		}
 		p := config.Defaults()
 		p.Source, p.Target = pos[0], pos[1]
@@ -342,13 +480,13 @@ func loadPairs(f *runFlags, pos []string) ([]config.Pair, *bool, error) {
 	}
 	for i := range pairs {
 		if err := f.apply(&pairs[i]); err != nil {
-			return nil, nil, err
+			return nil, settings, err
 		}
 		if err := pairs[i].Normalize(); err != nil {
-			return nil, nil, err
+			return nil, settings, err
 		}
 	}
-	return pairs, notifyCfg, config.CheckOverlaps(pairs)
+	return pairs, f.settings(settings), config.CheckOverlaps(pairs)
 }
 
 // ---------- run ----------
@@ -369,7 +507,7 @@ func cmdRun(args []string) error {
 	if f.noColor {
 		useColor = false
 	}
-	pairs, notifyCfg, err := loadPairs(f, pos)
+	pairs, settings, err := loadPairs(f, pos)
 	if err != nil {
 		return err
 	}
@@ -389,7 +527,7 @@ func cmdRun(args []string) error {
 		return errors.New("--ui tui needs an interactive terminal")
 	}
 
-	notify.Enabled = !f.noNotify && !f.once && (notifyCfg == nil || *notifyCfg)
+	notify.Enabled = !f.noNotify && !f.once && (settings.Notify == nil || *settings.Notify)
 
 	// "ask" needs someone to ask: the dashboard, or a prompt in an interactive
 	// terminal. Otherwise the pair's headless_conflict policy applies.
@@ -446,6 +584,18 @@ func cmdRun(args []string) error {
 		}
 	} else {
 		emit = printer.Handle
+	}
+
+	// webhooks and the HTTP API see every event too
+	hooks := webhook.New(settings.Webhooks)
+	var apiSrv *api.Server
+	if hooks != nil || (settings.Serve != "" && !f.once) {
+		base := emit
+		emit = func(ev engine.Event) {
+			base(ev)
+			hooks.Handle(ev)
+			apiSrv.Broadcast(ev)
+		}
 	}
 
 	// plain interactive terminal: ask about conflicts right here
@@ -552,13 +702,28 @@ func cmdRun(args []string) error {
 		return nil
 	}
 
+	if settings.Serve != "" {
+		apiSrv = api.New(engines, settings.ServeToken)
+		go func() {
+			if err := apiSrv.ListenAndServe(ctx, settings.Serve); err != nil {
+				emit(engine.Event{Time: time.Now(), Kind: engine.KError, Msg: "HTTP API: " + err.Error()})
+			}
+		}()
+	}
+
 	if uiMode == "plain" {
 		for _, p := range pairs {
-			arrow := "→"
+			arrow, target := "→", p.Target
 			if p.Mode == "two-way" {
 				arrow = "⇄"
 			}
-			fmt.Printf("%s %s  %s %s %s\n", paint("1", "ferry "+version), paint("90", p.Name), p.Source, arrow, p.Target)
+			if p.Remote != "" {
+				target = p.Remote
+			}
+			fmt.Printf("%s %s  %s %s %s\n", paint("1", "ferry "+version), paint("90", p.Name), p.Source, arrow, target)
+		}
+		if settings.Serve != "" {
+			fmt.Println(paint("90", "HTTP API on http://"+settings.Serve))
 		}
 		fmt.Println(paint("90", "watching for changes… press Ctrl+C to stop"))
 	}
@@ -574,6 +739,9 @@ func cmdRun(args []string) error {
 	}
 
 	if uiMode == "tui" {
+		if settings.Theme != "" {
+			tui.SetTheme(settings.Theme)
+		}
 		prog := tea.NewProgram(tui.New(engines, version), tea.WithAltScreen(), tea.WithContext(ctx))
 		go func() {
 			for ev := range evCh {
@@ -637,6 +805,8 @@ func cmdCommit(args []string) error {
 	fs := flag.NewFlagSet("commit", flag.ContinueOnError)
 	msg := fs.String("m", "", "commit message (default: summary of changed files)")
 	push := fs.Bool("push", false, "push after committing")
+	sign := fs.Bool("sign", false, "sign the commit (git commit -S)")
+	author := fs.String("author", "", "commit author, \"Name <email>\"")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return exitErr(2)
@@ -654,9 +824,9 @@ func cmdCommit(args []string) error {
 		return nil
 	}
 	if *msg == "" {
-		*msg = fmt.Sprintf("sync: update %d file(s) — %s", len(lines), time.Now().Format("2006-01-02 15:04"))
+		*msg = "sync: " + engine.SummarizeStatus(lines)
 	}
-	hash, err := gitx.CommitAll(dir, *msg)
+	hash, err := gitx.CommitAll(dir, *msg, gitx.CommitOptions{Author: *author, Sign: *sign})
 	if err != nil {
 		return err
 	}
@@ -730,15 +900,20 @@ func relTo(p config.Pair, file string) string {
 
 func cmdBackups(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: ferry backups list|restore <source> <target> [file]")
+		return errors.New("usage: ferry backups list|restore|prune <source> <target> [file]")
 	}
 	sub := args[0]
 	fs := flag.NewFlagSet("backups", flag.ContinueOnError)
 	ver := fs.Int("version", 1, "which version to restore (1 = newest)")
 	to := fs.String("to", "", "restore to this path instead of the original location")
+	olderThan := fs.String("older-than", "", "prune: delete versions older than this (e.g. 30d)")
+	maxSize := fs.String("max-size", "", "prune: delete the oldest versions past this total per pair (e.g. 1GB)")
 	pos, err := parseInterspersed(fs, args[1:])
 	if err != nil {
 		return exitErr(2)
+	}
+	if sub == "prune" {
+		return backupsPrune(pos, *olderThan, *maxSize)
 	}
 	if len(pos) < 2 {
 		return errors.New("expected <source> <target>")
@@ -793,8 +968,49 @@ func cmdBackups(args []string) error {
 		}
 		fmt.Printf("%s %s from %s → %s\n", paint("32", "restored"), b.Rel, b.Time.Format("2006-01-02 15:04:05"), dest)
 	default:
-		return errors.New("usage: ferry backups list|restore ...")
+		return errors.New("usage: ferry backups list|restore|prune ...")
 	}
+	return nil
+}
+
+func backupsPrune(pos []string, olderThan, maxSize string) error {
+	age, err := config.ParseDuration(olderThan)
+	if err != nil {
+		return fmt.Errorf("--older-than: %v", err)
+	}
+	size, err := config.ParseSize(maxSize)
+	if err != nil {
+		return fmt.Errorf("--max-size: %v", err)
+	}
+	if age <= 0 && size <= 0 {
+		return errors.New("give --older-than (e.g. 30d) and/or --max-size (e.g. 1GB)")
+	}
+	var ids []string
+	if len(pos) >= 2 {
+		p := config.Defaults()
+		p.Source, p.Target = pos[0], pos[1]
+		if err := p.Normalize(); err != nil {
+			return err
+		}
+		ids = []string{p.ID()}
+	} else {
+		entries, _ := os.ReadDir(config.DataDir())
+		for _, en := range entries {
+			if en.IsDir() {
+				ids = append(ids, en.Name())
+			}
+		}
+	}
+	total, freed := 0, int64(0)
+	for _, id := range ids {
+		n, f, err := engine.PruneBackups(config.DataDir(), id, age, int64(size))
+		if err != nil {
+			return err
+		}
+		total += n
+		freed += f
+	}
+	fmt.Printf("%s removed %d backup version(s), freed %s\n", paint("32", "✓"), total, config.HumanSize(freed))
 	return nil
 }
 
@@ -817,12 +1033,12 @@ func cmdService(args []string) error {
 			if len(pos) != 2 {
 				return errors.New("usage: ferry service install --config ferry.yaml | <source> <target> [--two-way --delete ...]")
 			}
-			pairs, _, err := loadPairs(f, pos)
+			pairs, settings, err := loadPairs(f, pos)
 			if err != nil {
 				return err
 			}
 			cfg = filepath.Join(config.DataDir(), "service.yaml")
-			if err := writeServiceConfig(cfg, pairs[0]); err != nil {
+			if err := writeServiceConfig(cfg, pairs[0], settings); err != nil {
 				return err
 			}
 		}
@@ -856,15 +1072,24 @@ func cmdService(args []string) error {
 	return nil
 }
 
-func writeServiceConfig(path string, p config.Pair) error {
+func writeServiceConfig(path string, p config.Pair, s config.Settings) error {
 	p.DryRun = false
 	doc := map[string]any{"pairs": []config.Pair{p}}
+	if s.Serve != "" {
+		doc["serve"] = s.Serve
+	}
+	if s.ServeToken != "" {
+		doc["serve_token"] = s.ServeToken
+	}
+	if len(s.Webhooks) > 0 {
+		doc["webhooks"] = s.Webhooks
+	}
 	data, err := yaml.Marshal(doc)
 	if err != nil {
 		return err
 	}
 	_ = os.MkdirAll(filepath.Dir(path), 0o755)
-	return os.WriteFile(path, append([]byte("# generated by ferry service install\n"), data...), 0o644)
+	return os.WriteFile(path, append([]byte("# generated by ferry service install\n"), data...), 0o600)
 }
 
 // ---------- conflict prompts ----------
@@ -876,26 +1101,23 @@ func askChoice(in *bufio.Reader, e *engine.Engine, rel string) (engine.Choice, b
 	promptMu.Lock()
 	defer promptMu.Unlock()
 	for {
-		fmt.Printf("\n%s %s %s changed on both sides.\n  [s] keep source  [t] keep target  [n] keep newer  [b] keep both  [d] diff  [l] later: ",
+		fmt.Printf("\n%s %s %s changed on both sides.\n  [s] keep source  [t] keep target  [n] keep newer  [b] keep both  [m] merge  [d] diff  [l] later: ",
 			paint("1;31", "conflict"), paint("90", "["+e.Name()+"]"), paint("1", rel))
 		line, err := in.ReadString('\n')
 		if err != nil {
 			return "", false
 		}
-		switch strings.ToLower(strings.TrimSpace(line)) {
-		case "s", "source":
-			return engine.UseSource, true
-		case "t", "target":
-			return engine.UseTarget, true
-		case "n", "newer":
-			return engine.UseNewer, true
-		case "b", "both":
-			return engine.KeepBoth, true
+		answer := strings.ToLower(strings.TrimSpace(line))
+		switch answer {
 		case "d", "diff":
 			printDiff(e.Diff(rel, true))
+			continue
 		case "l", "later", "":
-			fmt.Println(paint("90", "  left as is. Resolve later with: ferry resolve "+rel+" --keep source|target|newer|both"))
+			fmt.Println(paint("90", "  left as is. Resolve later with: ferry resolve "+rel+" --keep source|target|newer|both|merge"))
 			return "", false
+		}
+		if c, ok := engine.ParseChoice(answer); ok {
+			return c, true
 		}
 	}
 }
@@ -953,27 +1175,22 @@ func cmdConflicts(args []string) error {
 		fmt.Println("no conflicts")
 		return nil
 	}
-	fmt.Println(paint("90", "\nresolve with: ferry resolve <file> --keep source|target|newer|both   (or --all)"))
+	fmt.Println(paint("90", "\nresolve with: ferry resolve <file> --keep source|target|newer|both|merge   (or --all)"))
 	return nil
 }
 
 func cmdResolve(args []string) error {
 	fs := flag.NewFlagSet("resolve", flag.ContinueOnError)
-	keep := fs.String("keep", "", "source | target | newer | both")
+	keep := fs.String("keep", "", "source | target | newer | both | merge")
 	all := fs.Bool("all", false, "resolve every conflict (of --pair, or of all pairs)")
 	pairName := fs.String("pair", "", "pair name, when files are ambiguous")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return exitErr(2)
 	}
-	choice, ok := map[string]engine.Choice{
-		"source": engine.UseSource, "s": engine.UseSource,
-		"target": engine.UseTarget, "t": engine.UseTarget,
-		"newer": engine.UseNewer, "n": engine.UseNewer,
-		"both": engine.KeepBoth, "keep-both": engine.KeepBoth, "b": engine.KeepBoth,
-	}[strings.ToLower(*keep)]
+	choice, ok := engine.ParseChoice(*keep)
 	if !ok {
-		return errors.New("usage: ferry resolve <file>... --keep source|target|newer|both [--all] [--pair NAME]")
+		return errors.New("usage: ferry resolve <file>... --keep source|target|newer|both|merge [--all] [--pair NAME]")
 	}
 	if !*all && len(pos) == 0 {
 		return errors.New("name the conflicted file(s), or use --all")

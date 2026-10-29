@@ -1,0 +1,65 @@
+{
+  "name": "ferry-sync",
+  "displayName": "Ferry",
+  "description": "Status, conflicts, undo and commits for Ferry folder sync, right in VS Code.",
+  "version": "0.1.0",
+  "publisher": "anupam42",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anupam42/Ferry"
+  },
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": ["SCM Providers", "Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "ferry.showPairs", "title": "Show Pairs", "category": "Ferry" },
+      { "command": "ferry.showConflicts", "title": "Resolve Conflicts…", "category": "Ferry" },
+      { "command": "ferry.start", "title": "Start Syncing in a Terminal", "category": "Ferry" },
+      { "command": "ferry.pause", "title": "Pause Pair", "category": "Ferry" },
+      { "command": "ferry.resume", "title": "Resume Pair", "category": "Ferry" },
+      { "command": "ferry.resync", "title": "Full Resync", "category": "Ferry" },
+      { "command": "ferry.commit", "title": "Commit Target", "category": "Ferry" },
+      { "command": "ferry.commitPush", "title": "Commit and Push Target", "category": "Ferry" },
+      { "command": "ferry.undo", "title": "Undo Last Sync", "category": "Ferry" },
+      { "command": "ferry.history", "title": "Show Sync History", "category": "Ferry" },
+      { "command": "ferry.plan", "title": "Preview Changes (Plan)", "category": "Ferry" },
+      { "command": "ferry.doctor", "title": "Run Doctor", "category": "Ferry" }
+    ],
+    "configuration": {
+      "title": "Ferry",
+      "properties": {
+        "ferry.path": {
+          "type": "string",
+          "default": "ferry",
+          "description": "Path to the ferry binary."
+        },
+        "ferry.apiUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:7878",
+          "description": "Address of a running ferry started with --serve (or serve: in ferry.yaml). Used for pause, resume, resync, commit and live notifications."
+        },
+        "ferry.apiToken": {
+          "type": "string",
+          "default": "",
+          "description": "Token for the HTTP API, if ferry runs with serve_token."
+        },
+        "ferry.pollSeconds": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "description": "How often the status bar refreshes."
+        },
+        "ferry.notifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a notification when a conflict or error happens (needs the HTTP API)."
+        }
+      }
+    }
+  }
+}

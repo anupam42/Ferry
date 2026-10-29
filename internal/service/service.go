@@ -198,6 +198,23 @@ func Stop() error {
 	return errors.New("unsupported OS")
 }
 
+// IsInstalled reports whether the background service is registered.
+func IsInstalled() bool {
+	switch runtime.GOOS {
+	case "linux":
+		_, err := os.Stat(filepath.Join(userConfigDir(), "systemd", "user", unitName+".service"))
+		return err == nil
+	case "darwin":
+		home, _ := os.UserHomeDir()
+		_, err := os.Stat(filepath.Join(home, "Library", "LaunchAgents", launchID+".plist"))
+		return err == nil
+	case "windows":
+		_, err := runCmd("schtasks", "/Query", "/TN", taskName)
+		return err == nil
+	}
+	return false
+}
+
 // Status returns a human-readable status.
 func Status() string {
 	switch runtime.GOOS {
