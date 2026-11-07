@@ -26,7 +26,7 @@ Work in one folder, commit from another. **Ferry** watches a working folder and 
 
 - [Install](#install) · [Quick start](#quick-start) · [Web app](#web-app)
 - [Features](#features): [Sync](#sync) · [Choosing what to sync](#choosing-what-to-sync) · [Conflicts and merging](#conflicts-and-merging) · [Safety](#safety) · [History and undo](#history-and-undo) · [Git](#git) · [Remote targets over ssh](#remote-targets-over-ssh) · [Cloud storage targets](#cloud-storage-targets) · [Scheduling](#scheduling) · [Dashboard](#dashboard) · [Status, plan and doctor](#status-plan-and-doctor) · [Integrations](#integrations) · [Background service](#background-service)
-- [Commands](#commands) · [Dashboard keys](#dashboard-keys) · [Config file](#config-file) · [Behaviour notes](#behaviour-notes) · [Todo](#todo)
+- [Commands](#commands) · [Dashboard keys](#dashboard-keys) · [Config file](#config-file) · [Behaviour notes](#behaviour-notes) · [Contributing](CONTRIBUTING.md) · [Todo](#todo)
 
 ## Install
 
@@ -411,7 +411,11 @@ src/ignore.ts           gitignore-syntax matcher
 src/config.ts           YAML config, validation, sync windows, path mapping
 src/gitx.ts             git CLI wrapper (status, commit, staging, branch, guard, upstream, LFS, PRs), local or over ssh
 src/remote.ts           ssh target parsing and commands
-src/api.ts              local HTTP API (Bun.serve, server-sent events)
+src/cloud.ts            S3-compatible targets (Bun's S3 client)
+src/ai.ts               {ai} commit messages (Claude API)
+src/api.ts              local HTTP API (Bun.serve, server-sent events); also serves the web app
+src/web/index.html      the web app (one self-contained file, bundled into the binary)
+src/cli/ui.ts           ferry ui: runs pairs in the background and adds/removes them from the browser
 src/webhook.ts          Slack / Discord / ntfy / JSON webhooks
 src/tui/                dashboard: term.ts (styles, boxes, keys, screen), widgets, theme, diffview
 src/printer.ts          plain and JSON output
@@ -421,7 +425,7 @@ editors/vscode          VS Code extension (plain JavaScript, no build step)
 ```
 
 ```bash
-bun install                  # the only runtime dependency is the yaml package
+bun install                  # runtime dependencies: yaml and @anthropic-ai/sdk
 bun src/main.ts --help       # run from source
 bun test                     # unit and integration tests (needs git on PATH)
 bun run typecheck
@@ -432,6 +436,8 @@ bun scripts/build.ts linux-x64   # one platform; add --archive for release archi
 Every pair runs its own serial task queue: timers, the file watcher, the dashboard and the HTTP API all queue work rather than touching sync state directly, so one pair's changes are applied one at a time and in order. git, ssh and hooks run asynchronously, so a slow push doesn't freeze the dashboard.
 
 The state, history, hash-cache and status files are compatible with the earlier Go version of ferry, so an existing data folder keeps working.
+
+Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs, set up the project and send a pull request.
 
 ## Releasing
 

@@ -1,0 +1,49 @@
+name: Bug report
+description: Something doesn't work the way the docs say it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Remove private paths and tokens before posting.
+        Found a security problem? Please use **Report a vulnerability** on the Security tab instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or config
+      description: The full `ferry …` command, or the relevant part of your ferry.yaml.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `ferry version` and `ferry doctor`
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS, Linux, Windows, WSL, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where are the folders?
+      multiple: true
+      options: [Local disk, Network drive, ssh target, Cloud storage (s3://), Other]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Anything else
+      description: Error messages, `ferry history` output, screenshots of the dashboard or web app.
