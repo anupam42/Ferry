@@ -27,7 +27,7 @@ defaults:               # applies to every pair below; any key can be overridden
   max_size: 50MB        # skip bigger files
   binary: warn          # allow | warn | skip
   lfs: false            # track large or binary files with git LFS instead of skipping them
-  secrets: warn         # files that look like credentials: warn | block | off
+  secrets: warn         # files that look like credentials: warn | block | redact (one-way: blank them out) | off
   secret_allow: []      # globs never flagged as secrets, e.g. ["test/fixtures/**"]
   eol: keep             # line endings of text files written to the target: keep | lf | crlf
   symlinks: skip        # skip | follow (copy what they point to) | link (recreate the link)
@@ -51,6 +51,7 @@ defaults:               # applies to every pair below; any key can be overridden
     enabled: false
     interval: 10m
     message: "sync: {summary}"   # also {count} {files} {source} {target} {pair} {date} {time} {datetime}
+                                 # and {ai}: Claude writes the message (needs ANTHROPIC_API_KEY)
     push: false
 
 pairs:
@@ -73,3 +74,12 @@ pairs:
   # - name: server
   #   source: ./site
   #   target: deploy@example.com:/srv/site   # ssh target (one-way)
+
+  # - name: backup
+  #   source: ./site
+  #   target: s3://my-bucket/site            # S3, R2, MinIO… (one-way; credentials from AWS_* / S3_* env vars)
+
+  # - name: docs
+  #   source: ./docs
+  #   targets: [~/code/site-a/docs, ~/code/site-b/docs]   # one source into several repos (one-way)
+  #   transform: {"*.md": "prettier --stdin-filepath {path}"}   # pipe files through a formatter (one-way)

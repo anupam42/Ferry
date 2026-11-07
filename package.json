@@ -15,6 +15,7 @@
     "build": "bun build src/main.ts --compile --minify --sourcemap --outfile dist/ferry"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "yaml": "^2"
   },
   "devDependencies": {

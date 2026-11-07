@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import YAML, { isMap, isScalar, isSeq, LineCounter, type Node, type Pair as YPair, type YAMLMap } from "yaml";
 
+import * as cloud from "./cloud.ts";
 import * as remote from "./remote.ts";
 import { formatDuration, humanSize, parseDuration, parseSize } from "./util.ts";
 
@@ -37,6 +38,9 @@ export interface Pair {
   defaultIgnores: boolean;
   only: string[]; // include globs (gitignore syntax); empty = everything
   map: Record<string, string> | null; // source subfolder -> target subfolder; one pair each
+  targets: string[]; // extra targets: one one-way pair per target, all from the same source
+  /** glob -> shell command; matching text files are piped through it on the way to the target (one-way). */
+  transform: Record<string, string> | null;
 
   branch: string;
   autoCommit: AutoCommit;
@@ -53,7 +57,7 @@ export interface Pair {
 
   maxSize: number;
   binary: string; // allow | warn | skip
-  secrets: string; // warn | block | off
+  secrets: string; // warn | block | redact | off
   secretAllow: string[];
   eol: string; // keep | lf | crlf
   symlinks: string; // skip | follow | link
@@ -75,6 +79,7 @@ export interface Pair {
   days: string[]; // e.g. ["mon-fri"]
 
   remote: string; // ssh target; set from target: user@host:path
+  cloud: string; // object storage target; set from target: s3://bucket/prefix
   dryRun: boolean;
 }
 
@@ -102,7 +107,7 @@ export function defaults(): Pair {
     name: "", source: "", target: "",
     mode: "one-way", delete: false, onDelete: "", mirror: false,
     conflict: "ask", headlessConflict: "hold", merge: false,
-    ignore: [], useGitignore: true, defaultIgnores: true, only: [], map: null,
+    ignore: [], useGitignore: true, defaultIgnores: true, only: [], map: null, targets: [], transform: null,
     branch: "",
     autoCommit: { enabled: false, interval: 10 * 60_000, message: DEFAULT_COMMIT_MESSAGE, push: false },
     gitGuard: true, checkUpstream: 0, autoPull: false, pullRebase: false, beforeCommit: "",
@@ -111,7 +116,7 @@ export function defaults(): Pair {
     batchLimit: 200, batchAction: "apply", batchSettle: 3000, maxOpsPerSec: 0,
     backups: 5, backupMaxAge: 0, backupMaxSize: 0, trash: false,
     watcher: "auto", interval: 500, settle: 300, every: 0, window: "", days: [],
-    remote: "", dryRun: false,
+    remote: "", cloud: "", dryRun: false,
   };
 }
 
@@ -129,7 +134,7 @@ const FIELDS: [string, keyof Pair, FieldType][] = [
   ["mode", "mode", "str"], ["delete", "delete", "bool"], ["on_delete", "onDelete", "str"], ["mirror", "mirror", "bool"],
   ["conflict", "conflict", "str"], ["headless_conflict", "headlessConflict", "str"], ["merge", "merge", "bool"],
   ["ignore", "ignore", "list"], ["use_gitignore", "useGitignore", "bool"], ["default_ignores", "defaultIgnores", "bool"],
-  ["only", "only", "list"], ["map", "map", "map"],
+  ["only", "only", "list"], ["map", "map", "map"], ["targets", "targets", "list"], ["transform", "transform", "map"],
   ["branch", "branch", "str"], ["auto_commit", "autoCommit", "auto"], ["git_guard", "gitGuard", "bool"],
   ["check_upstream", "checkUpstream", "dur"], ["auto_pull", "autoPull", "bool"], ["pull_rebase", "pullRebase", "bool"],
   ["before_commit", "beforeCommit", "str"], ["pr", "pr", "bool"], ["pr_base", "prBase", "str"],
@@ -142,7 +147,7 @@ const FIELDS: [string, keyof Pair, FieldType][] = [
   ["trash", "trash", "bool"],
   ["watcher", "watcher", "str"], ["interval", "interval", "dur"], ["settle", "settle", "dur"], ["every", "every", "dur"],
   ["window", "window", "str"], ["days", "days", "list"],
-  ["remote", "remote", "str"],
+  ["remote", "remote", "str"], ["cloud", "cloud", "str"],
 ];
 
 class Decoder {
@@ -257,7 +262,10 @@ class Decoder {
 }
 
 /** Reads a YAML config. Relative source/target paths are resolved against the file's folder. */
-export function loadFile(file: string): { pairs: Pair[]; settings: Settings } {
+export function loadFile(
+  file: string,
+  opts: { allowEmpty?: boolean; lenient?: boolean } = {},
+): { pairs: Pair[]; settings: Settings; dropped: { pair: Pair; reason: string }[] } {
   const text = fs.readFileSync(file, "utf8");
   const lc = new LineCounter();
   const doc = YAML.parseDocument(text, { lineCounter: lc, uniqueKeys: false });
@@ -309,7 +317,7 @@ export function loadFile(file: string): { pairs: Pair[]; settings: Settings } {
       throw new Error(`${file} defaults: ${(e as Error).message}`);
     }
   }
-  if (pairNodes.length === 0) throw new Error(`${file}: no pairs defined`);
+  if (pairNodes.length === 0 && !opts.allowEmpty) throw new Error(`${file}: no pairs defined`);
   const dir = path.dirname(path.resolve(file));
   const pairs: Pair[] = [];
   pairNodes.forEach((n, i) => {
@@ -323,14 +331,82 @@ export function loadFile(file: string): { pairs: Pair[]; settings: Settings } {
       throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`);
     }
     p.ignore = [...base.ignore, ...p.ignore];
-    for (const k of ["source", "target"] as const) {
-      if (p[k] !== "" && !remote.isSpec(p[k]) && !path.isAbsolute(expandHome(p[k]))) p[k] = path.join(dir, p[k]);
+    const resolve = (t: string) =>
+      t !== "" && !isRemoteSpec(t) && !path.isAbsolute(expandHome(t)) ? path.join(dir, t) : t;
+    p.source = resolve(p.source);
+    p.target = resolve(p.target);
+    p.targets = p.targets.map(resolve);
+    try {
+      for (const q of expandTargets(p)) pairs.push(...expandMap(q));
+    } catch (e) {
+      throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`);
     }
-    pairs.push(...expandMap(p));
   });
   for (const p of pairs) normalize(p);
+  if (opts.lenient) {
+    const { kept, dropped } = dropOverlaps(pairs);
+    return { pairs: kept, settings, dropped };
+  }
   checkOverlaps(pairs);
-  return { pairs, settings };
+  return { pairs, settings, dropped: [] };
+}
+
+/**
+ * checkOverlaps without the error: when two pairs share a name or a target,
+ * the one listed later wins (in the web app's config that is the one added
+ * last) and the earlier one is returned in dropped.
+ */
+export function dropOverlaps(pairs: Pair[]): { kept: Pair[]; dropped: { pair: Pair; reason: string }[] } {
+  const kept: Pair[] = [];
+  const dropped: { pair: Pair; reason: string }[] = [];
+  for (let i = pairs.length - 1; i >= 0; i--) {
+    const p = pairs[i]!;
+    const clash = kept.find((q) => q.name === p.name || samePath(q.target, p.target));
+    if (clash) {
+      dropped.unshift({ pair: p, reason: clash.name === p.name ? `has the same name as "${clash.name}"` : `writes to the same target as "${clash.name}"` });
+    } else kept.unshift(p);
+  }
+  return { kept, dropped };
+}
+
+/** An ssh or cloud target (not a local path). */
+export function isRemoteSpec(s: string): boolean {
+  return remote.isSpec(s) || cloud.isSpec(s);
+}
+
+/**
+ * Turns a pair with `targets:` into one one-way pair per target, all reading
+ * the same source. `target:`, if also set, is the first of them.
+ */
+export function expandTargets(p: Pair): Pair[] {
+  if (p.targets.length === 0) return [p];
+  const all = [...(p.target !== "" ? [p.target] : []), ...p.targets];
+  if (p.mode === "two-way" || p.mode === "twoway" || p.mode === "bidirectional") {
+    throw new Error("targets: (several targets) only works in one-way mode");
+  }
+  if (p.map && Object.keys(p.map).length > 0) throw new Error("use either map or targets in a pair, not both");
+  const name = p.name || path.basename(expandHome(p.source));
+  const used = new Set<string>();
+  return all.map((t, i) => {
+    const q = clonePair(p);
+    q.targets = [];
+    q.target = t;
+    let label = targetLabel(t) || String(i + 1);
+    if (used.has(label)) label += "-" + (i + 1);
+    used.add(label);
+    q.name = name + "/" + label;
+    return q;
+  });
+}
+
+function targetLabel(t: string): string {
+  const s = t.replace(/[\/]+$/, "");
+  if (cloud.isSpec(s)) {
+    const c = cloud.parse(s);
+    return c.prefix ? c.bucket + "/" + path.posix.basename(c.prefix) : c.bucket;
+  }
+  if (remote.isSpec(s)) return path.posix.basename(remote.parse(s).path) || s;
+  return path.basename(s);
 }
 
 /** Turns a pair with `map:` into one pair per mapped subfolder. */
@@ -345,10 +421,11 @@ function expandMap(p: Pair): Pair[] {
     const dest = p.map[k]!.replaceAll("\\", "/").replace(/^\/+|\/+$/g, "");
     q.name = name + "/" + sub;
     q.source = path.join(p.source, ...k.split(/[\\/]/));
-    if (remote.isSpec(p.target) || p.remote !== "") {
-      const t = p.remote !== "" ? p.remote : p.target;
+    if (isRemoteSpec(p.target) || p.remote !== "" || p.cloud !== "") {
+      const t = p.remote || p.cloud || p.target;
       q.target = t.replace(/\/+$/, "") + "/" + dest;
       q.remote = "";
+      q.cloud = "";
     } else {
       q.target = path.join(p.target, ...p.map[k]!.split(/[\\/]/));
     }
@@ -369,8 +446,21 @@ export function normalize(p: Pair): void {
   const fail = (msg: string): never => {
     throw new Error(`pair "${p.name}": ${msg}`);
   };
-  if (p.source === "" || (p.target === "" && p.remote === "")) fail("source and target are required");
+  if (p.source === "" || (p.target === "" && p.remote === "" && p.cloud === "")) fail("source and target are required");
+  if (p.targets.length > 0) fail("targets: is expanded when a config file is loaded; list them as separate pairs here");
   if (remote.isSpec(p.target)) p.remote = p.target;
+  if (cloud.isSpec(p.target)) p.cloud = p.target;
+  if (p.cloud !== "") {
+    let cs: cloud.Spec;
+    try {
+      cs = cloud.parse(p.cloud);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+    p.cloud = cs.toString();
+    // cloud pairs sync into a local shadow copy, which is uploaded
+    p.target = path.join(dataDir(), "cloud", shortHash(p.cloud));
+  }
   if (p.remote !== "") {
     let sp: remote.Spec;
     try {
@@ -384,7 +474,7 @@ export function normalize(p: Pair): void {
   }
   p.source = path.resolve(expandHome(p.source));
   p.target = path.resolve(expandHome(p.target));
-  if (p.name === "") p.name = path.basename(p.source) + " → " + (p.remote !== "" ? p.remote : path.basename(p.target));
+  if (p.name === "") p.name = path.basename(p.source) + " → " + (p.remote || p.cloud || path.basename(p.target));
   let st: fs.Stats | undefined;
   try {
     st = fs.statSync(p.source);
@@ -396,6 +486,7 @@ export function normalize(p: Pair): void {
   else if (oneOf(p.mode, "two-way", "twoway", "bidirectional")) p.mode = "two-way";
   else fail("mode must be one-way or two-way");
   if (p.remote !== "" && p.mode === "two-way") fail("remote (ssh) targets only support one-way mode");
+  if (p.cloud !== "" && p.mode === "two-way") fail("cloud (s3://) targets only support one-way mode");
   if (!oneOf(p.conflict, "ask", "hold", "source", "target", "newer", "keep-both")) {
     fail("conflict must be ask, hold, source, target, newer or keep-both");
   }
@@ -410,7 +501,16 @@ export function normalize(p: Pair): void {
   p.delete = p.onDelete === "propagate";
   if (!oneOf(p.binary, "allow", "warn", "skip")) fail("binary must be allow, warn or skip");
   if (p.secrets === "") p.secrets = "warn";
-  if (!oneOf(p.secrets, "warn", "block", "off")) fail("secrets must be warn, block or off");
+  if (!oneOf(p.secrets, "warn", "block", "redact", "off")) fail("secrets must be warn, block, redact or off");
+  // a redacted or transformed target differs from its source on purpose; in
+  // two-way mode that version would be copied back over the original
+  if (p.secrets === "redact" && p.mode === "two-way") fail("secrets: redact only applies to one-way mode");
+  if (p.transform && Object.keys(p.transform).length > 0) {
+    if (p.mode === "two-way") fail("transform only applies to one-way mode");
+    for (const [glob, cmd] of Object.entries(p.transform)) {
+      if (glob.trim() === "" || cmd.trim() === "") fail("transform entries need a glob and a command");
+    }
+  } else p.transform = null;
   if (p.eol === "") p.eol = "keep";
   if (!oneOf(p.eol, "keep", "lf", "crlf")) fail("eol must be keep, lf or crlf");
   if (p.symlinks === "") p.symlinks = "skip";
@@ -573,7 +673,9 @@ export function pairToYAMLObject(p: Pair): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, field, type] of FIELDS) {
     const v = p[field];
-    if (field === "remote" && v === "") continue;
+    if ((field === "remote" || field === "cloud") && v === "") continue;
+    if (field === "targets" && (v as string[]).length === 0) continue;
+    if (field === "transform" && v == null) continue;
     switch (type) {
       case "dur": out[key] = formatDuration(v as number); break;
       case "size": out[key] = humanSize(v as number); break;
@@ -652,7 +754,7 @@ defaults:               # applies to every pair below; any key can be overridden
   max_size: 50MB        # skip bigger files
   binary: warn          # allow | warn | skip
   lfs: false            # track large or binary files with git LFS instead of skipping them
-  secrets: warn         # files that look like credentials: warn | block | off
+  secrets: warn         # files that look like credentials: warn | block | redact (one-way: blank them out) | off
   secret_allow: []      # globs never flagged as secrets, e.g. ["test/fixtures/**"]
   eol: keep             # line endings of text files written to the target: keep | lf | crlf
   symlinks: skip        # skip | follow (copy what they point to) | link (recreate the link)
@@ -676,6 +778,7 @@ defaults:               # applies to every pair below; any key can be overridden
     enabled: false
     interval: 10m
     message: "sync: {summary}"   # also {count} {files} {source} {target} {pair} {date} {time} {datetime}
+                                 # and {ai}: Claude writes the message (needs ANTHROPIC_API_KEY)
     push: false
 
 pairs:
@@ -698,4 +801,98 @@ pairs:
   # - name: server
   #   source: ./site
   #   target: deploy@example.com:/srv/site   # ssh target (one-way)
+
+  # - name: backup
+  #   source: ./site
+  #   target: s3://my-bucket/site            # S3, R2, MinIO… (one-way; credentials from AWS_* / S3_* env vars)
+
+  # - name: docs
+  #   source: ./docs
+  #   targets: [~/code/site-a/docs, ~/code/site-b/docs]   # one source into several repos (one-way)
+  #   transform: {"*.md": "prettier --stdin-filepath {path}"}   # pipe files through a formatter (one-way)
 `;
+
+/**
+ * Pairs from a plain object with config-file keys (snake_case), as sent by
+ * the web app. It goes through the same decoding and checks as a ferry.yaml
+ * pair; relative paths are resolved against the current folder.
+ */
+export function pairsFromObject(obj: Record<string, unknown>): Pair[] {
+  const lc = new LineCounter();
+  const doc = YAML.parseDocument(YAML.stringify(obj), { lineCounter: lc });
+  const p = defaults();
+  try {
+    new Decoder(lc).pair(doc.contents, p);
+  } catch (e) {
+    throw new Error((e as Error).message.replace(/^line \d+: /, ""));
+  }
+  const out = expandTargets(p).flatMap(expandMap);
+  for (const q of out) normalize(q);
+  checkOverlaps(out);
+  return out;
+}
+
+/**
+ * Adds a pair (config-file keys) to the pairs: list of a YAML config,
+ * keeping the file's comments and layout. Creates the file if needed.
+ */
+export function appendPairToFile(file: string, obj: Record<string, unknown>): void {
+  let text = "";
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch {}
+  if (text.trim() === "") text = "# ferry configuration (pairs added from the web app are saved here)\n\npairs: []\n";
+  const doc = YAML.parseDocument(text);
+  if (doc.errors.length > 0) throw new Error(`${file}: ${doc.errors[0]!.message}`);
+  const pairs = doc.get("pairs");
+  if (pairs == null || (isScalar(pairs) && pairs.value == null)) doc.set("pairs", doc.createNode([obj]));
+  else if (isSeq(pairs)) {
+    pairs.flow = false;
+    pairs.add(doc.createNode(obj));
+  } else throw new Error(`${file}: pairs is not a list`);
+  fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+  fs.writeFileSync(file, doc.toString());
+}
+
+/**
+ * Removes a pair from a config file: the entry with its name, or an unnamed
+ * entry with the same source and target. Returns false when no entry
+ * matches (for example a pair expanded from map: or targets:).
+ */
+export function removePairFromFile(file: string, name: string, match?: Pair): boolean {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch {
+    return false;
+  }
+  const doc = YAML.parseDocument(text);
+  const pairs = doc.get("pairs");
+  if (!isSeq(pairs)) return false;
+  const dir = path.dirname(path.resolve(file));
+  const local = (v: unknown) => {
+    const t = String(v ?? "").trim();
+    return isRemoteSpec(t) ? t.replace(/\/+$/, "") : path.resolve(dir, expandHome(t));
+  };
+  const same = (it: YAMLMap) => {
+    if (!match || it.get("name") != null || it.get("map") != null || it.get("targets") != null) return false;
+    if (!samePath(local(it.get("source")), match.source)) return false;
+    const t = local(it.get("target"));
+    if (isRemoteSpec(t)) {
+      const want = match.remote || match.cloud;
+      if (want === "") return false;
+      try {
+        return (remote.isSpec(t) ? remote.parse(t).toString() : cloud.parse(t).toString()) === want;
+      } catch {
+        return false;
+      }
+    }
+    return samePath(t, match.target);
+  };
+  let i = pairs.items.findIndex((it) => isMap(it) && String(it.get("name") ?? "") === name);
+  if (i < 0) i = pairs.items.findIndex((it) => isMap(it) && same(it as YAMLMap));
+  if (i < 0) return false;
+  pairs.items.splice(i, 1);
+  fs.writeFileSync(file, doc.toString());
+  return true;
+}

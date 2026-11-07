@@ -1,6 +1,6 @@
 # Ferry
 
-Work in one folder, commit from another. **Ferry** watches a working folder and mirrors every change into your git repo folder. It can also sync in both directions, with conflict detection and three-way merges, or push to a server over ssh. It runs from any terminal (PowerShell, cmd, bash, zsh, fish) on Windows, macOS and Linux as a single self-contained binary (nothing else to install).
+Work in one folder, commit from another. **Ferry** watches a working folder and mirrors every change into your git repo folder. It can also sync in both directions, with conflict detection and three-way merges, or push to a server over ssh or to cloud storage (S3, R2, MinIO). Prefer a browser to a terminal? `ferry ui` opens a web app where you can do everything without typing commands. It runs from any terminal (PowerShell, cmd, bash, zsh, fish) on Windows, macOS and Linux as a single self-contained binary (nothing else to install).
 
 ```
 ⇄ ferry 1.2.0                                              2 pair(s) · ? help · q quit
@@ -19,8 +19,8 @@ Work in one folder, commit from another. **Ferry** watches a working folder and 
 
 ## Contents
 
-- [Install](#install) · [Quick start](#quick-start)
-- [Features](#features): [Sync](#sync) · [Choosing what to sync](#choosing-what-to-sync) · [Conflicts and merging](#conflicts-and-merging) · [Safety](#safety) · [History and undo](#history-and-undo) · [Git](#git) · [Remote targets over ssh](#remote-targets-over-ssh) · [Scheduling](#scheduling) · [Dashboard](#dashboard) · [Status, plan and doctor](#status-plan-and-doctor) · [Integrations](#integrations) · [Background service](#background-service)
+- [Install](#install) · [Quick start](#quick-start) · [Web app](#web-app)
+- [Features](#features): [Sync](#sync) · [Choosing what to sync](#choosing-what-to-sync) · [Conflicts and merging](#conflicts-and-merging) · [Safety](#safety) · [History and undo](#history-and-undo) · [Git](#git) · [Remote targets over ssh](#remote-targets-over-ssh) · [Cloud storage targets](#cloud-storage-targets) · [Scheduling](#scheduling) · [Dashboard](#dashboard) · [Status, plan and doctor](#status-plan-and-doctor) · [Integrations](#integrations) · [Background service](#background-service)
 - [Commands](#commands) · [Dashboard keys](#dashboard-keys) · [Config file](#config-file) · [Behaviour notes](#behaviour-notes)
 
 ## Install
@@ -63,6 +63,22 @@ ferry doctor
 
 PowerShell is the same: `ferry C:\work\scratch C:\code\my-repo --two-way`. Flags can go before or after the folders.
 
+## Web app
+
+```bash
+ferry ui                      # opens http://127.0.0.1:7878 in your browser
+```
+
+The web app does what the terminal dashboard does, with buttons instead of keys:
+
+- **Add folder pairs** with a folder picker. Choose "one way" or "both ways", and set what happens to deleted files, files to skip, secret handling, extra targets and auto-commit. Pairs you add are saved (in `./ferry.yaml` if there is one, otherwise in ferry's data folder as `ui.yaml`), so they start again next time. **Stop syncing** removes a pair; no files are deleted.
+- **Files**: everything synced this session, with a diff and an **Ignore** button for each file. Conflicts appear at the top with "keep working folder's / keep target's / keep newer / keep both / merge" buttons and a side-by-side **Compare**.
+- **Commit**: uncommitted files, a message box, "let Claude write the message" and "push afterwards".
+- **History & undo**: every sync pass, **Undo the last sync**, and **Go back** to how things were 15 minutes ago, this morning, yesterday or at a time you type. It shows what will change before doing it.
+- **Stats** and a live **Activity** feed. Pause, resume, "sync everything now" and approval of large batches are at the top.
+
+`ferry ui --config work.yaml`, `ferry ui ./scratch ./repo` (pairs added in the browser then last only for the session), `--port 8080` and `--no-open` work as you'd expect. Keep the terminal window open while you sync; the web page talks to that process. The page and its API only answer on `localhost` unless you set `--host` together with `--serve-token`. The same page is also served by `ferry --serve 127.0.0.1:7878` (without adding or removing pairs).
+
 ## Features
 
 ### Sync
@@ -79,6 +95,8 @@ PowerShell is the same: `ferry C:\work\scratch C:\code\my-repo --two-way`. Flags
 - **Hash cache.** Content hashes are cached by path, size and modified time and kept between runs, so large trees aren't re-read on every comparison. A full resync (`r`) clears the cache.
 - **`--mirror`**: on start, make the target exactly match the source. It lists what it will delete and asks first; use `--yes` in scripts.
 - **Multiple pairs** from `ferry.yaml`, each with its own settings.
+- **One source, several targets**: `ferry ./docs ./site-a ./site-b s3://bucket/docs`, or `targets: [...]` in a pair. Each target becomes its own one-way pair (named `<pair>/<target folder>`), with its own state, history and undo.
+- **Transforms** (one-way): `--transform "*.ts=prettier --stdin-filepath {path}"` (repeatable), or `transform: {"*.ts": "prettier --stdin-filepath {path}"}` in a pair. Matching text files are piped through the command on their way to the target, so the repo gets formatted or cleaned-up files while your working copy stays as you wrote it. The command runs in the source folder with the file on stdin; `{path}` is the file's relative path. If it fails or takes more than a minute, the file is copied unchanged with a warning. Files over 8 MB and binary files are never transformed.
 
 ### Choosing what to sync
 - **`.gitignore` support.** It reads `.gitignore` files in the source (including nested ones) and the target. It also reads `.syncignore` files and `--ignore` globs, all in full gitignore syntax (`!negation`, `dir/`, `**`). Edits to these files apply live.
@@ -109,7 +127,7 @@ PowerShell is the same: `ferry C:\work\scratch C:\code\my-repo --two-way`. Flags
 ### Safety
 - **Backups before every overwrite or delete.** The last 5 versions of each file are kept outside both folders (`--backups N`). Use `ferry backups list|restore <src> <dst> [file] [--version N]`.
 - **Backup limits.** `--backup-max-age 30d` and `--backup-max-size 1GB` prune old versions automatically (at start and every hour). `ferry backups prune --older-than 30d --max-size 1GB [<src> <dst>]` does it by hand, for one pair or all of them.
-- **Secret scanning** (`--secrets warn|block|off`, default `warn`). Before a file is copied into the target, Ferry checks its name (`.env`, `id_rsa`, `*.pem`, `*.p12`, …) and its content (private keys, AWS, GitHub, GitLab, Slack and Stripe keys, Google and `sk-…` API keys, quoted password or token assignments). `warn` notifies you and copies the file anyway. `block` skips it. Paths in `secret_allow` (gitignore globs, such as `test/fixtures/**`) are never flagged.
+- **Secret scanning** (`--secrets warn|block|off`, default `warn`). Before a file is copied into the target, Ferry checks its name (`.env`, `id_rsa`, `*.pem`, `*.p12`, …) and its content (private keys, AWS, GitHub, GitLab, Slack and Stripe keys, Google and `sk-…` API keys, quoted password or token assignments). `warn` notifies you and copies the file anyway. `block` skips it. `redact` (one-way only) copies the file with each secret replaced by a placeholder such as `<REDACTED:aws-key>`. Every value in a `.env` file is replaced, and a credential file whose contents can't be recognised (for example `credentials.json`) is held back instead. Your working copy keeps the real values. Paths in `secret_allow` (gitignore globs, such as `test/fixtures/**`) are never flagged.
 - **Trash** (`--trash`): deletions synced to the other side also go to the OS recycle bin (Windows), Trash (macOS) or the freedesktop trash (Linux), as well as Ferry's own backups.
 - **Large-batch handling.** Bursts like `npm install` or `git checkout` wait for activity to stop before syncing: batches over `--batch-limit 200` need `--batch-settle 3s` of quiet. `--batch-action confirm` holds them until you press `y`, and `--max-ops 100` throttles file operations per second.
 - **Atomic writes.** Files go to a temp file first and are then renamed. On Windows, file locks get retries.
@@ -122,13 +140,16 @@ PowerShell is the same: `ferry C:\work\scratch C:\code\my-repo --two-way`. Flags
 - `ferry undo` reverses the newest pass: files Ferry created are removed, overwritten or deleted files come back from their backups, and renames are reversed. It asks first (`--yes` skips the question), and `--batch ID` undoes an older pass. In the dashboard, press `u` twice in the history view.
 - The versions being replaced are backed up first, so an undo can be reverted with `ferry backups restore`.
 - In two-way mode the reverted files count as new edits and sync back to the other side, so both sides return to their earlier versions. In one-way mode only the target is reverted; the source keeps your edits, and they are copied again the next time the file changes or on a full resync.
-- Undo needs backups (`backups` > 0) to restore updated or deleted files. It isn't available for remote (ssh) targets.
+- **Go back to a moment**: `ferry restore --at "2h ago"` undoes every pass recorded after that time, newest first, for every pair (or just `--pair NAME`). Times can be `30m`, `2h ago`, `yesterday`, `today`, `15:30` or `2026-11-07 15:30`. `--dry-run` lists the passes and files first, and it asks before changing anything (`--yes` skips the question).
+- **Stats**: `ferry stats [--pair NAME] [--since 7d|24h|30d|all] [--json]` totals what was added, updated, deleted and renamed, shows changes per day and the busiest day, and lists the most-changed files.
+- Undo and restore need backups (`backups` > 0) to restore updated or deleted files. They aren't available for ssh or cloud targets.
 
 ### Git
 - **Commit from the dashboard**: `c` to commit, `C` to commit and push. There is also `ferry commit -m "msg" [--push] [--sign] [--author "Name <email>"] <repo>`.
 - **Per-file staging**: press `a` on a file to stage or unstage it. When anything is staged, `c` commits only the staged files.
 - **Generated commit messages.** The `{summary}` placeholder becomes something like `add README.md; update 3 files in src/api; delete old.txt`. `ferry commit` without `-m` uses it too.
-- **Auto-commit** on a timer: `--auto-commit "sync: {summary}" --auto-commit-interval 10m --push`. Placeholders: `{summary} {count} {files} {source} {target} {pair} {date} {time} {datetime}`.
+- **Auto-commit** on a timer: `--auto-commit "sync: {summary}" --auto-commit-interval 10m --push`. Placeholders: `{summary} {count} {files} {source} {target} {pair} {date} {time} {datetime} {ai}`.
+- **Commit messages written by Claude**: `{ai}` in a message template (for example `--auto-commit "{ai}"`), `ferry commit --ai`, or the checkbox in the web app sends the changed files and the diff (up to 60 KB) to the Claude API and uses the reply as the message. It needs `ANTHROPIC_API_KEY` (or an `ant auth login` profile) and uses `claude-opus-5-5` (set `FERRY_AI_MODEL` to change it). If no credentials are set or the request fails, the `{summary}` text is used instead. The diff leaves your machine, so don't use `{ai}` for code you can't send to an outside service.
 - **Checks before committing**: `--before-commit "npm test"` runs in the target before every commit (manual or automatic). If it fails, the commit is skipped and you get an error with the last lines of its output.
 - **Pull before push**: `--pull-rebase` runs `git pull --rebase --autostash` before every push. If the rebase fails it is aborted and nothing is pushed.
 - **Pull requests**: `--pr` opens a pull request with the `gh` CLI after pushing, unless one is already open for the branch (`--pr-base main` picks the base). Combine it with `--branch` to keep synced work on its own branch.
@@ -143,6 +164,11 @@ PowerShell is the same: `ferry C:\work\scratch C:\code\my-repo --two-way`. Flags
 - It uses your system `ssh`, so keys, agents and `~/.ssh/config` work as usual. Ferry runs ssh with `BatchMode=yes`, so it never waits for a password; use keys. The host needs `tar` and a POSIX shell.
 - If the remote folder is a git repo, the git features work over ssh too: auto-commit, push, branch, `--before-commit` (it runs on the host), and the dashboard's git panel.
 - Remote targets are one-way. Full resync (`r`) re-sends every file. Changes made directly on the host aren't detected.
+
+### Cloud storage targets
+- A target can be **`s3://bucket/optional/prefix`**: `ferry ./site s3://my-bucket/www`. Any S3-compatible service works: AWS S3, Cloudflare R2, MinIO, Backblaze B2, and Google Cloud Storage in interoperability mode.
+- Credentials come from the environment: `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (or `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`), plus `AWS_REGION`, or `S3_ENDPOINT` for services other than AWS (for R2: `https://<account>.r2.cloudflarestorage.com`). `ferry doctor` checks that the bucket can be reached.
+- Like ssh targets, Ferry syncs into a local shadow copy and then uploads changed files (8 at a time) and deletes removed ones. Uploads that fail are retried with the next pass. Cloud targets are one-way, have no git features, and full resync (`r`) uploads every file again.
 
 ### Scheduling
 - **Timer instead of watching**: `--every 15m` scans and syncs every 15 minutes and doesn't use a file watcher at all.
@@ -179,6 +205,11 @@ PowerShell is the same: `ferry C:\work\scratch C:\code\my-repo --two-way`. Flags
   | `POST /pairs/{name}/commit?message=…&push=1` | commit (and push) the target |
   | `POST /pairs/{name}/resolve` with `{"path": "...", "choice": "source\|target\|newer\|both\|merge"}` | resolve a conflict |
   | `POST /pairs/{name}/undo` | undo the last pass |
+  | `POST /pairs/{name}/restore` with `{"at": "2h ago"}` (add `"dry_run": true` to preview) | undo every pass after that time |
+  | `POST /pairs/{name}/ignore` with `{"path": "..."}` | stop syncing a file (adds it to `.syncignore`) |
+  | `GET /pairs/{name}/stats?since=7d` · `GET /pairs/{name}/plan` | history totals · what the next pass would do |
+  | `GET /` · `GET /info` · `GET /fs?path=…` | the web app, version info, sub-folders (folder picker) |
+  | `POST /pairs` · `POST /pairs/{name}/remove` | add a pair (config-file keys as JSON) · stop one; `ferry ui` only |
 
   Without a token, the API only answers requests addressed to `localhost`, and POST requests must send an `X-Ferry` header (a web page can't send one to another site). Set `serve_token` (or `FERRY_TOKEN`) to require `Authorization: Bearer <token>`, which is also how you allow other hosts. URL-encode pair names, since mapped pairs contain `/`.
   ```bash
@@ -214,16 +245,20 @@ No admin rights are needed. Logs go to the ferry data folder. `ferry status` sho
 | Command | |
 |---|---|
 | `ferry [run] [flags] <source> <target>` | sync one pair and watch (dashboard in a terminal) |
+| `ferry [run] [flags] <source> <target> <target2>…` | one source into several targets (one-way) |
 | `ferry [run] --config ferry.yaml [--pair NAME]` | sync the pairs in a config file (`ferry` alone uses `./ferry.yaml`) |
 | `ferry init [file]` | write a commented sample config |
 | `ferry status [--json] [--running]` | what every pair is doing |
 | `ferry plan [--diff] [--format text\|markdown\|json] …` | what the next pass would do, without writing |
-| `ferry commit [-m msg] [--push] [--sign] [--author A] [dir]` | commit everything in a target repo |
+| `ferry commit [-m msg \| --ai] [--push] [--sign] [--author A] [dir]` | commit everything in a target repo |
 | `ferry diff [--sides] <source> <target> <file>` | diff a file vs HEAD (or vs the source) |
 | `ferry conflicts [--diff]` | conflicts waiting for a decision |
 | `ferry resolve <file>… --keep source\|target\|newer\|both\|merge [--all] [--pair NAME]` | settle conflicts |
 | `ferry history [--pair NAME] [-n 20] [--json]` | recent sync passes |
 | `ferry undo [--pair NAME] [--batch ID] [--yes]` | reverse a sync pass |
+| `ferry restore --at "2h ago" [--pair NAME] [--dry-run] [--yes]` | go back to how things were at a moment |
+| `ferry stats [--pair NAME] [--since 7d] [--json]` | totals, busiest days, most-changed files |
+| `ferry ui [--config file \| <source> <target>] [--port 7878] [--no-open]` | the web app |
 | `ferry backups list\|restore\|prune …` | stored versions |
 | `ferry doctor [--config file \| <source> <target>]` | check the setup |
 | `ferry service install\|uninstall\|start\|stop\|status\|logs` | background service |
@@ -240,6 +275,7 @@ Run `ferry run -h` for every flag.
 | `/` | filter files and activity (`esc` clears) |
 | `d` / `enter` | diff the selected file (`v` in the diff: side by side) |
 | `e` | open the selected file in your editor |
+| `i` | stop syncing the selected file (adds it to the source's `.syncignore`) |
 | `s` `t` `n` `b` `m` | resolve a conflict: keep source / target / newer / both, or merge |
 | | (`◇` in the file list = deleted on one side, kept on the other) |
 | `a` | stage / unstage the selected file |
@@ -281,7 +317,7 @@ defaults:
   max_size: 50MB
   binary: warn             # allow | warn | skip
   lfs: false
-  secrets: warn            # warn | block | off
+  secrets: warn            # warn | block | redact (one-way) | off
   secret_allow: []
   eol: keep                # keep | lf | crlf
   symlinks: skip           # skip | follow | link
@@ -305,7 +341,7 @@ defaults:
   pr_base: ""
   sign_commits: false
   commit_author: ""
-  auto_commit: {enabled: false, interval: 10m, message: "sync: {summary}", push: false}
+  auto_commit: {enabled: false, interval: 10m, message: "sync: {summary}", push: false}   # "{ai}": Claude writes it
 pairs:
   - name: web-app
     source: ~/scratch/web-app     # relative paths are relative to the config file
@@ -324,13 +360,17 @@ pairs:
   - name: server
     source: ./site
     target: deploy@example.com:/srv/site
+  - name: docs
+    source: ./docs
+    targets: [~/code/site-a/docs, s3://my-bucket/docs]   # one one-way pair per target
+    transform: {"*.md": "prettier --stdin-filepath {path}"}   # one-way only
 ```
 
 ## Behaviour notes
 - **One-way** overwrites target files that differ from the source; backups keep the old versions. Deleting a file in the source leaves the target copy alone unless `on_delete: propagate`.
 - **Two-way deletions**: by default (`keep`) a deletion stays local, and the other copy is kept but not copied back. Use `restore` to copy it back, or `propagate` to delete it on both sides. Renames are synced under every setting.
 - **Two-way conflicts**: nothing is ever overwritten silently by default. The dashboard or terminal asks you; without either, the conflict is held until you run `ferry resolve`. With `merge: true`, edits that don't overlap are merged without asking.
-- **Data folder.** State, backups, history, the hash cache, status files, merge bases, remote shadow copies and logs live in your user cache folder (`~/.cache/ferry`, `~/Library/Caches/ferry` or `%LocalAppData%\ferry`). You can override it with `FERRY_HOME`.
+- **Data folder.** State, backups, history, the hash cache, status files, merge bases, remote and cloud shadow copies, the web app's `ui.yaml` and logs live in your user cache folder (`~/.cache/ferry`, `~/Library/Caches/ferry` or `%LocalAppData%\ferry`). You can override it with `FERRY_HOME`.
 - **Exit codes:** `--once` exits with 1 if any file failed, and with 3 if conflicts were left for you to resolve. `ferry doctor` exits with 1 if it finds a problem.
 
 ## Development

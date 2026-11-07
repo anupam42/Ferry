@@ -116,7 +116,7 @@ export function allHistory(dataDir: string): Batch[] {
  */
 export function undo(dataDir: string, b: Batch, keep: number): { done: string[]; problems: string[] } {
   if (b.undone) throw new Error("that batch was already undone");
-  if (b.remote) throw new Error("undo isn't supported for remote (ssh) targets");
+  if (b.remote) throw new Error("undo isn't supported for remote (ssh or cloud) targets");
   if (keep < 1) keep = 5;
   const bdir = backupDir(dataDir, b.pair_id);
   const root = (s: string) => (s === "source" ? b.source : b.target);
@@ -184,4 +184,95 @@ function markUndone(dataDir: string, pairID: string, batchID: string): void {
   const bs = readJournal(file);
   for (const b of bs) if (b.id === batchID) b.undone = true;
   writeJournal(file, bs);
+}
+
+/** The batches of a pair recorded after t that haven't been undone, newest first. */
+export function batchesSince(dataDir: string, id: string, t: number): Batch[] {
+  return history(dataDir, id).filter((b) => !b.undone && batchTime(b) > t);
+}
+
+/**
+ * Rolls a pair back to how ferry left it at time t by undoing every batch
+ * recorded after t, newest first. Each undo backs up what it replaces, so a
+ * restore can itself be reverted with "ferry backups restore".
+ */
+export function restoreTo(
+  dataDir: string, id: string, t: number, keep: number,
+): { batches: Batch[]; done: string[]; problems: string[] } {
+  const batches = batchesSince(dataDir, id, t);
+  const done: string[] = [], problems: string[] = [];
+  for (const b of batches) {
+    const r = undo(dataDir, b, keep);
+    done.push(...r.done);
+    problems.push(...r.problems);
+  }
+  return { batches, done, problems };
+}
+
+/** What happened in a pair's history, for "ferry stats". */
+export interface Stats {
+  pair: string;
+  batches: number;
+  undone: number;
+  added: number;
+  updated: number;
+  deleted: number;
+  renamed: number;
+  toTarget: number; // files written in the target
+  toSource: number; // files written in the source (two-way)
+  first: string; // RFC 3339, "" if no batches
+  last: string;
+  busiestDay: string; // YYYY-MM-DD
+  busiestDayFiles: number;
+  topFiles: { path: string; changes: number }[];
+  perDay: { day: string; files: number }[]; // oldest first
+}
+
+/** Totals over the batches recorded since `since` (ms; 0 = all history). */
+export function stats(pair: string, batches: Batch[], since: number, topN = 10): Stats {
+  const st: Stats = {
+    pair, batches: 0, undone: 0, added: 0, updated: 0, deleted: 0, renamed: 0, toTarget: 0, toSource: 0,
+    first: "", last: "", busiestDay: "", busiestDayFiles: 0, topFiles: [], perDay: [],
+  };
+  const files = new Map<string, number>();
+  const days = new Map<string, number>();
+  let first = Infinity, last = 0;
+  for (const b of batches) {
+    const t = batchTime(b);
+    if (since > 0 && t < since) continue;
+    st.batches++;
+    if (b.undone) st.undone++;
+    first = Math.min(first, t);
+    last = Math.max(last, t);
+    const c = counts(b);
+    st.added += c.add;
+    st.updated += c.update;
+    st.deleted += c.del;
+    st.renamed += c.rename;
+    const d = new Date(t);
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    days.set(day, (days.get(day) ?? 0) + b.entries.length);
+    for (const en of b.entries) {
+      if (en.side === "source") st.toSource++;
+      else st.toTarget++;
+      const p = en.op === "rename" && en.to ? en.to : en.path;
+      files.set(p, (files.get(p) ?? 0) + 1);
+    }
+  }
+  if (st.batches > 0) {
+    st.first = new Date(first).toISOString();
+    st.last = new Date(last).toISOString();
+  }
+  st.topFiles = [...files]
+    .sort((a, b) => b[1] - a[1] || cmp(a[0], b[0]))
+    .slice(0, topN)
+    .map(([path, changes]) => ({ path, changes }));
+  st.perDay = [...days].sort((a, b) => cmp(a[0], b[0])).map(([day, n]) => ({ day, files: n }));
+  for (const { day, files: n } of st.perDay) {
+    if (n > st.busiestDayFiles) {
+      st.busiestDay = day;
+      st.busiestDayFiles = n;
+    }
+  }
+  return st;
 }

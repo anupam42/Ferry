@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 // ferry — keep a working folder and a git repo folder in sync from any terminal.
 import {
-  cmdBackups, cmdCommit, cmdConflicts, cmdDiff, cmdDoctor, cmdHistory, cmdInit, cmdPlan, cmdResolve, cmdService,
-  cmdStatus, cmdUndo,
+  cmdBackups, cmdCommit, cmdConflicts, cmdDiff, cmdDoctor, cmdHistory, cmdInit, cmdPlan, cmdResolve, cmdRestore,
+  cmdService, cmdStats, cmdStatus, cmdUndo,
 } from "./cli/commands.ts";
 import { COMMIT, DATE, out, paint, stdinLines, VERSION } from "./cli/common.ts";
 import { cmdCompletion } from "./cli/completion.ts";
 import { cmdRun } from "./cli/run.ts";
+import { cmdUI } from "./cli/ui.ts";
 import { SUBCOMMANDS, usage } from "./cli/usage.ts";
 import { ExitError } from "./util.ts";
 
@@ -37,6 +38,9 @@ async function main(argv: string[]): Promise<void> {
     case "resolve": return cmdResolve(rest);
     case "history": return cmdHistory(rest);
     case "undo": return cmdUndo(rest);
+    case "restore": return cmdRestore(rest);
+    case "stats": return cmdStats(rest);
+    case "ui": return cmdUI(rest);
     case "doctor": return cmdDoctor(rest);
     case "service": return cmdService(rest);
     case "completion": return cmdCompletion(rest);

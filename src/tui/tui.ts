@@ -107,6 +107,7 @@ const HELP = `
     d / enter     diff selected file (vs last commit, or source vs target for a conflict)
                   in the diff: v toggles side-by-side
     e             open the file in $EDITOR, VS Code or the default app
+    i             stop syncing the selected file (adds it to the source's .syncignore)
 
   Conflicts (two-way mode, select a ! file)
     s  keep source     t  keep target     n  keep newer     b  keep both
@@ -447,6 +448,16 @@ export class Dashboard {
         }
         return;
       }
+      case "i": {
+        if (!r || r.path === "") return this.say("select a file first (↑/↓)");
+        try {
+          const line = e.ignorePath(r.path);
+          this.say(line ? `ignoring ${r.path} from now on (added ${line} to the source's .syncignore; copies already made stay)` : `${r.path} is already in .syncignore`);
+        } catch (err) {
+          this.say("ignore: " + errMsg(err));
+        }
+        return;
+      }
       case "e": {
         if (!r || r.path === "") return this.say("select a file first (↑/↓)");
         let p = e.targetPath(r.path);
@@ -647,7 +658,7 @@ export class Dashboard {
     }
     if (this.mode === "search") return t.title.render(" / ") + this.search.view(t.muted) + t.muted.render("  enter keep · esc clear");
     if (this.flashing()) return " " + t.flash.render(this.flash);
-    const keys = ["tab pair", "↑↓ file", "/ filter", "d diff", "e edit", "a stage", "c commit", "p pause", "r resync", "H history", "s/t/n/b/m resolve", "? help"];
+    const keys = ["tab pair", "↑↓ file", "/ filter", "d diff", "e edit", "i ignore", "a stage", "c commit", "p pause", "r resync", "H history", "s/t/n/b/m resolve", "? help"];
     return truncate(t.muted.render(" " + keys.join(" · ")), w);
   }
 

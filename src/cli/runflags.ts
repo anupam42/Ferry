@@ -2,7 +2,7 @@
 // plus a config file into pairs.
 import fs from "node:fs";
 
-import { checkOverlaps, defaults, loadFile, normalize, emptySettings, type Pair, type Settings } from "../config.ts";
+import { checkOverlaps, defaults, expandTargets, loadFile, normalize, emptySettings, type Pair, type Settings } from "../config.ts";
 import { ExitError, parseDuration, parseSize } from "../util.ts";
 import { usage } from "./usage.ts";
 import { FlagSet } from "./flags.ts";
@@ -41,8 +41,9 @@ export function newRunFlags(name = "run"): FlagSet {
     .string("max-size", "50MB", "skip files larger than this (0 = no limit)")
     .string("binary", d.binary, "binary files: allow | warn | skip")
     .bool("lfs", false, "track large and binary files with git LFS instead of skipping them")
-    .string("secrets", d.secrets, "files that look like credentials: warn | block | off")
+    .string("secrets", d.secrets, "files that look like credentials: warn | block | redact (one-way) | off")
     .multi("secret-allow", "glob never flagged as a secret (repeatable)")
+    .multi("transform", 'pipe matching files through a command on the way to the target: "GLOB=CMD" (repeatable, one-way)')
     .string("eol", d.eol, "line endings of text files written to the target: keep | lf | crlf")
     .string("symlinks", d.symlinks, "skip | follow | link")
     .int("batch-limit", d.batchLimit, "batches bigger than this wait for activity to settle")
@@ -118,6 +119,15 @@ export function applyFlags(f: FlagSet, p: Pair): void {
       case "lfs": p.lfs = b(name); break;
       case "secrets": p.secrets = s(name); break;
       case "secret-allow": p.secretAllow = [...p.secretAllow, ...f.getMulti(name)]; break;
+      case "transform": {
+        p.transform = { ...(p.transform ?? {}) };
+        for (const t of f.getMulti(name)) {
+          const i = t.indexOf("=");
+          if (i <= 0 || i === t.length - 1) throw new Error(`--transform "${t}": expected GLOB=COMMAND, e.g. "*.ts=prettier --stdin-filepath {path}"`);
+          p.transform[t.slice(0, i).trim()] = t.slice(i + 1).trim();
+        }
+        break;
+      }
       case "eol": p.eol = s(name); break;
       case "symlinks": p.symlinks = s(name); break;
       case "batch-limit": p.batchLimit = f.getInt(name); break;
@@ -171,16 +181,19 @@ export function loadPairs(f: FlagSet, pos: string[]): { pairs: Pair[]; settings:
       if (pairs.length === 0) throw new Error(`no pair named "${only}" in ${cfgPath}`);
     }
   } else {
-    if (pos.length !== 2) throw new Error("expected <source> <target>");
+    if (pos.length < 2) throw new Error("expected <source> <target> [more targets…]");
     const p = defaults();
     p.source = pos[0]!;
     p.target = pos[1]!;
+    p.targets = pos.slice(2);
     pairs = [p];
   }
-  for (const p of pairs) {
+  // several targets on the command line become one pair each
+  pairs = pairs.flatMap((p) => {
     applyFlags(f, p);
-    normalize(p);
-  }
+    return expandTargets(p);
+  });
+  for (const p of pairs) normalize(p);
   checkOverlaps(pairs);
   return { pairs, settings: settingsFrom(f, settings) };
 }

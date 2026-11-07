@@ -172,3 +172,33 @@ export class ExitError extends Error {
     super(`exit ${code}`);
   }
 }
+
+/**
+ * A point in time from user input: "2h ago", "2h", "yesterday", "15:30"
+ * (today, or yesterday if that is still ahead), "2026-11-07 15:30" or any
+ * date Date.parse understands. Throws on anything else.
+ */
+export function parseWhen(input: string, now: Date = new Date()): number {
+  const s = input.trim().toLowerCase();
+  if (s === "") throw new Error("expected a time, e.g. 2h ago or 15:30");
+  if (s === "now") return now.getTime();
+  if (s === "yesterday") return now.getTime() - 86_400_000;
+  if (s === "today") return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const ago = s.replace(/\s+ago$/, "").replaceAll(" ", "");
+  if (/^(\d+(?:\.\d*)?(ns|us|µs|ms|s|m|h|d|w))+$/.test(ago)) return now.getTime() - parseDuration(ago);
+  const hm = /^(\d{1,2}):(\d{2})$/.exec(s);
+  if (hm) {
+    const t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), +hm[1]!, +hm[2]!).getTime();
+    if (+hm[1]! > 23 || +hm[2]! > 59) throw new Error(`bad time "${input}"`);
+    return t > now.getTime() ? t - 86_400_000 : t;
+  }
+  // "2026-11-07 15:30" is read as local time
+  const local = /^(\d{4})-(\d{2})-(\d{2})(?:[ t](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(s);
+  if (local) {
+    const [, y, mo, d, h, mi, se] = local;
+    return new Date(+y!, +mo! - 1, +d!, +(h ?? 0), +(mi ?? 0), +(se ?? 0)).getTime();
+  }
+  const t = Date.parse(input);
+  if (Number.isNaN(t)) throw new Error(`can't read the time "${input}" (try 2h ago, 15:30 or 2026-11-07 15:30)`);
+  return t;
+}

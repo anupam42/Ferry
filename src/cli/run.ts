@@ -195,7 +195,7 @@ export async function cmdRun(args: string[]): Promise<void> {
   if (uiMode === "plain") {
     for (const p of pairs) {
       const arrow = p.mode === "two-way" ? "⇄" : "→";
-      println(`${paint("1", "ferry " + VERSION)} ${paint("90", p.name)}  ${p.source} ${arrow} ${p.remote || p.target}`);
+      println(`${paint("1", "ferry " + VERSION)} ${paint("90", p.name)}  ${p.source} ${arrow} ${p.remote || p.cloud || p.target}`);
     }
     if (settings.serve !== "") println(paint("90", "HTTP API on http://" + settings.serve));
     println(paint("90", "watching for changes… press Ctrl+C to stop"));

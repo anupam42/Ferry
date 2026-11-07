@@ -66,3 +66,73 @@ export function scanSecretFile(p: string): string[] {
     fs.closeSync(fd);
   }
 }
+
+// ---------- redaction (secrets: redact) ----------
+
+/** What replaces a secret: the placeholder names the kind, never the value. */
+export const redacted = (what: string) => `<REDACTED:${what}>`;
+
+/** The same detectors as secretPatterns, written so that a match can be replaced. */
+const redactors: [string, RegExp, (m: string, ...g: string[]) => string][] = [
+  [
+    "private-key",
+    /-----BEGIN ((?:[A-Z]+ )*PRIVATE KEY(?: BLOCK)?)-----[\s\S]*?-----END \1-----/g,
+    () => redacted("private-key"),
+  ],
+  ["aws-key", /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, () => redacted("aws-key")],
+  ["github-token", /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})/g, () => redacted("github-token")],
+  ["gitlab-token", /\bglpat-[A-Za-z0-9_\-]{20,}/g, () => redacted("gitlab-token")],
+  ["slack-token", /\bxox[abposr]-[A-Za-z0-9-]{10,}/g, () => redacted("slack-token")],
+  ["stripe-key", /\b[sr]k_live_[A-Za-z0-9]{20,}/g, () => redacted("stripe-key")],
+  ["google-api-key", /\bAIza[0-9A-Za-z_\-]{35}/g, () => redacted("google-api-key")],
+  ["api-key", /\bsk-(?:ant-|proj-)?[A-Za-z0-9_\-]{32,}/g, () => redacted("api-key")],
+  [
+    "secret",
+    // keep the name and quotes, replace only the value
+    /(\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|passw(?:or)?d)["']?\s*[:=]\s*)(["'])[^"'\s]{12,}\2/gi,
+    (_m, pre, q) => `${pre}${q}${redacted("secret")}${q}`,
+  ],
+];
+
+/** KEY=value lines of a .env file: every value is replaced. */
+const envLine = /^([ \t]*(?:export[ \t]+)?[A-Za-z_][A-Za-z0-9_.-]*[ \t]*=[ \t]*)(.*)$/gm;
+
+export interface Redaction {
+  data: Buffer;
+  /** How many secrets were replaced. */
+  count: number;
+  /**
+   * The file is a credential by its name (an SSH key, credentials.json, …)
+   * and nothing in it could be redacted: it must not be copied at all.
+   */
+  block: boolean;
+}
+
+/**
+ * A copy of data with everything that looks like a credential replaced by a
+ * placeholder such as <REDACTED:aws-key>. Values in .env files are all
+ * replaced. rel is the file's path, used to recognise credential files.
+ */
+export function redactSecrets(rel: string, data: Buffer): Redaction {
+  let text = data.toString("utf8");
+  let count = 0;
+  const nameHit = secretNameHit(rel);
+  if (nameHit === "environment file") {
+    text = text.replace(envLine, (m, pre: string, val: string) => {
+      const v = val.trim();
+      if (v === "" || v.startsWith("#") || v === '""' || v === "''") return m;
+      count++;
+      return pre + redacted("value");
+    });
+  }
+  for (const [, re, fn] of redactors) {
+    text = text.replace(re, (...args: unknown[]) => {
+      count++;
+      const groups = args.slice(1, -2) as string[];
+      return fn(args[0] as string, ...groups);
+    });
+  }
+  // a key file whose content we couldn't recognise: refuse rather than guess
+  const block = nameHit !== "" && nameHit !== "environment file" && count === 0;
+  return { data: Buffer.from(text, "utf8"), count, block };
+}

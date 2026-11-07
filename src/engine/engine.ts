@@ -8,6 +8,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import * as ai from "../ai.ts";
 import { dataDir as configDataDir, inWindow, pairFromJSON, pairID, windowLabel, type Pair } from "../config.ts";
 import { diff, isBinary, type Line } from "../difftext.ts";
 import * as gitx from "../gitx.ts";
@@ -15,6 +16,7 @@ import { Matcher } from "../ignore.ts";
 import { merge3 } from "../merge.ts";
 import { send as notify } from "../notify.ts";
 import { exec, isWindows, processAlive } from "../proc.ts";
+import * as cloud from "../cloud.ts";
 import * as remote from "../remote.ts";
 import {
   cmp, errMsg, firstLine, fmtClock, fmtDate, fmtDateHM, fmtHM, fmtStamp, formatDuration, humanSize, isoTime,
@@ -26,8 +28,10 @@ import {
   snapshotsEqual, stat, writeFileAtomic, type FileStat, type Snapshot,
 } from "./fsops.ts";
 import { HashCache } from "./hashcache.ts";
-import { appendBatch, history, journalPath, undo, type Batch, type JournalEntry } from "./journal.ts";
-import { scanSecretFile, secretNameHit } from "./secrets.ts";
+import {
+  appendBatch, history, journalPath, restoreTo, stats, undo, type Batch, type JournalEntry, type Stats,
+} from "./journal.ts";
+import { redactSecrets, scanSecretFile, secretNameHit } from "./secrets.ts";
 import { TarWriter } from "./tar.ts";
 import { moveToTrash } from "./trash.ts";
 import {
@@ -83,6 +87,8 @@ const hashOf = (b: Base, s: Side) => (s === SRC && b.sh ? b.sh : b.h);
 
 const MERGE_MAX = 2 << 20; // base copies are kept for text files up to this size
 const EOL_MAX = 16 << 20;
+const TRANSFORM_MAX = 8 << 20; // bigger files are copied as they are
+const TRANSFORM_TIMEOUT = 60_000;
 
 /** Go's path.Ext: the suffix from the last dot in the final element (".env" → ".env"). */
 function goExt(p: string): string {
@@ -112,6 +118,8 @@ export class Engine {
   private matcher: Matcher; // rebuilt each scan so .gitignore edits apply live
   private only: Matcher | null;
   private secretAllow: Matcher | null;
+  private transforms: [Matcher, string][] | null;
+  private rewriteCache = new Map<string, { key: string; out: { data: Buffer | null; block?: string; note?: string } }>();
   private hashes = new HashCache();
 
   // queue
@@ -160,8 +168,11 @@ export class Engine {
     this.gitTarget = cfg.remote !== "" ? cfg.remote : cfg.target;
     this.only = cfg.only.length > 0 ? new Matcher(...cfg.only) : null;
     this.secretAllow = cfg.secretAllow.length > 0 ? new Matcher(...cfg.secretAllow) : null;
+    this.transforms = cfg.transform && Object.keys(cfg.transform).length > 0
+      ? Object.entries(cfg.transform).map(([glob, cmd]) => [new Matcher(glob), cmd] as [Matcher, string])
+      : null;
     this.status = {
-      name: cfg.name, source: cfg.source, target: cfg.target, remote: cfg.remote, mode: cfg.mode, watcher: "",
+      name: cfg.name, source: cfg.source, target: cfg.target, remote: cfg.remote || cfg.cloud, mode: cfg.mode, watcher: "",
       userPaused: false, guardReason: "", conflicts: [], pendingBatch: 0, pending: false,
       lastSync: 0, added: 0, updated: 0, deleted: 0, renamed: 0, skipped: 0, failed: 0,
       isGit: false, branch: "", gitStatus: [], changed: [],
@@ -279,7 +290,7 @@ export class Engine {
     void this.do(async () => {
       this.prevSrc = null;
       this.hashes.clear();
-      if (this.cfg.remote !== "") this.remoteFull = true;
+      if (this.cfg.remote !== "" || this.cfg.cloud !== "") this.remoteFull = true;
       this.emit({ kind: "info", msg: "full resync" });
       await this.cycle(true, true);
     });
@@ -555,7 +566,7 @@ export class Engine {
       }
       const d = this.abs(DST, rel);
       const di = lstat(d);
-      if (di && this.same(this.abs(SRC, rel), d)) {
+      if (di && this.sameForTarget(rel, this.abs(SRC, rel), d)) {
         if (!(s.mode & MODE_SYMLINK) && !di.isSymbolicLink() && (Number(di.mode) & 0o777) !== (s.mode & 0o777)) {
           ops.push({ kind: "chmod", rel, side: DST });
         }
@@ -935,7 +946,23 @@ export class Engine {
             }
             if (o.isNew) this.emit({ kind: "warn", path: o.rel, msg: `binary file (${humanSize(size)}) — are you sure it belongs in git?` });
           }
-          if (o.side === DST && this.cfg.secrets !== "off" && !binary) {
+          // in redact mode secrets are replaced below instead of reported
+          let content: Buffer | null = null, rewriteNote = "";
+          if (o.side === DST && !binary && this.rewrites(o.rel)) {
+            const tc = this.targetContent(o.rel, fp);
+            if (tc.block) {
+              if (!sameStat(this.secretSeen.get(o.rel), fst)) {
+                this.emit({ kind: "skip", path: o.rel, msg: `possible secret: ${tc.block} — not copied (secrets: redact)` });
+                notify(this.cfg.name + "/secret", "ferry: held back a possible secret", o.rel);
+                this.secretSeen.set(o.rel, fst);
+              }
+              skipped++;
+              break;
+            }
+            content = tc.data;
+            rewriteNote = tc.note ?? "";
+          }
+          if (o.side === DST && this.cfg.secrets !== "off" && this.cfg.secrets !== "redact" && !binary) {
             const hits = this.checkSecrets(o.rel, fp);
             if (hits.length > 0) {
               const msg = "possible secret: " + hits.join(", ");
@@ -958,13 +985,15 @@ export class Engine {
           }
           this.skipped.delete(o.rel);
           if (dry) {
-            this.emit({ kind, path: o.rel, dir: arrow(o.side) });
+            this.emit({ kind, path: o.rel, dir: arrow(o.side), msg: rewriteNote || undefined });
             count(o.isNew);
             break;
           }
           const bk = o.isNew ? "" : backupFile(bdir, sideName(o.side), o.rel, tp, this.cfg.backups);
           try {
-            if (o.side === DST && this.cfg.eol !== "keep" && !binary) {
+            if (content) {
+              writeFileAtomic(tp, this.cfg.eol !== "keep" ? convertEOL(content, this.cfg.eol) : content, fst.mode, fst.mod);
+            } else if (o.side === DST && this.cfg.eol !== "keep" && !binary) {
               writeFileAtomic(tp, convertEOL(fs.readFileSync(fp), this.cfg.eol), fst.mode, fst.mod);
             } else {
               copyFile(fp, tp);
@@ -977,7 +1006,7 @@ export class Engine {
           }
           note(kind, o.side, o.rel, "", bk);
           this.recordBase(o.rel);
-          this.emit({ kind, path: o.rel, dir: arrow(o.side) });
+          this.emit({ kind, path: o.rel, dir: arrow(o.side), msg: rewriteNote || undefined });
           this.track(o.rel, kind, arrow(o.side));
           this.remoteQueue(o.rel, false);
           count(o.isNew);
@@ -1165,6 +1194,66 @@ export class Engine {
     return true;
   }
 
+  /** The transform command for rel, if any (first matching glob wins, in config order). */
+  private transformFor(rel: string): string {
+    if (!this.transforms) return "";
+    for (const [m, cmd] of this.transforms) if (m.match(rel, false)) return cmd;
+    return "";
+  }
+
+  /** Whether files written to the target may differ from their source (transform or redact). */
+  private rewrites(rel: string): boolean {
+    return this.transformFor(rel) !== "" || this.cfg.secrets === "redact";
+  }
+
+  /**
+   * The content the target should get for a source file, when it isn't a
+   * plain copy: the file piped through its transform command, then with
+   * secrets redacted. null means "copy as is"; block means "don't copy".
+   * Results are cached by source path, size and mtime.
+   */
+  private targetContent(rel: string, src: string): { data: Buffer | null; block?: string; note?: string } {
+    const cmd = this.transformFor(rel);
+    const redact = this.cfg.secrets === "redact" && !this.secretAllow?.match(rel, false);
+    if (!cmd && !redact) return { data: null };
+    const fi = stat(src);
+    if (!fi) return { data: null };
+    const key = `${fi.size}|${fi.mtimeNs}`;
+    const hit = this.rewriteCache.get(rel);
+    if (hit && hit.key === key) return hit.out;
+    let out: { data: Buffer | null; block?: string; note?: string } = { data: null };
+    if (Number(fi.size) <= TRANSFORM_MAX && !isBinaryFile(src)) {
+      let data: Buffer = fs.readFileSync(src);
+      const notes: string[] = [];
+      let changed = false;
+      if (cmd) {
+        const r = runTransform(cmd, rel, this.cfg.source, data);
+        if (r.ok) {
+          data = r.data;
+          changed = true;
+          notes.push("transformed");
+        } else {
+          this.warn(`${rel}: transform failed, copying it unchanged: ${r.error}`);
+        }
+      }
+      if (redact) {
+        const red = redactSecrets(rel, data);
+        if (red.block) out = { data: null, block: secretNameHit(rel) + " that can't be redacted" };
+        else if (red.count > 0) {
+          data = red.data;
+          changed = true;
+          notes.push(`${red.count} secret(s) redacted`);
+        }
+      }
+      if (!out.block && changed) out = { data, note: notes.join(", ") };
+    } else if (redact && secretNameHit(rel) !== "" && secretNameHit(rel) !== "environment file") {
+      out = { data: null, block: secretNameHit(rel) + " that can't be redacted" };
+    }
+    if (this.rewriteCache.size > 5000) this.rewriteCache.clear();
+    this.rewriteCache.set(rel, { key, out });
+    return out;
+  }
+
   /** What looks like a credential in a file about to be copied into the target, unless secret_allow matches. */
   private checkSecrets(rel: string, p: string): string[] {
     if (this.secretAllow?.match(rel, false)) return [];
@@ -1220,6 +1309,23 @@ export class Engine {
     }
     if (this.cfg.eol === "keep") return false;
     return sameIgnoringEOL(a, b, ia, ib);
+  }
+
+  /** Whether the target file already holds what the source would produce (after transform/redact). */
+  private sameForTarget(rel: string, src: string, dst: string): boolean {
+    if (!this.rewrites(rel)) return this.same(src, dst);
+    const tc = this.targetContent(rel, src);
+    if (tc.block) return false;
+    if (!tc.data) return this.same(src, dst);
+    let want = tc.data;
+    if (this.cfg.eol !== "keep") want = convertEOL(want, this.cfg.eol);
+    const di = stat(dst);
+    if (!di || Number(di.size) !== want.length) return false;
+    try {
+      return this.hash(dst) === crypto.createHash("sha256").update(want).digest("hex");
+    } catch {
+      return false;
+    }
   }
 
   // ---------- mirror ----------
@@ -1379,7 +1485,13 @@ export class Engine {
         return;
       }
     }
-    const msg = expandMessage(tmpl, this.cfg, lines);
+    let msg = expandMessage(tmpl, this.cfg, lines);
+    if (msg.includes("{ai}")) {
+      this.emit({ kind: "info", msg: "asking Claude for a commit message…" });
+      const { msg: written, error } = await ai.tryCommitMessage(lines, await gitx.pendingDiff(this.gitTarget, stagedOnly));
+      if (written === null) this.warn("AI commit message unavailable (" + error + "); using the generated summary");
+      msg = msg.replaceAll("{ai}", written ?? summarizeStatus(lines));
+    }
     const opts = { author: this.cfg.commitAuthor, sign: this.cfg.signCommits };
     let hash: string;
     try {
@@ -1443,7 +1555,7 @@ export class Engine {
   // archive over ssh, and deletions are applied with rm.
 
   private remoteQueue(rel: string, deleted: boolean): void {
-    if (this.cfg.remote === "" || this.cfg.dryRun) return;
+    if ((this.cfg.remote === "" && this.cfg.cloud === "") || this.cfg.dryRun) return;
     if (deleted) {
       this.remoteAdd.delete(rel);
       this.remoteDel.add(rel);
@@ -1455,6 +1567,7 @@ export class Engine {
 
   /** Sends queued changes to the ssh target. On failure the queue is kept for the next pass. */
   private async pushRemote(): Promise<void> {
+    if (this.cfg.cloud !== "") return this.pushCloud();
     if (this.cfg.remote === "" || this.cfg.dryRun) return;
     if (this.remoteFull) {
       for (const rel of scanDir(this.cfg.target, new Matcher(...HARD_IGNORES), false, null, "link").keys()) this.remoteAdd.add(rel);
@@ -1481,6 +1594,46 @@ export class Engine {
     this.emit({ kind: "info", msg: `pushed ${adds.length} file(s) and removed ${dels.length} on ${this.cfg.remote}` });
     this.remoteAdd.clear();
     this.remoteDel.clear();
+    this.remoteFull = false;
+  }
+
+  /**
+   * Uploads queued changes to the cloud target and deletes removed objects.
+   * Each object that made it is taken off the queue, so a failure retries
+   * only what is left.
+   */
+  private async pushCloud(): Promise<void> {
+    if (this.cfg.dryRun) return;
+    if (this.remoteFull) {
+      for (const rel of scanDir(this.cfg.target, new Matcher(...HARD_IGNORES), false, null, "follow").keys()) this.remoteAdd.add(rel);
+    }
+    if (this.remoteAdd.size === 0 && this.remoteDel.size === 0) {
+      this.remoteFull = false;
+      return;
+    }
+    const spec = cloud.parse(this.cfg.cloud);
+    const store = cloud.open(spec);
+    const adds = sortedKeys(this.remoteAdd), dels = sortedKeys(this.remoteDel);
+    let up = 0, gone = 0;
+    try {
+      await cloud.eachLimit(adds, 8, async (rel) => {
+        const p = this.abs(DST, rel);
+        if (stat(p)) {
+          await store.put(spec.key(rel), p);
+          up++;
+        }
+        this.remoteAdd.delete(rel);
+      });
+      await cloud.eachLimit(dels, 8, async (rel) => {
+        await store.del(spec.key(rel));
+        this.remoteDel.delete(rel);
+        gone++;
+      });
+    } catch (e) {
+      throw new Error(`upload to ${this.cfg.cloud} failed: ${firstLine(errMsg(e))}`);
+    } finally {
+      if (up + gone > 0) this.emit({ kind: "info", msg: `uploaded ${up} file(s) and removed ${gone} on ${this.cfg.cloud}` });
+    }
     this.remoteFull = false;
   }
 
@@ -1540,7 +1693,7 @@ export class Engine {
       id: fmtStamp(now, 6, Math.floor((performance.now() * 1000) % 1000)), time: now.toISOString(),
       pair: this.cfg.name, pair_id: this.id, source: this.cfg.source, target: this.cfg.target, entries,
     };
-    if (this.cfg.remote) b.remote = this.cfg.remote;
+    if (this.cfg.remote || this.cfg.cloud) b.remote = this.cfg.remote || this.cfg.cloud;
     this.journalN++;
     appendBatch(journalPath(this.dataDir, this.id), b, this.journalN % 50 === 1);
   }
@@ -1559,6 +1712,47 @@ export class Engine {
       return { batch: b, problems };
     }
     throw new Error("nothing to undo");
+  }
+
+  /** Undoes every batch recorded after t (ms), newest first. */
+  restoreTo(t: number): { batches: Batch[]; done: string[]; problems: string[] } {
+    const r = restoreTo(this.dataDir, this.id, t, this.cfg.backups);
+    if (r.batches.length > 0) {
+      void this.do(() =>
+        this.emit({ kind: "info", msg: `restored to ${fmtClock(new Date(t))}: undid ${r.batches.length} sync batch(es)` }),
+      );
+    }
+    return r;
+  }
+
+  /** Totals from this pair's history since `since` (ms; 0 = everything). */
+  stats(since: number): Stats {
+    return stats(this.cfg.name, this.history(), since);
+  }
+
+  /**
+   * Stops syncing rel by adding it to the source's .syncignore. The rule is
+   * anchored ("/path") so only that file or folder is matched. Returns the
+   * line that was added, or "" if it was already there.
+   */
+  ignorePath(rel: string): string {
+    const clean = rel.replaceAll("\\", "/").replace(/^\/+|\/+$/g, "");
+    if (clean === "" || clean.split("/").includes("..")) throw new Error("not a path inside the pair: " + rel);
+    const line = "/" + clean.replace(/([*?[\]!#\\ ])/g, "\\$1");
+    const file = path.join(this.cfg.source, ".syncignore");
+    let text = "";
+    try {
+      text = fs.readFileSync(file, "utf8");
+    } catch {}
+    if (text.split(/\r?\n/).includes(line)) return "";
+    const sep = text === "" || text.endsWith("\n") ? "" : "\n";
+    fs.writeFileSync(file, text + sep + line + "\n");
+    void this.do(() => {
+      this.untrack(clean);
+      this.emit({ kind: "info", path: clean, msg: "ignored from now on (added to .syncignore)" });
+      this.publish();
+    });
+    return line;
   }
 
   // ---------- state ----------
@@ -1671,7 +1865,7 @@ export class Engine {
       last_sync: isoTime(st.lastSync), added: st.added, updated: st.updated, deleted: st.deleted,
       renamed: st.renamed, skipped: st.skipped, failed: st.failed, updated_at: new Date().toISOString(),
     };
-    if (this.cfg.remote) ps.remote = this.cfg.remote;
+    if (this.cfg.remote || this.cfg.cloud) ps.remote = this.cfg.remote || this.cfg.cloud;
     if (st.guardReason) ps.guard_reason = st.guardReason;
     if (st.pendingBatch) ps.pending_batch = st.pendingBatch;
     if (st.watcher) ps.watcher = st.watcher;
@@ -1697,6 +1891,26 @@ export class Engine {
 
 function countWrites(ops: Op[]): number {
   return ops.filter((o) => ["copy", "delete", "rename", "dup", "merge"].includes(o.kind)).length;
+}
+
+/**
+ * Pipes data through a shell command run in the source folder. {path} in the
+ * command is replaced by the file's pair-relative path, quoted for the shell.
+ */
+export function runTransform(cmd: string, rel: string, cwd: string, data: Buffer): { ok: true; data: Buffer } | { ok: false; error: string } {
+  const quoted = isWindows ? `"${rel.replaceAll('"', "")}"` : remote.quote(rel);
+  const line = cmd.replaceAll("{path}", quoted);
+  const argv = isWindows ? ["cmd", "/C", line] : ["sh", "-c", line];
+  try {
+    const r = Bun.spawnSync(argv, { cwd, stdin: data, stdout: "pipe", stderr: "pipe", timeout: TRANSFORM_TIMEOUT });
+    if (r.exitCode !== 0) {
+      const why = r.signalCode ? "timed out or was killed" : `exit ${r.exitCode}`;
+      return { ok: false, error: `${why}: ${firstLine(r.stderr.toString().trim() || r.stdout.toString().trim())}` };
+    }
+    return { ok: true, data: Buffer.from(r.stdout) };
+  } catch (e) {
+    return { ok: false, error: errMsg(e) };
+  }
 }
 
 function permString(perm: number): string {
@@ -1729,7 +1943,7 @@ export function expandMessage(tmpl: string, p: Pair, lines: string[]): string {
   const now = new Date();
   const files = lines.filter((l) => l.length > 3).map((l) => l.slice(3).replace(/^"+|"+$/g, ""));
   const shown = files.length > 5 ? [...files.slice(0, 5), `+${files.length - 5} more`] : files;
-  const target = p.remote !== "" ? p.remote : path.basename(p.target);
+  const target = p.remote || p.cloud || path.basename(p.target);
   const vars: Record<string, string> = {
     "{count}": String(files.length), "{files}": shown.join(", "), "{summary}": summarizeStatus(lines),
     "{source}": path.basename(p.source), "{target}": target, "{pair}": p.name,

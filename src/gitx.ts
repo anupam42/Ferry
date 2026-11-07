@@ -12,6 +12,24 @@ export function available(): boolean {
   return which("git") !== null;
 }
 
+/**
+ * The diff a commit would contain, for writing a message: staged changes
+ * only, or everything against HEAD (untracked files are listed by status,
+ * not diffed). "" if git can't produce one, e.g. before the first commit.
+ */
+export async function pendingDiff(dir: string, stagedOnly: boolean): Promise<string> {
+  const args = stagedOnly ? ["diff", "--cached", "--no-color", "-U2"] : ["diff", "HEAD", "--no-color", "-U2"];
+  try {
+    return await run(dir, ...args);
+  } catch {
+    try {
+      return await run(dir, "diff", "--cached", "--no-color", "-U2");
+    } catch {
+      return "";
+    }
+  }
+}
+
 /** "git version x.y.z", or "". */
 export async function version(): Promise<string> {
   const r = await exec(["git", "--version"]);

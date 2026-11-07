@@ -6,7 +6,7 @@ import { SUBCOMMANDS } from "./usage.ts";
 /** Every run flag, plus the flags of the other subcommands. */
 function flagNames(): string[] {
   const seen = new Set(newRunFlags().names());
-  for (const n of ["keep", "all", "diff", "sides", "format", "batch", "n", "version", "to", "older-than", "m", "running", "help"]) seen.add(n);
+  for (const n of ["keep", "all", "diff", "sides", "format", "batch", "n", "version", "to", "older-than", "m", "running", "help", "at", "since", "ai", "port", "host", "no-open"]) seen.add(n);
   return [...seen].sort();
 }
 
@@ -36,7 +36,7 @@ _ferry() {
     --mode) COMPREPLY=( $(compgen -W "one-way two-way" -- "$cur") ); return ;;
     --on-delete) COMPREPLY=( $(compgen -W "keep restore propagate" -- "$cur") ); return ;;
     --conflict|--headless-conflict) COMPREPLY=( $(compgen -W "ask hold source target newer keep-both" -- "$cur") ); return ;;
-    --secrets) COMPREPLY=( $(compgen -W "warn block off" -- "$cur") ); return ;;
+    --secrets) COMPREPLY=( $(compgen -W "warn block redact off" -- "$cur") ); return ;;
     --eol) COMPREPLY=( $(compgen -W "keep lf crlf" -- "$cur") ); return ;;
     --symlinks) COMPREPLY=( $(compgen -W "skip follow link" -- "$cur") ); return ;;
     --ui) COMPREPLY=( $(compgen -W "auto tui plain json" -- "$cur") ); return ;;
@@ -70,7 +70,7 @@ _ferry() {
   esac
   case $words[CURRENT-1] in
     --keep) _values 'choice' source target newer both merge; return ;;
-    --secrets) _values 'mode' warn block off; return ;;
+    --secrets) _values 'mode' warn block redact off; return ;;
     --eol) _values 'eol' keep lf crlf; return ;;
     --theme) _values 'theme' auto dark light mono; return ;;
     --config|--log) _files; return ;;
