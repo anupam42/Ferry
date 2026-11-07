@@ -1,9 +1,22 @@
 <h1 align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-dark.svg">
-    <img alt="Ferry" src="assets/logo/logo.svg" width="300">
+    <img alt="Ferry" src="assets/logo/logo.svg" width="340">
   </picture>
 </h1>
+
+<p align="center">
+  <b>Meet Relay, the Sync Spirit</b><br>
+  <em>A friendly, floating companion that keeps your files and projects in flow.</em>
+</p>
+
+<p align="center">
+  <img src="assets/mascot/relay-happy.svg" alt="Relay, happy: all synced" width="96" title="All synced">
+  <img src="assets/mascot/relay-focused.svg" alt="Relay, focused: syncing" width="96" title="Syncing">
+  <img src="assets/mascot/relay-sleepy.svg" alt="Relay, sleepy: paused" width="96" title="Paused">
+  <img src="assets/mascot/relay-worried.svg" alt="Relay, worried: a conflict" width="96" title="Conflict">
+  <img src="assets/mascot/relay-love.svg" alt="Relay, love: thank you" width="96" title="Thank you">
+</p>
 
 Work in one folder, commit from another. **Ferry** watches a working folder and mirrors every change into your git repo folder. It can also sync in both directions, with conflict detection and three-way merges, or push to a server over ssh or to cloud storage (S3, R2, MinIO). Prefer a browser to a terminal? `ferry ui` opens a web app where you can do everything without typing commands. It runs from any terminal (PowerShell, cmd, bash, zsh, fish) on Windows, macOS and Linux as a single self-contained binary (nothing else to install).
 
@@ -453,6 +466,10 @@ Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs, set
    Each token is a PAT with `repo` scope.
 3. `git tag v1.2.0 && git push --tags`. The release workflow cross-compiles every platform with bun, attaches archives, `.deb`, `.rpm` and `.apk` packages (built with nfpm) and checksums, and updates the tap and the bucket (`scripts/publish-manifests.ts`) and winget. The winget step updates an existing package, so submit the first version to `microsoft/winget-pkgs` by hand.
 4. CI (`.github/workflows/ci.yml`) runs the typecheck, the tests, and a compiled-binary smoke test on Ubuntu, macOS and Windows for every push and pull request.
+
+## Brand
+
+Ferry's mascot is **Relay, the Sync Spirit**. The logo, the mascot in every pose and expression, and the icons are in [`assets/`](assets); the [brand sheet](assets/mascot/relay-sheet.svg) shows them all. They're generated from one script, so edit [`scripts/generate-mascot.py`](scripts/generate-mascot.py) and run `python3 scripts/generate-mascot.py assets/mascot assets/logo` rather than editing the SVGs by hand.
 
 ## License
 

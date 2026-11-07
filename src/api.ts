@@ -33,6 +33,7 @@ import { eventJSON, parseChoice, type Event } from "./engine/types.ts";
 import { errMsg, parseWhen } from "./util.ts";
 import webPage from "./web/index.html" with { type: "text" };
 import logoSVG from "../assets/logo/icon.svg" with { type: "text" };
+import mascotSVG from "../assets/mascot/relay.svg" with { type: "text" };
 
 const PAGE = webPage as unknown as string;
 
@@ -105,6 +106,11 @@ export class ApiServer {
     }
     if (req.method === "GET" && (url.pathname === "/logo.svg" || url.pathname === "/favicon.ico")) {
       return new Response(logoSVG as unknown as string, {
+        headers: { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=86400", "X-Content-Type-Options": "nosniff" },
+      });
+    }
+    if (req.method === "GET" && url.pathname === "/relay.svg") {
+      return new Response(mascotSVG as unknown as string, {
         headers: { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=86400", "X-Content-Type-Options": "nosniff" },
       });
     }
