@@ -32,6 +32,7 @@ import { batchesSince } from "./engine/journal.ts";
 import { eventJSON, parseChoice, type Event } from "./engine/types.ts";
 import { errMsg, parseWhen } from "./util.ts";
 import webPage from "./web/index.html" with { type: "text" };
+import logoSVG from "../assets/logo/icon.svg" with { type: "text" };
 
 const PAGE = webPage as unknown as string;
 
@@ -100,6 +101,11 @@ export class ApiServer {
           "Content-Security-Policy": "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
           "X-Content-Type-Options": "nosniff",
         },
+      });
+    }
+    if (req.method === "GET" && (url.pathname === "/logo.svg" || url.pathname === "/favicon.ico")) {
+      return new Response(logoSVG as unknown as string, {
+        headers: { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=86400", "X-Content-Type-Options": "nosniff" },
       });
     }
     if (req.method === "GET" && url.pathname === "/status") {
