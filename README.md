@@ -1,6 +1,8 @@
 <h1 align="center">
-  <img src="assets/logo/icon.svg" alt="" width="56" height="56" align="center">
-  Ferry
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-dark.svg">
+    <img alt="Ferry" src="assets/logo/logo.svg" width="300">
+  </picture>
 </h1>
 
 Work in one folder, commit from another. **Ferry** watches a working folder and mirrors every change into your git repo folder. It can also sync in both directions, with conflict detection and three-way merges, or push to a server over ssh or to cloud storage (S3, R2, MinIO). Prefer a browser to a terminal? `ferry ui` opens a web app where you can do everything without typing commands. It runs from any terminal (PowerShell, cmd, bash, zsh, fish) on Windows, macOS and Linux as a single self-contained binary (nothing else to install).
