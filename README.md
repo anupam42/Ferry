@@ -21,7 +21,7 @@ Work in one folder, commit from another. **Ferry** watches a working folder and 
 
 - [Install](#install) · [Quick start](#quick-start) · [Web app](#web-app)
 - [Features](#features): [Sync](#sync) · [Choosing what to sync](#choosing-what-to-sync) · [Conflicts and merging](#conflicts-and-merging) · [Safety](#safety) · [History and undo](#history-and-undo) · [Git](#git) · [Remote targets over ssh](#remote-targets-over-ssh) · [Cloud storage targets](#cloud-storage-targets) · [Scheduling](#scheduling) · [Dashboard](#dashboard) · [Status, plan and doctor](#status-plan-and-doctor) · [Integrations](#integrations) · [Background service](#background-service)
-- [Commands](#commands) · [Dashboard keys](#dashboard-keys) · [Config file](#config-file) · [Behaviour notes](#behaviour-notes)
+- [Commands](#commands) · [Dashboard keys](#dashboard-keys) · [Config file](#config-file) · [Behaviour notes](#behaviour-notes) · [Todo](#todo)
 
 ## Install
 
@@ -372,6 +372,23 @@ pairs:
 - **Two-way conflicts**: nothing is ever overwritten silently by default. The dashboard or terminal asks you; without either, the conflict is held until you run `ferry resolve`. With `merge: true`, edits that don't overlap are merged without asking.
 - **Data folder.** State, backups, history, the hash cache, status files, merge bases, remote and cloud shadow copies, the web app's `ui.yaml` and logs live in your user cache folder (`~/.cache/ferry`, `~/Library/Caches/ferry` or `%LocalAppData%\ferry`). You can override it with `FERRY_HOME`.
 - **Exit codes:** `--once` exits with 1 if any file failed, and with 3 if conflicts were left for you to resolve. `ferry doctor` exits with 1 if it finds a problem.
+
+## Todo
+
+Ideas being considered, roughly in priority order. Checked items are done.
+
+- [ ] **AI conflict resolution** — a "let Claude resolve this" choice for conflicts in the dashboard and web app, next to `s`/`t`/`n`/`b`/`m`. Sends the merge base and both versions, shows the reply for approval before writing. Reuses the Anthropic SDK already used for `{ai}` commit messages.
+- [ ] **Compressed ssh push** — stream the batch tar through `zstd` (falling back to plain tar when it isn't installed) to cut bandwidth to ssh targets.
+- [ ] **`/metrics` endpoint** on the local HTTP API (Prometheus format): files synced, errors, conflicts and last-pass time per pair, so the background service can be monitored.
+- [ ] **rclone targets** — treat `rclone` like `git-lfs`: an optional tool that adds Google Drive, Dropbox, OneDrive, WebDAV, SFTP and more as targets.
+- [ ] **`--bandwidth 1MB/s`** — byte-level throttling for ssh and cloud uploads (`--max-ops` already throttles operations).
+- [ ] **`ferry send <folder> user@host:path`** — one-shot transfer with no state or watching, reusing the ssh + tar plumbing.
+- [ ] **`ferry bootstrap`** — initial target→source pull when adopting Ferry against an existing ssh or cloud deployment.
+- [ ] **Case-collision detection** — warn when two source files differ only by case (breaks macOS and Windows checkouts); also a `doctor` check.
+- [ ] **Environment variables in the config** — expand `$VAR`/`${VAR}` in string values so tokens and webhook URLs don't have to be stored in plaintext.
+- [ ] **Neovim plugin** — status, conflict resolution and pause/resume over the HTTP API and `/events`, like the VS Code extension.
+- [ ] **Encrypted targets** (`--encrypt`) — sync files encrypted with a passphrase or age key, so the target can be an untrusted repo or bucket.
+- [ ] **`ferry snapshot`** — save the current state of a pair as a timestamped tarball in the data folder, a checkpoint before a risky refactor.
 
 ## Development
 
