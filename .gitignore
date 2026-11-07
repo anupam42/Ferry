@@ -4,3 +4,6 @@
 /ferry-bin*
 *.vsix
 node_modules/
+
+# rendered videos and GIFs for social posts (regenerate rather than commit)
+exports/

@@ -711,6 +711,9 @@ def sky_lantern(x, scale, colour):
             f'<ellipse cx="0" cy="12" rx="9" ry="5" fill="#FFF3B0"/></g>')
 
 
+LOOP = 12  # seconds
+
+
 def diwali_lanterns():
     rnd = random.Random(42)
     lanterns = ""
@@ -718,16 +721,19 @@ def diwali_lanterns():
         x = rnd.uniform(60, 540)
         if 210 < x < 390:  # keep Relay's space clear at the start
             x = rnd.choice([rnd.uniform(60, 200), rnd.uniform(400, 540)])
-        dur = rnd.uniform(9, 14)
-        lanterns += (f'<g class="rise" style="animation-duration:{dur:.1f}s;animation-delay:-{rnd.uniform(0, dur):.1f}s"><g transform="translate(0 520)">'
+        # every motion in this card repeats on a 12 s cycle, so it loops seamlessly as a video or GIF
+        dur = LOOP
+        lanterns += (f'<g class="rise" style="animation-duration:{dur}s;animation-delay:-{(i + rnd.uniform(0, .6)) * dur / 9:.2f}s"><g transform="translate(0 520)">'
                      f'<g class="sway" style="animation-delay:{rnd.uniform(0, 2):.1f}s">{sky_lantern(x, rnd.uniform(.55, 1), rnd.choice(["#FF9A3C", "#FFB547", "#FF7A45"]))}</g></g></g>')
     # Relay lets one go
     own = f'<g class="rise-own"><g transform="translate(0 0)">{sky_lantern(300, .9, "#FFB547")}</g></g>'
-    body = stars_(3, 26, 380) + lanterns + relay_at("l", 156, 230, .64, FACE("happy", "big")) + own
+    body = stars_(3, 26, 380) + lanterns + own + relay_at("l", 156, 230, .64, FACE("happy", "big"))  # Relay's lantern rises from behind it
     css = DIYA_CSS + """
     .rise { animation: rise linear infinite; }
-    .rise-own { animation: own 9s ease-in infinite; }
-    .sway { animation: sway 2.6s ease-in-out infinite alternate; }
+    .rise-own { animation: own 12s ease-in infinite; }
+    .sway { animation: sway 3s ease-in-out infinite alternate; }
+    .float { animation-duration: 4s; }
+    .twinkle { animation-duration: 2s; }
     @keyframes rise { from { transform: translateY(0); opacity: 1; } 85% { opacity: 1; } to { transform: translateY(-600px); opacity: 0; } }
     @keyframes own { 0% { transform: translateY(250px); opacity: 0; } 8% { opacity: 1; } 100% { transform: translateY(-120px); opacity: 0; } }
     @keyframes sway { from { transform: translateX(-6px); } to { transform: translateX(6px); } }
