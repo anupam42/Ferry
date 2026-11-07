@@ -469,7 +469,10 @@ Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs, set
 
 ## Brand
 
-Ferry's mascot is **Relay, the Sync Spirit**. The logo, the mascot in every pose and expression, and the icons are in [`assets/`](assets); the [brand sheet](assets/mascot/relay-sheet.svg) shows them all. They're generated from one script, so edit [`scripts/generate-mascot.py`](scripts/generate-mascot.py) and run `python3 scripts/generate-mascot.py assets/mascot assets/logo` rather than editing the SVGs by hand.
+Ferry's mascot is **Relay, the Sync Spirit**. The logo, the mascot in every pose and expression, and the icons are in [`assets/`](assets); the [brand sheet](assets/mascot/relay-sheet.svg) shows them all.
+
+Animated cards (plain SVG, they play anywhere an image does):
+Diwali ([fireworks](assets/mascot/relay-diwali.svg), [rangoli](assets/mascot/relay-diwali-rangoli.svg), [sky lanterns](assets/mascot/relay-diwali-lanterns.svg), [sparkler](assets/mascot/relay-diwali-sparkler.svg), [diya row](assets/mascot/relay-diwali-diyas.svg), [sweets](assets/mascot/relay-diwali-sweets.svg)) · [Holi](assets/mascot/relay-holi.svg) · [Eid](assets/mascot/relay-eid.svg) · [Christmas](assets/mascot/relay-christmas.svg) · [New Year](assets/mascot/relay-new-year.svg) · [Halloween](assets/mascot/relay-halloween.svg) · [Syncing loader](assets/mascot/relay-syncing.svg) They're generated from one script, so edit [`scripts/generate-mascot.py`](scripts/generate-mascot.py) and run `python3 scripts/generate-mascot.py assets/mascot assets/logo` rather than editing the SVGs by hand.
 
 ## License
 

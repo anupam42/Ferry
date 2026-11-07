@@ -324,3 +324,499 @@ if logo_out:
     open(os.path.join(logo_out, "logo.svg"), "w").write(wordmark(NAVY))
     open(os.path.join(logo_out, "logo-dark.svg"), "w").write(wordmark("#F2F5FA"))
     print("wrote 3 logo files")
+
+
+# ---------- animated greeting: Happy Diwali ----------
+# Plain SVG + CSS animation, so it plays as an <img> (README, browsers, chat).
+# Everything holds still for people who ask for reduced motion.
+def diya(x, y, scale, delay, glow_id):
+    """A clay lamp with a flickering flame, centred at the rim (x, y)."""
+    return f'''<g transform="translate({x} {y}) scale({scale})">
+    <circle cx="0" cy="-30" r="46" fill="url(#{glow_id})" class="glow" style="animation-delay:{delay}s"/>
+    <path d="M-46 0C-40 30 40 30 46 0Z" fill="url(#clay)" stroke="#5A2A12" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M-46 0C-20 -10 20 -10 46 0" fill="none" stroke="#F3B35C" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-22" cy="12" r="3.5" fill="#F7C873"/><circle cx="0" cy="16" r="3.5" fill="#F7C873"/><circle cx="22" cy="12" r="3.5" fill="#F7C873"/>
+    <g class="flame" style="animation-delay:{delay}s">
+      <path d="M0 -6C-14 -18 -12 -34 0 -54C12 -34 14 -18 0 -6Z" fill="url(#flame)"/>
+      <path d="M0 -10C-6 -18 -5 -26 0 -34C5 -26 6 -18 0 -10Z" fill="#FFF6C9"/>
+    </g>
+  </g>'''
+
+
+def burst(x, y, r, colour, delay, n=12):
+    dots = "".join(
+        f'<circle cx="{x + r * math.cos(2 * math.pi * k / n):.1f}" cy="{y + r * math.sin(2 * math.pi * k / n):.1f}" r="{4 if k % 2 else 3}" fill="{colour}"/>'
+        for k in range(n))
+    rays = "".join(
+        f'<path d="M{x + r * .45 * math.cos(2 * math.pi * k / n):.1f} {y + r * .45 * math.sin(2 * math.pi * k / n):.1f}'
+        f'L{x + r * .8 * math.cos(2 * math.pi * k / n):.1f} {y + r * .8 * math.sin(2 * math.pi * k / n):.1f}" stroke="{colour}" stroke-width="3" stroke-linecap="round"/>'
+        for k in range(0, n, 2))
+    return f'<g class="burst" style="transform-origin:{x}px {y}px;animation-delay:{delay}s">{rays}{dots}</g>'
+
+
+def diwali():
+    W, H = 600, 470
+    stars = [(60, 120, 0), (180, 96, .7), (420, 104, 1.3), (548, 128, .4), (34, 260, 1.8), (566, 300, 1.1), (250, 150, 2.2), (360, 150, .9)]
+    bulbs = []
+    for i in range(13):  # a garland hanging in a gentle curve
+        bx = 30 + i * 45
+        by = 26 + 22 * math.sin(math.pi * i / 12)
+        c = ["#FFD166", "#FF7AA2", "#7EE0C3", "#7FB4FF"][i % 4]
+        bulbs.append(f'<circle cx="{bx}" cy="{by + 10:.1f}" r="7" fill="{c}" class="bulb" style="animation-delay:{(i % 3) * .5}s"/>')
+    garland = (f'<path d="M14 26Q300 92 586 26" fill="none" stroke="#C9A24A" stroke-width="2.5" opacity=".7"/>' + "".join(bulbs))
+    relay = figure("d", FACE("happy", "big"))
+    content = f'''<style>
+    .float {{ animation: float 3.6s ease-in-out infinite; }}
+    .flame {{ transform-box: fill-box; transform-origin: 50% 100%; animation: flicker .9s ease-in-out infinite alternate; }}
+    .glow {{ animation: glow 1.8s ease-in-out infinite alternate; }}
+    .burst {{ opacity: 0; animation: burst 3s ease-out infinite; }}
+    .star {{ animation: twinkle 2.4s ease-in-out infinite; }}
+    .bulb {{ animation: blink 1.5s steps(2, jump-none) infinite; }}
+    .title {{ animation: shimmer 4s ease-in-out infinite; }}
+    @keyframes float {{ 0%, 100% {{ transform: translateY(0); }} 50% {{ transform: translateY(-10px); }} }}
+    @keyframes flicker {{ 0% {{ transform: scale(1, 1) skewX(0deg); }} 50% {{ transform: scale(.94, 1.08) skewX(-3deg); }} 100% {{ transform: scale(1.04, .95) skewX(3deg); }} }}
+    @keyframes glow {{ from {{ opacity: .55; }} to {{ opacity: 1; }} }}
+    @keyframes burst {{ 0% {{ opacity: 0; transform: scale(.15); }} 15% {{ opacity: 1; }} 60% {{ opacity: .9; transform: scale(1); }} 100% {{ opacity: 0; transform: scale(1.12); }} }}
+    @keyframes twinkle {{ 0%, 100% {{ opacity: .25; }} 50% {{ opacity: 1; }} }}
+    @keyframes blink {{ 0% {{ opacity: 1; }} 100% {{ opacity: .35; }} }}
+    @keyframes shimmer {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: .82; }} }}
+    @media (prefers-reduced-motion: reduce) {{ * {{ animation: none !important; }} .burst {{ opacity: 1; }} }}
+  </style>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#160F3B"/><stop offset="1" stop-color="#2D1A5C"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE7A3"/><stop offset="1" stop-color="#F2B33D"/></linearGradient>
+    <linearGradient id="clay" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9783A"/><stop offset="1" stop-color="#9C4219"/></linearGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FF7A1A"/><stop offset=".55" stop-color="#FFB627"/><stop offset="1" stop-color="#FFE57A"/></linearGradient>
+    <radialGradient id="glowA"><stop offset="0" stop-color="#FFC94D" stop-opacity=".75"/><stop offset="1" stop-color="#FFC94D" stop-opacity="0"/></radialGradient>
+    <radialGradient id="warm" cx="0.5" cy="0.85" r="0.6"><stop offset="0" stop-color="#FFB547" stop-opacity=".28"/><stop offset="1" stop-color="#FFB547" stop-opacity="0"/></radialGradient>
+    <clipPath id="dclip"><path d="{SIL}"/></clipPath>
+  </defs>
+  <rect width="{W}" height="{H}" rx="28" fill="url(#sky)"/>
+  <rect width="{W}" height="{H}" rx="28" fill="url(#warm)"/>
+  {"".join(f'<circle cx="{x}" cy="{y}" r="2.6" fill="#FFF4D6" class="star" style="animation-delay:{d}s"/>' for x, y, d in stars)}
+  {garland}
+  {burst(86, 196, 44, "#FFD166", 0)}
+  {burst(514, 186, 50, "#FF7AA2", 1)}
+  {burst(520, 312, 34, "#7EE0C3", 2)}
+  {burst(78, 330, 30, "#7FB4FF", 1.6)}
+  <text x="300" y="104" text-anchor="middle" class="title" font-family="ui-rounded, 'SF Pro Rounded', Nunito, 'Varela Round', system-ui, sans-serif" font-size="46" font-weight="800" fill="url(#gold)" letter-spacing="1">Happy Diwali</text>
+  <text x="300" y="134" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="16" fill="#E9DDFB" opacity=".9">Wishing you light, joy and conflict-free syncs</text>
+  <g class="float"><g transform="translate(138 150) scale(0.72)">{relay}</g></g>
+  {diya(300, 420, 1.0, 0, "glowA")}
+  {diya(156, 430, .62, .4, "glowA")}
+  {diya(444, 430, .62, .8, "glowA")}'''
+    return svg(content, (0, 0, W, H), label="Relay wishing you a Happy Diwali", title="Happy Diwali from Relay")
+
+
+open(os.path.join(out, "relay-diwali.svg"), "w").write(diwali())
+print("wrote relay-diwali.svg")
+
+
+# ---------- more animated cards ----------
+import random
+
+TITLE_FONT = "ui-rounded, 'SF Pro Rounded', Nunito, 'Varela Round', system-ui, sans-serif"
+BODY_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+BASE_CSS = """
+    .float { animation: float 3.6s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }"""
+
+
+def relay_at(pid, x, y, scale, face, on_top="", spark=None):
+    """Relay placed in a card; on_top is drawn in Relay's own coordinates (hats, paint)."""
+    return (f'<g class="float"><g transform="translate({x} {y}) scale({scale})">'
+            f'<defs><clipPath id="{pid}clip"><path d="{SIL}"/></clipPath></defs>{figure(pid, face, spark=spark)}{on_top}</g></g>')
+
+
+def card(name, label_, title, sky, title_fill, subtitle, sub_color, body, css, defs_extra="", title_y=84, sub_y=446,
+         H=470, title_font=None, title_size=46):
+    W = 600
+    content = f'''<style>{BASE_CSS}{css}
+  </style>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{sky[0]}"/><stop offset="1" stop-color="{sky[1]}"/></linearGradient>
+    {defs_extra}
+  </defs>
+  <rect width="{W}" height="{H}" rx="28" fill="url(#sky)"/>
+  {body}
+  <text x="300" y="{title_y}" text-anchor="middle" font-family="{title_font or TITLE_FONT}" font-size="{title_size}" font-weight="800" fill="{title_fill}" letter-spacing="1">{title}</text>
+  <text x="300" y="{sub_y}" text-anchor="middle" font-family="{BODY_FONT}" font-size="16" fill="{sub_color}">{subtitle}</text>'''
+    open(os.path.join(out, name), "w").write(svg(content, (0, 0, W, H), label=label_, title=label_))
+
+
+def falling(n, shape, seed, colours, w=600, h=470, dmin=5, dmax=11):
+    """Things that fall forever (snow, confetti): each loops from above the card to below it."""
+    rnd = random.Random(seed)
+    out = ""
+    for i in range(n):
+        x = rnd.uniform(10, w - 10)
+        dur = rnd.uniform(dmin, dmax)
+        delay = -rnd.uniform(0, dur)  # negative delay: already mid-fall at the start
+        c = colours[i % len(colours)]
+        out += f'<g class="fall" style="animation-duration:{dur:.1f}s;animation-delay:{delay:.1f}s"><g transform="translate({x:.0f} -20)">{shape(rnd, c)}</g></g>'
+    return out
+
+
+def blob(cx, cy, r, seed, n=9):
+    """A splash: a circle with soft random bumps."""
+    rnd = random.Random(seed)
+    pts = []
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        rr = r * rnd.uniform(.72, 1.18)
+        pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
+    d = f"M{(pts[0][0] + pts[-1][0]) / 2:.1f} {(pts[0][1] + pts[-1][1]) / 2:.1f}"
+    for i in range(n):
+        p, q = pts[i], pts[(i + 1) % n]
+        d += f"Q{p[0]:.1f} {p[1]:.1f} {(p[0] + q[0]) / 2:.1f} {(p[1] + q[1]) / 2:.1f}"
+    return d + "Z"
+
+
+# Holi: colour splashes pop around Relay, powder drifts up, Relay has paint spots
+def holi():
+    cols = ["#FF4F8B", "#FFC83D", "#33C48D", "#3D8BFF", "#A15CFF", "#FF7A3D"]
+    spots = [(70, 190, 46), (530, 200, 52), (110, 360, 40), (500, 360, 44), (300, 150, 26), (40, 300, 28), (565, 300, 26)]
+    splashes = "".join(
+        f'<path d="{blob(x, y, r, i * 7 + 3)}" fill="{cols[i % len(cols)]}" class="pop" style="transform-origin:{x}px {y}px;animation-delay:{i * .45:.2f}s"/>'
+        for i, (x, y, r) in enumerate(spots))
+    rnd = random.Random(11)
+    powder = "".join(
+        f'<circle cx="{rnd.uniform(40, 560):.0f}" cy="{rnd.uniform(300, 460):.0f}" r="{rnd.uniform(3, 7):.1f}" fill="{cols[i % 6]}" class="rise" '
+        f'style="animation-duration:{rnd.uniform(4, 7):.1f}s;animation-delay:-{rnd.uniform(0, 6):.1f}s"/>' for i in range(26))
+    paint = (f'<g clip-path="url(#hclip)">'
+             f'<path d="{blob(150, 120, 22, 5)}" fill="#FF4F8B" opacity=".85"/><path d="{blob(330, 80, 16, 9)}" fill="#FFC83D" opacity=".9"/>'
+             f'<path d="{blob(300, 236, 18, 4)}" fill="#A15CFF" opacity=".8"/><path d="{blob(120, 230, 14, 2)}" fill="#33C48D" opacity=".85"/></g>')
+    body = splashes + powder + relay_at("h", 138, 140, .72, FACE("laughing", "big"), paint)
+    css = """
+    .pop { animation: pop 3.2s ease-out infinite; }
+    .rise { animation: rise linear infinite; }
+    @keyframes pop { 0% { transform: scale(0); opacity: 0; } 18% { transform: scale(1.08); opacity: .95; } 30% { transform: scale(1); } 80% { opacity: .9; } 100% { transform: scale(1); opacity: 0; } }
+    @keyframes rise { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .9; } 100% { transform: translate(14px, -260px); opacity: 0; } }"""
+    grad = '<linearGradient id="rainbow" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF4F8B"/><stop offset=".25" stop-color="#FF7A3D"/><stop offset=".5" stop-color="#E5A800"/><stop offset=".75" stop-color="#22A779"/><stop offset="1" stop-color="#7A4DFF"/></linearGradient>'
+    card("relay-holi.svg", "Happy Holi from Relay", "Happy Holi", ("#FFF8EF", "#FFEFF6"), "url(#rainbow)",
+         "May your days be as colourful as your diffs", "#6B4A7A", body, css, grad)
+
+
+# Christmas: snow falls, Relay wears a Santa hat, snowy ground
+SANTA_HAT = (f'<g transform="rotate(-10 250 30)">'
+             f'<path d="M188 40C200 -20 250 -70 318 -62C352 -58 372 -40 376 -18C350 -34 326 -30 314 -4L312 36Z" fill="#E23A3A" stroke="{NAVY}" stroke-width="7" stroke-linejoin="round"/>'
+             f'<rect x="178" y="22" width="150" height="34" rx="17" fill="#FFFFFF" stroke="{NAVY}" stroke-width="7"/>'
+             f'<circle cx="378" cy="-16" r="18" fill="#FFFFFF" stroke="{NAVY}" stroke-width="7"/></g>')
+
+
+def christmas():
+    snow = falling(46, lambda r, c: f'<circle r="{r.uniform(2, 5):.1f}" fill="#FFFFFF" opacity="{r.uniform(.6, 1):.2f}"/>', 21, ["#fff"])
+    ground = ('<path d="M0 410C120 380 220 400 300 392C400 382 480 404 600 390V470H0Z" fill="#EAF2FF"/>'
+              '<path d="M0 410C120 380 220 400 300 392C400 382 480 404 600 390" fill="none" stroke="#C9DBF5" stroke-width="3"/>')
+    tree = ('<g transform="translate(70 300)"><path d="M0 -70L34 -10H18L44 40H-44L-18 -10H-34Z" fill="#1F8A5B"/><rect x="-7" y="40" width="14" height="18" fill="#8A5A32"/>'
+            '<circle cx="-10" cy="0" r="4" fill="#FFD166" class="twinkle"/><circle cx="14" cy="20" r="4" fill="#FF7AA2" class="twinkle" style="animation-delay:.6s"/>'
+            '<circle cx="-18" cy="30" r="4" fill="#7FB4FF" class="twinkle" style="animation-delay:1.2s"/><path d="M0 -84l5 10 11 1-8 7 3 11-11-6-11 6 3-11-8-7 11-1z" fill="#FFD166"/></g>')
+    body = ground + tree + relay_at("c", 150, 150, .72, FACE("happy", "big"), SANTA_HAT) + snow
+    css = """
+    .fall { animation: fall linear infinite; }
+    .twinkle { animation: twinkle 1.8s ease-in-out infinite; }
+    @keyframes fall { from { transform: translate(0, 0); } to { transform: translate(18px, 510px); } }
+    @keyframes twinkle { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }"""
+    card("relay-christmas.svg", "Merry Christmas from Relay", "Merry Christmas", ("#0E2149", "#1D3B78"), "#FFFFFF",
+         "Peace, joy and a clean working tree", "#22335A", body, css, sub_y=446)
+
+
+# New Year: confetti falls, party hat, "2027" pops in
+PARTY_HAT = (f'<g transform="rotate(12 250 20)">'
+             f'<path d="M200 34L256 -78L312 30Z" fill="#7A4DFF" stroke="{NAVY}" stroke-width="7" stroke-linejoin="round"/>'
+             f'<path d="M228 -22L284 -8M214 8L298 22M242 -50L270 -42" stroke="#FFD166" stroke-width="9" stroke-linecap="round"/>'
+             f'<circle cx="256" cy="-84" r="15" fill="#FF7AA2" stroke="{NAVY}" stroke-width="6"/></g>')
+
+
+def new_year(year="2027"):
+    conf = falling(40, lambda r, c: f'<rect x="-6" y="-3" width="{r.uniform(9, 14):.0f}" height="6" rx="2" fill="{c}" transform="rotate({r.uniform(0, 180):.0f})"/>',
+                   33, ["#FFD166", "#FF7AA2", "#7EE0C3", "#7FB4FF", "#B892FF"], dmin=4, dmax=8)
+    big = (f'<text x="300" y="128" text-anchor="middle" font-family="{TITLE_FONT}" font-size="56" font-weight="900" fill="url(#gold2)" '
+           f'class="pop" style="transform-origin:300px 110px">{year}</text>')
+    body = big + relay_at("n", 156, 196, .62, FACE("excited", "big"), PARTY_HAT, spark=GOLD) + conf
+    css = """
+    .fall { animation: fall linear infinite; }
+    .pop { animation: pop 2.6s ease-in-out infinite; }
+    @keyframes fall { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(-30px, 510px) rotate(540deg); } }
+    @keyframes pop { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.12); } 24% { transform: scale(1); } }"""
+    grad = '<linearGradient id="gold2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF0B8"/><stop offset="1" stop-color="#F2B33D"/></linearGradient>'
+    card("relay-new-year.svg", f"Happy New Year {year} from Relay", "Happy New Year", ("#120B33", "#3A1F6B"), "#FFFFFF",
+         "New year, fresh commits", "#E9DDFB", body, css, grad, title_y=62)
+
+
+# Eid: crescent moon and star, swinging lanterns
+def lantern(x, length, colour, delay):
+    return (f'<g class="swing" style="transform-origin:{x}px 0px;animation-delay:{delay}s">'
+            f'<path d="M{x} 0V{length}" stroke="#E8C77A" stroke-width="2"/>'
+            f'<g transform="translate({x} {length})">'
+            f'<path d="M-10 0h20l6 10H-16z" fill="#E8C77A"/>'
+            f'<path d="M-16 10h32c4 14 4 30 0 44H-16c-4-14-4-30 0-44z" fill="{colour}" stroke="#E8C77A" stroke-width="3"/>'
+            f'<path d="M0 14v36M-9 16c-3 12-3 24 0 36M9 16c3 12 3 24 0 36" stroke="#FFE7A3" stroke-width="2" opacity=".8"/>'
+            f'<circle cx="0" cy="32" r="16" fill="#FFD27A" opacity=".35" class="glow"/>'
+            f'<path d="M-16 54h32l-6 8h-20z" fill="#E8C77A"/><path d="M0 62v10" stroke="#E8C77A" stroke-width="3" stroke-linecap="round"/></g></g>')
+
+
+def eid():
+    moon = ('<g class="glow"><circle cx="500" cy="120" r="46" fill="#FFE7A3"/><circle cx="520" cy="104" r="40" fill="url(#skyfill)"/></g>'
+            '<path d="M454 72l4 9 10 1-8 6 3 10-9-5-9 5 3-10-8-6 10-1z" fill="#FFE7A3" class="twinkle"/>')
+    rnd = random.Random(5)
+    stars = "".join(f'<circle cx="{rnd.uniform(20, 580):.0f}" cy="{rnd.uniform(110, 300):.0f}" r="{rnd.uniform(1.5, 2.8):.1f}" fill="#FFF4D6" class="twinkle" style="animation-delay:{rnd.uniform(0, 2):.1f}s"/>' for _ in range(16))
+    lanterns = lantern(70, 60, "#2BA58A", 0) + lantern(130, 110, "#C2416B", .5) + lantern(560, 40, "#3D6FD8", .9) + lantern(470, 230, "#B8862B", .3)
+    body = stars + moon + lanterns + relay_at("e", 150, 150, .72, FACE("happy", "big"))
+    css = """
+    .swing { animation: swing 3s ease-in-out infinite alternate; }
+    .glow { animation: glow 2.4s ease-in-out infinite alternate; }
+    .twinkle { animation: twinkle 2.2s ease-in-out infinite; }
+    @keyframes swing { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+    @keyframes glow { from { opacity: .7; } to { opacity: 1; } }
+    @keyframes twinkle { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }"""
+    grad = '<linearGradient id="skyfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0B3B45"/><stop offset="1" stop-color="#0E4A55"/></linearGradient>'
+    card("relay-eid.svg", "Eid Mubarak from Relay", "Eid Mubarak", ("#0A3540", "#145A63"), "#FFE7A3",
+         "Wishing you peace, joy and blessings", "#D8F3EE", body, css, grad, title_y=64)
+
+
+# Halloween: Relay is already a ghost. Bats flap, the pumpkin glows
+def bat(x, y, s, delay):
+    return (f'<g class="bob" style="animation-delay:{delay}s"><g transform="translate({x} {y}) scale({s})">'
+            f'<g class="flap" style="animation-delay:{delay}s"><path d="M0 0C-10 -14 -26 -18 -40 -10C-32 -6 -30 2 -34 8C-24 2 -16 4 -10 10C-8 4 -4 2 0 4C4 2 8 4 10 10C16 4 24 2 34 8C30 2 32 -6 40 -10C26 -18 10 -14 0 0Z" fill="#1A1033"/></g>'
+            f'<circle cx="-3" cy="-1" r="1.6" fill="#FFB547"/><circle cx="3" cy="-1" r="1.6" fill="#FFB547"/></g></g>')
+
+
+def halloween():
+    pumpkin = ('<g transform="translate(470 392)"><ellipse cx="0" cy="0" rx="60" ry="46" fill="#F07A1A" stroke="#7A3208" stroke-width="5"/>'
+               '<path d="M-20 -44C-26 -10 -26 20 -18 44M20 -44C26 -10 26 20 18 44" fill="none" stroke="#C25A0E" stroke-width="4"/>'
+               '<path d="M-4 -46c0-10 4-16 12-20" fill="none" stroke="#4E7A2A" stroke-width="7" stroke-linecap="round"/>'
+               '<g class="glow"><path d="M-30 -10l12-12 10 12zM8 -10l12-12 10 12z" fill="#FFE07A"/>'
+               '<path d="M-34 12c14 16 54 16 68 0l-8 2-6 8-8-6-8 8-8-8-8 6-6-8z" fill="#FFE07A"/></g></g>')
+    moon = '<circle cx="90" cy="130" r="40" fill="#FFE9B0" opacity=".9"/>'
+    bats = bat(150, 150, 1, 0) + bat(500, 170, .8, .7) + bat(420, 120, .6, 1.3)
+    boo = (f'<text x="96" y="300" font-family="{TITLE_FONT}" font-size="34" font-weight="900" fill="#FFFFFF" '
+           f'class="boo" transform="rotate(-12 96 300)">Boo!</text>')
+    body = moon + bats + pumpkin + boo + relay_at("w", 150, 140, .72, FACE("surprised", "o"))
+    css = """
+    .bob { animation: bob 2.6s ease-in-out infinite; }
+    .flap { transform-box: fill-box; transform-origin: center; animation: flap .35s ease-in-out infinite alternate; }
+    .glow { animation: glow 1.4s ease-in-out infinite alternate; }
+    .boo { animation: boo 2.4s ease-in-out infinite; }
+    @keyframes bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-14px, -12px); } }
+    @keyframes flap { from { transform: scaleY(1); } to { transform: scaleY(.45); } }
+    @keyframes glow { from { opacity: .65; } to { opacity: 1; } }
+    @keyframes boo { 0%, 60%, 100% { opacity: 0; } 70%, 90% { opacity: 1; } }"""
+    card("relay-halloween.svg", "Happy Halloween from Relay", "Happy Halloween", ("#1B0F33", "#4A1F4F"), "#FFB547",
+         "No scary merges tonight", "#F3DDF0", body, css, title_y=70)
+
+
+# Syncing: a loading animation for the product. Relay ferries a file from your
+# folder to the repo, then flies back for the next one.
+def syncing():
+    W, H = 600, 290
+    folder = lambda x, colour, label_text: (
+        f'<g transform="translate({x} 150)"><path d="M-46 -34a8 8 0 0 1 8-8h26l10 10h40a8 8 0 0 1 8 8v58a8 8 0 0 1-8 8h-76a8 8 0 0 1-8-8z" fill="{colour}" stroke="{NAVY}" stroke-width="5" stroke-linejoin="round"/>'
+        f'<path d="M-46 -18h92" stroke="{NAVY}" stroke-width="5" opacity=".25"/></g>'
+        f'<text x="{x}" y="226" text-anchor="middle" font-family="{BODY_FONT}" font-size="15" font-weight="600" fill="{NAVY}">{label_text}</text>')
+    doc = (f'<g class="doc"><rect x="-14" y="-18" width="28" height="36" rx="4" fill="#FFFFFF" stroke="{NAVY}" stroke-width="4"/>'
+           f'<path d="M-7 -8h14M-7 0h14M-7 8h9" stroke="{NAVY}" stroke-width="3" stroke-linecap="round"/></g>')
+    track = f'<path d="M150 52Q300 4 450 52" fill="none" stroke="#9BB4DC" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round"/>'
+    rider = (f'<g class="ferry"><g transform="translate(-58 -46) scale(.26)"><defs><clipPath id="sclip"><path d="{SIL}"/></clipPath></defs>'
+             f'{figure("s", FACE("focused", "smirk"))}</g><g transform="translate(50 30) rotate(8)">{doc}</g></g>')
+    css = """
+    .ferry { animation: ferry 3.2s ease-in-out infinite; }
+    .doc { animation: doc 3.2s linear infinite; }
+    .dots circle { animation: dot 1.2s ease-in-out infinite; }
+    @keyframes ferry {
+      0% { transform: translate(150px, 52px) scaleX(1); }
+      45% { transform: translate(450px, 52px) scaleX(1); }
+      50% { transform: translate(450px, 52px) scaleX(-1); }
+      95% { transform: translate(150px, 52px) scaleX(-1); }
+      100% { transform: translate(150px, 52px) scaleX(1); } }
+    @keyframes doc { 0%, 45% { opacity: 1; } 47%, 97% { opacity: 0; } 100% { opacity: 1; } }
+    @keyframes dot { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } .ferry { transform: translate(300px, 30px); } }"""
+    content = f'''<style>{css}
+  </style>
+  <rect width="{W}" height="{H}" rx="24" fill="#F4F7FC"/>
+  {track}
+  {folder(150, "#FFD27A", "your folder")}
+  {folder(450, "#9BC9FF", "repo")}
+  {rider}
+  <text x="300" y="266" text-anchor="middle" font-family="{TITLE_FONT}" font-size="20" font-weight="800" fill="{NAVY}">Syncing</text>
+  <g class="dots">{"".join(f'<circle cx="{352 + i * 11}" cy="261" r="3" fill="{NAVY}" style="animation-delay:{i * .2}s"/>' for i in range(3))}</g>'''
+    open(os.path.join(out, "relay-syncing.svg"), "w").write(svg(content, (0, 0, W, H), label="Relay syncing your files", title="Syncing"))
+
+
+holi()
+christmas()
+new_year()
+eid()
+halloween()
+syncing()
+print("wrote 6 more animated cards")
+
+
+# ---------- Diwali variants ----------
+DIWALI_DEFS = '''<linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE7A3"/><stop offset="1" stop-color="#F2B33D"/></linearGradient>
+    <linearGradient id="clay" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9783A"/><stop offset="1" stop-color="#9C4219"/></linearGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FF7A1A"/><stop offset=".55" stop-color="#FFB627"/><stop offset="1" stop-color="#FFE57A"/></linearGradient>
+    <radialGradient id="glowA"><stop offset="0" stop-color="#FFC94D" stop-opacity=".75"/><stop offset="1" stop-color="#FFC94D" stop-opacity="0"/></radialGradient>'''
+DIYA_CSS = """
+    .flame { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker .9s ease-in-out infinite alternate; }
+    .glow { animation: glow 1.8s ease-in-out infinite alternate; }
+    .twinkle { animation: twinkle 2.2s ease-in-out infinite; }
+    @keyframes flicker { 0% { transform: scale(1, 1) skewX(0deg); } 50% { transform: scale(.94, 1.08) skewX(-3deg); } 100% { transform: scale(1.04, .95) skewX(3deg); } }
+    @keyframes glow { from { opacity: .55; } to { opacity: 1; } }
+    @keyframes twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }"""
+
+
+def stars_(seed, n, ymax=300):
+    rnd = random.Random(seed)
+    return "".join(f'<circle cx="{rnd.uniform(20, 580):.0f}" cy="{rnd.uniform(20, ymax):.0f}" r="{rnd.uniform(1.4, 2.8):.1f}" fill="#FFF4D6" '
+                   f'class="twinkle" style="animation-delay:{rnd.uniform(0, 2.2):.1f}s"/>' for _ in range(n))
+
+
+# 1. Rangoli that draws itself on the floor
+def diwali_rangoli():
+    cx, cy = 300, 404
+    def petals(n, r_in, r_out, width, colour, delay):
+        out = ""
+        for k in range(n):
+            a = 360 * k / n
+            out += (f'<path d="M0 {-r_in}C{width} {-(r_in + r_out) / 2} {width * .6} {-r_out + 6} 0 {-r_out}C{-width * .6} {-r_out + 6} {-width} {-(r_in + r_out) / 2} 0 {-r_in}Z" '
+                    f'transform="rotate({a:.1f})" pathLength="1" fill="{colour}" stroke="#FFF1C9" stroke-width="2.5" class="draw" style="animation-delay:{delay + k * .06:.2f}s"/>')
+        return out
+    dots = "".join(f'<circle cx="{150 * math.cos(2 * math.pi * k / 24):.1f}" cy="{150 * math.sin(2 * math.pi * k / 24):.1f}" r="5" fill="#FFE7A3" class="dot" style="animation-delay:{1.6 + k * .03:.2f}s"/>' for k in range(24))
+    rangoli = (f'<g transform="translate({cx} {cy}) scale(1 .42)">'
+               f'<circle r="168" fill="none" stroke="#FFB547" stroke-width="4" pathLength="1" class="draw" style="animation-delay:0s"/>'
+               + petals(16, 92, 140, 22, "#E8336B", .2) + petals(12, 52, 96, 20, "#FFB627", .9) + petals(8, 18, 56, 16, "#2BB5A0", 1.4)
+               + f'<circle r="18" fill="#7A3DD8" stroke="#FFF1C9" stroke-width="3" pathLength="1" class="draw" style="animation-delay:1.8s"/>'
+               + dots + '</g>')
+    diyas = "".join(diya(x, y, .5, d, "glowA") for x, y, d in [(120, 404, 0), (480, 404, .4), (300, 462, .8)])
+    body = stars_(8, 14, 200) + rangoli + diyas + relay_at("r", 165, 112, .6, FACE("happy", "big"))
+    css = DIYA_CSS + """
+    .draw { stroke-dasharray: 1; stroke-dashoffset: 1; fill-opacity: 0; animation: draw 8s ease-in-out infinite; }
+    .dot { opacity: 0; animation: dotin 8s ease-in-out infinite; }
+    @keyframes draw { 0% { stroke-dashoffset: 1; fill-opacity: 0; } 18% { stroke-dashoffset: 0; fill-opacity: 0; } 30%, 86% { stroke-dashoffset: 0; fill-opacity: 1; } 96%, 100% { stroke-dashoffset: 0; fill-opacity: 0; opacity: 0; } }
+    @keyframes dotin { 0%, 20% { opacity: 0; } 30%, 86% { opacity: 1; } 96%, 100% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .draw { stroke-dashoffset: 0; fill-opacity: 1; } .dot { opacity: 1; } }"""
+    card("relay-diwali-rangoli.svg", "Happy Diwali from Relay: rangoli", "Happy Diwali", ("#3A0A22", "#6A1838"), "url(#gold)",
+         "May every pattern in your life fall into place", "#FBE3EC", body, css, DIWALI_DEFS, title_y=70, sub_y=104, H=500)
+
+
+# 2. Sky lanterns rising into the night
+def sky_lantern(x, scale, colour):
+    return (f'<g transform="translate({x} 0) scale({scale})">'
+            f'<ellipse cx="0" cy="-10" rx="40" ry="50" fill="url(#lglow)"/>'
+            f'<path d="M-22 -34h44l8 50h-60z" fill="{colour}" stroke="#7A2E0E" stroke-width="2.5" stroke-linejoin="round"/>'
+            f'<path d="M-11 -34l-3 50M11 -34l3 50" stroke="#7A2E0E" stroke-width="1.5" opacity=".5"/>'
+            f'<ellipse cx="0" cy="12" rx="9" ry="5" fill="#FFF3B0"/></g>')
+
+
+def diwali_lanterns():
+    rnd = random.Random(42)
+    lanterns = ""
+    for i in range(9):
+        x = rnd.uniform(60, 540)
+        if 210 < x < 390:  # keep Relay's space clear at the start
+            x = rnd.choice([rnd.uniform(60, 200), rnd.uniform(400, 540)])
+        dur = rnd.uniform(9, 14)
+        lanterns += (f'<g class="rise" style="animation-duration:{dur:.1f}s;animation-delay:-{rnd.uniform(0, dur):.1f}s"><g transform="translate(0 520)">'
+                     f'<g class="sway" style="animation-delay:{rnd.uniform(0, 2):.1f}s">{sky_lantern(x, rnd.uniform(.55, 1), rnd.choice(["#FF9A3C", "#FFB547", "#FF7A45"]))}</g></g></g>')
+    # Relay lets one go
+    own = f'<g class="rise-own"><g transform="translate(0 0)">{sky_lantern(300, .9, "#FFB547")}</g></g>'
+    body = stars_(3, 26, 380) + lanterns + relay_at("l", 156, 230, .64, FACE("happy", "big")) + own
+    css = DIYA_CSS + """
+    .rise { animation: rise linear infinite; }
+    .rise-own { animation: own 9s ease-in infinite; }
+    .sway { animation: sway 2.6s ease-in-out infinite alternate; }
+    @keyframes rise { from { transform: translateY(0); opacity: 1; } 85% { opacity: 1; } to { transform: translateY(-600px); opacity: 0; } }
+    @keyframes own { 0% { transform: translateY(250px); opacity: 0; } 8% { opacity: 1; } 100% { transform: translateY(-120px); opacity: 0; } }
+    @keyframes sway { from { transform: translateX(-6px); } to { transform: translateX(6px); } }
+    @media (prefers-reduced-motion: reduce) { .rise-own { transform: translateY(150px); } }"""
+    defs_ = DIWALI_DEFS + '<radialGradient id="lglow"><stop offset="0" stop-color="#FFC94D" stop-opacity=".55"/><stop offset="1" stop-color="#FFC94D" stop-opacity="0"/></radialGradient>'
+    card("relay-diwali-lanterns.svg", "Happy Diwali from Relay: sky lanterns", "Happy Diwali", ("#0B1236", "#24205A"), "url(#gold)",
+         "May your wishes rise and your builds stay green", "#E6E3FB", body, css, defs_, title_y=70, sub_y=104)
+
+
+# 3. A sparkler (phuljhadi)
+def diwali_sparkler():
+    tip = (482, 70)  # in Relay's coordinates
+    rnd = random.Random(9)
+    sparks = ""
+    for k in range(18):
+        a = 2 * math.pi * k / 18 + rnd.uniform(-.12, .12)
+        r1, r2 = rnd.uniform(10, 18), rnd.uniform(46, 80)
+        c = rnd.choice(["#FFF3B0", "#FFD166", "#FFB627"])
+        sparks += (f'<path d="M{tip[0] + r1 * math.cos(a):.1f} {tip[1] + r1 * math.sin(a):.1f}L{tip[0] + r2 * math.cos(a):.1f} {tip[1] + r2 * math.sin(a):.1f}" '
+                   f'stroke="{c}" stroke-width="4" stroke-linecap="round" class="spark" style="animation-delay:{rnd.uniform(0, .6):.2f}s;animation-duration:{rnd.uniform(.35, .7):.2f}s"/>')
+    flying = ""
+    for k in range(10):
+        a = rnd.uniform(0, 2 * math.pi)
+        d = rnd.uniform(70, 120)
+        flying += (f'<circle cx="{tip[0]}" cy="{tip[1]}" r="3.5" fill="#FFE57A" class="fly" '
+                   f'style="--dx:{d * math.cos(a):.0f}px;--dy:{d * math.sin(a):.0f}px;animation-delay:{rnd.uniform(0, 1.2):.2f}s"/>')
+    stick = (f'<path d="M400 236L{tip[0]} {tip[1]}" stroke="#6B6F7A" stroke-width="7" stroke-linecap="round"/>'
+             f'<path d="M430 176L{tip[0]} {tip[1]}" stroke="#3A3D45" stroke-width="9" stroke-linecap="round"/>'
+             f'<circle cx="{tip[0]}" cy="{tip[1]}" r="22" fill="url(#glowA)" class="glow"/><circle cx="{tip[0]}" cy="{tip[1]}" r="8" fill="#FFF8D6"/>')
+    body = stars_(12, 18, 420) + relay_at("k", 120, 150, .7, FACE("excited", "big"), stick + sparks + flying)
+    css = DIYA_CSS + """
+    .spark { animation: spark .5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+    .fly { animation: fly 1.4s ease-out infinite; }
+    @keyframes spark { from { opacity: .15; } to { opacity: 1; } }
+    @keyframes fly { 0% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }"""
+    card("relay-diwali-sparkler.svg", "Happy Diwali from Relay: sparkler", "Happy Diwali", ("#140D2E", "#2B1A4F"), "url(#gold)",
+         "Sparkle on! May every commit shine", "#E9DDFB", body, css, DIWALI_DEFS, title_y=70, sub_y=446)
+
+
+# 4. A row of diyas lighting up one by one, greeting in Hindi
+def diwali_diyas():
+    n = 7
+    row = ""
+    for i in range(n):
+        t = i / (n - 1)
+        x = 70 + t * 460
+        y = 400 + 30 * math.sin(math.pi * t)
+        row += (f'<g transform="translate({x:.0f} {y:.0f}) scale(.62)">'
+                f'<circle cx="0" cy="-30" r="46" fill="url(#glowA)" class="light" style="animation-delay:{i * .45:.2f}s"/>'
+                f'<path d="M-46 0C-40 30 40 30 46 0Z" fill="url(#clay)" stroke="#5A2A12" stroke-width="4" stroke-linejoin="round"/>'
+                f'<path d="M-46 0C-20 -10 20 -10 46 0" fill="none" stroke="#F3B35C" stroke-width="5" stroke-linecap="round"/>'
+                f'<g class="light" style="animation-delay:{i * .45:.2f}s"><g class="flame"><path d="M0 -6C-14 -18 -12 -34 0 -54C12 -34 14 -18 0 -6Z" fill="url(#flame)"/>'
+                f'<path d="M0 -10C-6 -18 -5 -26 0 -34C5 -26 6 -18 0 -10Z" fill="#FFF6C9"/></g></g></g>')
+    body = stars_(4, 16, 200) + relay_at("y", 156, 140, .64, FACE("happy", "big")) + row
+    css = DIYA_CSS + """
+    .light { opacity: 0; animation: light 7s ease-in-out infinite; }
+    @keyframes light { 0% { opacity: 0; } 6%, 82% { opacity: 1; } 92%, 100% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .light { opacity: 1; } }"""
+    deva = "'Kohinoor Devanagari', 'Noto Sans Devanagari', 'Nirmala UI', 'Devanagari Sangam MN', Mangal, sans-serif"
+    card("relay-diwali-diyas.svg", "Shubh Deepavali from Relay", "शुभ दीपावली", ("#1A0E2E", "#3A1C3F"), "url(#gold)",
+         "Shubh Deepavali · wishing you light, joy and prosperity", "#F3E3F4", body, css, DIWALI_DEFS, title_y=74, sub_y=110,
+         title_font=deva, title_size=48)
+
+
+# 5. Sweets: a plate of ladoos
+def diwali_sweets():
+    rnd = random.Random(2)
+    def ladoo(x, y, r, delay):
+        dots = "".join(f'<circle cx="{x + rnd.uniform(-r * .6, r * .6):.1f}" cy="{y + rnd.uniform(-r * .6, r * .6):.1f}" r="1.6" fill="#C9661A" opacity=".7"/>' for _ in range(7))
+        return (f'<g class="bounce" style="animation-delay:{delay:.2f}s"><circle cx="{x}" cy="{y}" r="{r}" fill="url(#ladoo)" stroke="#9C4A12" stroke-width="3"/>{dots}'
+                f'<ellipse cx="{x - r * .35:.1f}" cy="{y - r * .4:.1f}" rx="{r * .3:.1f}" ry="{r * .18:.1f}" fill="#FFE2A8" opacity=".8"/></g>')
+    pile = [(-60, 0), (-20, 0), (20, 0), (60, 0), (-40, -34), (0, -34), (40, -34), (-20, -66), (20, -66), (0, -98)]
+    ladoos = "".join(ladoo(300 + dx, 392 + dy, 22, i * .18) for i, (dx, dy) in enumerate(pile))
+    plate = ('<ellipse cx="300" cy="420" rx="150" ry="26" fill="#D9DEE8" stroke="#8B93A6" stroke-width="4"/>'
+             '<ellipse cx="300" cy="414" rx="124" ry="16" fill="#EEF1F6"/>')
+    sparkle_ = "".join(f'<path d="M{x} {y - 10}l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#FFD166" class="twinkle" style="animation-delay:{d}s"/>'
+                       for x, y, d in [(150, 330, 0), (452, 320, .7), (190, 250, 1.3), (420, 240, .4), (110, 410, 1.6), (494, 410, 1)])
+    body = sparkle_ + relay_at("w", 150, 92, .66, FACE("love", "big")) + plate + ladoos
+    css = DIYA_CSS + """
+    .bounce { animation: bounce 2.8s ease-in-out infinite; }
+    @keyframes bounce { 0%, 20%, 100% { transform: translateY(0); } 8% { transform: translateY(-10px); } }"""
+    defs_ = DIWALI_DEFS + '<radialGradient id="ladoo" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#FFC56B"/><stop offset="1" stop-color="#F08A1E"/></radialGradient>'
+    card("relay-diwali-sweets.svg", "Sweet Diwali from Relay", "Sweet Diwali", ("#FFF3E2", "#FFE1EA"), "#C2410C",
+         "May your merges be as sweet as ladoos", "#7A3B2A", body, css, defs_, title_y=64, sub_y=460, H=480)
+
+
+diwali_rangoli()
+diwali_lanterns()
+diwali_sparkler()
+diwali_diyas()
+diwali_sweets()
+print("wrote 5 Diwali variants")
