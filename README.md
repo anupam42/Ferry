@@ -26,7 +26,7 @@ Work in one folder, commit from another. **Ferry** watches a working folder and 
 
 - [Install](#install) · [Quick start](#quick-start) · [Web app](#web-app)
 - [Features](#features): [Sync](#sync) · [Choosing what to sync](#choosing-what-to-sync) · [Conflicts and merging](#conflicts-and-merging) · [Safety](#safety) · [History and undo](#history-and-undo) · [Git](#git) · [Remote targets over ssh](#remote-targets-over-ssh) · [Cloud storage targets](#cloud-storage-targets) · [Scheduling](#scheduling) · [Dashboard](#dashboard) · [Status, plan and doctor](#status-plan-and-doctor) · [Integrations](#integrations) · [Background service](#background-service)
-- [Commands](#commands) · [Dashboard keys](#dashboard-keys) · [Config file](#config-file) · [Behaviour notes](#behaviour-notes) · [Contributing](CONTRIBUTING.md) · [Todo](#todo)
+- [Commands](#commands) · [Dashboard keys](#dashboard-keys) · [Config file](#config-file) · [Behaviour notes](#behaviour-notes) · [Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Todo](#todo)
 
 ## Install
 
@@ -437,7 +437,7 @@ Every pair runs its own serial task queue: timers, the file watcher, the dashboa
 
 The state, history, hash-cache and status files are compatible with the earlier Go version of ferry, so an existing data folder keeps working.
 
-Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs, set up the project and send a pull request.
+Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs, set up the project and send a pull request, and [ROADMAP.md](ROADMAP.md) for ideas waiting for someone to build them.
 
 ## Releasing
 

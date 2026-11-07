@@ -21,7 +21,7 @@ Don't open a public issue for anything that could expose files, credentials or t
 
 ## Suggesting a feature
 
-Open an issue with the **Feature request** template before writing a large change. Describe the problem you want solved, not only the solution: there may be an existing flag that does it, or a simpler way. Small fixes don't need an issue first.
+Open an issue with the **Feature request** template before writing a large change. Describe the problem you want solved, not only the solution: there may be an existing flag that does it, or a simpler way. Small fixes don't need an issue first. Looking for something to work on? The [roadmap](ROADMAP.md) lists ideas, and marks which ones Ferry already does.
 
 ## Setting up
 
