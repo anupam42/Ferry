@@ -13,13 +13,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: oven-sh/setup-bun@v2
         with:
-          go-version-file: go.mod
+          bun-version-file: .bun-version
       - name: Configure git for tests
         run: |
           git config --global user.email ci@example.com
           git config --global user.name ci
-      - run: go vet ./...
-      - run: go test -race ./...
-      - run: go build -o ferry-bin .
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun test
+      # build a standalone binary for this runner and make sure it really runs
+      - run: bun build src/main.ts --compile --outfile dist/ferry
+      - name: Smoke-test the binary
+        shell: bash
+        run: |
+          export FERRY_HOME="$RUNNER_TEMP/ferry-home"
+          mkdir -p "$RUNNER_TEMP/s" && echo hi > "$RUNNER_TEMP/s/a.txt"
+          ./dist/ferry version
+          ./dist/ferry --once "$RUNNER_TEMP/s" "$RUNNER_TEMP/t"
+          test "$(cat "$RUNNER_TEMP/t/a.txt")" = hi
+          ./dist/ferry status --json

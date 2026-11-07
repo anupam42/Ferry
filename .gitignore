@@ -3,3 +3,4 @@
 /ferry.exe
 /ferry-bin*
 *.vsix
+node_modules/

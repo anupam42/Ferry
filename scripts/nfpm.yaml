@@ -1,0 +1,20 @@
+# Linux packages from the prebuilt binaries in dist/ (used by the release workflow).
+# VERSION and ARCH (amd64 | arm64) come from the environment.
+name: ferry
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+maintainer: Anupam Udupi <anupam.udupi@gmail.com>
+vendor: anupam42
+homepage: https://github.com/anupam42/Ferry
+description: Mirror a working folder into a git repo (and back) from any terminal.
+license: MIT
+contents:
+  - src: dist/ferry-linux-${ARCH}
+    dst: /usr/bin/ferry
+    file_info:
+      mode: 0755
+  - src: README.md
+    dst: /usr/share/doc/ferry/README.md
+  - src: LICENSE
+    dst: /usr/share/doc/ferry/LICENSE

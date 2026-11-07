@@ -59,7 +59,7 @@ func Merge3(base, ours, theirs []byte, l Labels) ([]byte, int, error) {
 		if k >= len(B) {
 			break
 		}
-		out.Write(B[k])
+		out.WriteString(B[k])
 		i, jo, jt = k+1, eo+1, et+1
 	}
 	return out.Bytes(), conflicts, nil

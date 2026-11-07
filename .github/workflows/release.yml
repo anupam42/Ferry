@@ -1,3 +1,6 @@
+# On every v* tag: cross-compile with bun for 6 platforms, publish a GitHub
+# release (archives + checksums + .deb/.rpm/.apk), then update Homebrew, Scoop
+# and winget. Secrets: HOMEBREW_TAP_TOKEN, SCOOP_BUCKET_TOKEN, WINGET_TOKEN.
 name: release
 on:
   push:
@@ -7,22 +10,53 @@ permissions:
   contents: write
 
 jobs:
-  goreleaser:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --clean
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - name: Build binaries and archives
+        run: bun scripts/build.ts --archive
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+      - name: Linux packages (.deb .rpm .apk)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          for arch in amd64 arm64; do
+            for fmt in deb rpm apk; do
+              docker run --rm -v "$PWD:/w" -w /w -e VERSION="$VERSION" -e ARCH="$arch" \
+                goreleaser/nfpm package --config scripts/nfpm.yaml --packager "$fmt" --target dist/
+            done
+          done
+          cd dist && sha256sum *.deb *.rpm *.apk >> checksums.txt
+      - name: Publish the GitHub release
+        run: |
+          cd dist
+          gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME" \
+            ferry_*.tar.gz ferry_*.zip *.deb *.rpm *.apk checksums.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update Homebrew and Scoop
+        run: bun scripts/publish-manifests.ts --push
+        env:
+          VERSION: ${{ github.ref_name }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
-          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+
+  # opens a PR against microsoft/winget-pkgs from github.com/anupam42/winget-pkgs
+  # (the package must already exist there; the first version is submitted by hand)
+  winget:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: anupam42.ferry
+          installers-regex: '_windows_(amd64|arm64)\.zip$'
+          fork-user: anupam42
+          token: ${{ secrets.WINGET_TOKEN }}

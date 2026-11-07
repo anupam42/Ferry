@@ -1,6 +1,6 @@
 # Ferry
 
-Work in one folder, commit from another. **Ferry** watches a working folder and mirrors every change into your git repo folder. It can also sync in both directions, with conflict detection and three-way merges, or push to a server over ssh. It runs from any terminal (PowerShell, cmd, bash, zsh, fish) on Windows, macOS and Linux as a single binary with no runtime.
+Work in one folder, commit from another. **Ferry** watches a working folder and mirrors every change into your git repo folder. It can also sync in both directions, with conflict detection and three-way merges, or push to a server over ssh. It runs from any terminal (PowerShell, cmd, bash, zsh, fish) on Windows, macOS and Linux as a single self-contained binary (nothing else to install).
 
 ```
 ⇄ ferry 1.2.0                                              2 pair(s) · ? help · q quit
@@ -33,7 +33,7 @@ Work in one folder, commit from another. **Ferry** watches a working folder and 
 | Homebrew | `brew install anupam42/tap/ferry` |
 | Scoop | `scoop bucket add anupam42 https://github.com/anupam42/scoop-bucket; scoop install ferry` |
 | winget | `winget install anupam42.ferry` |
-| From source | `go build .` (Go 1.24+; dependencies are vendored, so no network is needed) |
+| From source | `bun install && bun src/main.ts` (Bun 1.4+), or `bun scripts/build.ts` for a standalone binary in `dist/` |
 
 The install scripts, Homebrew, Scoop and winget only work once a release is published (see [Releasing](#releasing)).
 
@@ -335,35 +335,46 @@ pairs:
 
 ## Development
 
+Ferry is written in TypeScript and runs on [Bun](https://bun.sh). Releases are standalone executables made with `bun build --compile`, so users don't need Bun installed.
+
 ```
-main.go, commands.go    CLI and subcommands (completion.go: shell completions)
-internal/engine         sync loop: scanning, planning, two-way state, conflicts, renames, backups,
-                        history/undo, secrets, eol, hash cache, ssh push, trash, plan, status files, watcher
-internal/merge          line-based three-way merge (diff3)
-internal/ignore         gitignore-syntax matcher
-internal/config         YAML config, validation, sync windows, path mapping
-internal/gitx           git CLI wrapper (status, commit, staging, branch, guard, upstream, LFS, PRs), local or over ssh
-internal/remote         ssh target parsing and commands
-internal/api            local HTTP API
-internal/webhook        Slack / Discord / ntfy / JSON webhooks
-internal/tui            Bubble Tea dashboard (diffview.go: side-by-side diffs and highlighting)
-internal/ui             plain and JSON output
-internal/notify         desktop notifications
-internal/service        systemd / launchd / Task Scheduler
+src/main.ts             entry point; src/cli/: flags, run, subcommands, usage, shell completions
+src/engine/engine.ts    sync loop: scanning, planning, two-way state, conflicts, renames, applying,
+                        git guard/commit/push, ssh push, plan, state shared between processes
+src/engine/             fsops (scan, hash, atomic copy, backups), journal (history/undo), hashcache,
+                        secrets, trash, tar (ssh push), watch (fs.watch + polling), types
+src/merge.ts            line-based three-way merge (diff3)
+src/difftext.ts         unified line diff
+src/ignore.ts           gitignore-syntax matcher
+src/config.ts           YAML config, validation, sync windows, path mapping
+src/gitx.ts             git CLI wrapper (status, commit, staging, branch, guard, upstream, LFS, PRs), local or over ssh
+src/remote.ts           ssh target parsing and commands
+src/api.ts              local HTTP API (Bun.serve, server-sent events)
+src/webhook.ts          Slack / Discord / ntfy / JSON webhooks
+src/tui/                dashboard: term.ts (styles, boxes, keys, screen), widgets, theme, diffview
+src/printer.ts          plain and JSON output
+src/notify.ts           desktop notifications
+src/service.ts          systemd / launchd / Task Scheduler
 editors/vscode          VS Code extension (plain JavaScript, no build step)
 ```
 
 ```bash
-go test -race ./...         # unit and integration tests (needs git on PATH)
-./scripts/build.sh          # or .\scripts\build.ps1 — binaries for 6 platforms into dist/
+bun install                  # the only runtime dependency is the yaml package
+bun src/main.ts --help       # run from source
+bun test                     # unit and integration tests (needs git on PATH)
+bun run typecheck
+bun scripts/build.ts         # or ./scripts/build.sh / .\scripts\build.ps1 — binaries for 6 platforms into dist/
+bun scripts/build.ts linux-x64   # one platform; add --archive for release archives + checksums.txt
 ```
 
-Dependencies are vendored (`vendor/`). After changing them, run `go mod tidy && go mod vendor` with network access.
+Every pair runs its own serial task queue: timers, the file watcher, the dashboard and the HTTP API all queue work rather than touching sync state directly, so one pair's changes are applied one at a time and in order. git, ssh and hooks run asynchronously, so a slow push doesn't freeze the dashboard.
+
+The state, history, hash-cache and status files are compatible with the earlier Go version of ferry, so an existing data folder keeps working.
 
 ## Releasing
 
 1. Create the GitHub repo `anupam42/Ferry` and push this folder.
-2. For package managers, create these repos and secrets (skip any you don't want, and delete its section from `.goreleaser.yaml`):
+2. For package managers, create these repos and secrets (skip any you don't want; a missing token skips that step, and the `winget` job can be deleted from `release.yml`):
 
    | Package manager | Repo to create | Secret |
    |---|---|---|
@@ -372,8 +383,8 @@ Dependencies are vendored (`vendor/`). After changing them, run `go mod tidy && 
    | winget | a fork of `microsoft/winget-pkgs` | `WINGET_TOKEN` (PR to Microsoft) |
 
    Each token is a PAT with `repo` scope.
-3. `git tag v1.2.0 && git push --tags`. The release workflow builds every platform, attaches archives, `.deb`, `.rpm` and `.apk` packages and checksums, and updates the tap, the bucket and winget.
-4. CI (`.github/workflows/ci.yml`) runs vet, race tests and a build on Ubuntu, macOS and Windows for every push and pull request.
+3. `git tag v1.2.0 && git push --tags`. The release workflow cross-compiles every platform with bun, attaches archives, `.deb`, `.rpm` and `.apk` packages (built with nfpm) and checksums, and updates the tap and the bucket (`scripts/publish-manifests.ts`) and winget. The winget step updates an existing package, so submit the first version to `microsoft/winget-pkgs` by hand.
+4. CI (`.github/workflows/ci.yml`) runs the typecheck, the tests, and a compiled-binary smoke test on Ubuntu, macOS and Windows for every push and pull request.
 
 ## License
 
