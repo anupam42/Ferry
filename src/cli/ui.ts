@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { ApiServer, type PairManager } from "../api.ts";
+import { CHILD_ENV, PageWatcher, PORT_FILE_ENV, sourcePage, supervise } from "../devreload.ts";
 import {
   appendPairToFile, checkOverlaps, dataDir, setRepoInFile, expandHome, isRemoteSpec, loadFile, normalize, pairsFromObject, removePairFromFile,
   type Pair, type Settings, emptySettings,
@@ -32,7 +33,8 @@ export async function cmdUI(args: string[]): Promise<void> {
   const f = newRunFlags("ui")
     .string("host", "127.0.0.1", "address to listen on (anything but localhost needs --serve-token)")
     .int("port", 7878, "port for the web app (the next free one is used if it's taken)")
-    .bool("no-open", false, "don't open the browser");
+    .bool("no-open", false, "don't open the browser")
+    .bool("dev", false, "for working on Ferry: reload the page when src/web changes, restart when the code does");
   f.usage = () => {
     process.stderr.write("Usage: ferry ui [flags] [--config file | <source> <target>]\n");
     f.printDefaults();
@@ -46,6 +48,25 @@ export async function cmdUI(args: string[]): Promise<void> {
     throw e;
   }
   if (f.getBool("no-color")) out.color = false;
+
+  // --dev: a supervisor restarts the real "ferry ui" when Ferry's code changes
+  let dev: PageWatcher | null = null;
+  if (f.getBool("dev")) {
+    const page = sourcePage();
+    if (!page) {
+      println(paint("31", "error: ") + "--dev works when running Ferry from its source (bun src/main.ts ui --dev)");
+      throw new ExitError(2);
+    }
+    if (!process.env[CHILD_ENV]) {
+      println(paint("90", "dev mode: editing src/web/index.html updates the page; editing .ts files restarts ferry"));
+      await supervise(args.filter((a) => a !== "--dev"), (m) => println(paint("90", "dev: " + m)));
+      process.exit(0);
+    }
+    dev = new PageWatcher(page, (kind) => {
+      api?.pageChanged(kind);
+      println(paint("90", kind === "css" ? "dev: styles updated" : "dev: page reloaded"));
+    });
+  }
 
   // where pairs come from, and where pairs added in the browser go
   let pairs: Pair[];
@@ -157,7 +178,7 @@ export async function cmdUI(args: string[]): Promise<void> {
       if (configFile !== "") setRepoInFile(configFile, dir, false);
     },
   };
-  api = new ApiServer(engines, settings.serveToken, { version: VERSION, manager, repos });
+  api = new ApiServer(engines, settings.serveToken, { version: VERSION, manager, repos, dev });
   let port = f.getInt("port");
   for (let tries = 0; ; tries++) {
     try {
@@ -169,6 +190,7 @@ export async function cmdUI(args: string[]): Promise<void> {
     }
   }
   for (const p of pairs) start(p);
+  if (dev && process.env[PORT_FILE_ENV]) fs.writeFileSync(process.env[PORT_FILE_ENV]!, String(api.port));
 
   const shown = host === "0.0.0.0" || host === "::" ? "localhost" : host.includes(":") ? `[${host}]` : host;
   let url = `http://${shown}:${port}/`;
@@ -184,6 +206,7 @@ export async function cmdUI(args: string[]): Promise<void> {
   await new Promise<void>((r) => ctl.signal.addEventListener("abort", () => r(), { once: true }));
   await Promise.all([...stops.values()].map((s) => s.done));
   api.stop();
+  dev?.stop();
   println(paint("90", "stopped."));
   process.exit(0);
 }

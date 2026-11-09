@@ -322,3 +322,48 @@ describe("very large diffs", () => {
     expect((await g.fileDiff(d, "a.txt", false)).more).toBeUndefined();
   });
 });
+
+describe("insights", () => {
+  test("counts commits by day, weekday and hour, files by month, and streaks", async () => {
+    const d = await repo(); // one commit today, by T
+    const at = (daysAgo: number, hour: number) => {
+      const t = new Date();
+      t.setDate(t.getDate() - daysAgo);
+      t.setHours(hour, 15, 0, 0);
+      return t;
+    };
+    const commitAt = (when: Date, file: string, email = "t@example.com") => {
+      put(d, file, `${file} ${when.getTime()}\n`);
+      sh(d, "add", "-A");
+      const iso = when.toISOString();
+      Bun.spawnSync(["git", "-C", d, "commit", "-q", "-m", "work on " + file], { env: { ...process.env, GIT_AUTHOR_NAME: "X", GIT_AUTHOR_EMAIL: email, GIT_AUTHOR_DATE: iso, GIT_COMMITTER_NAME: "X", GIT_COMMITTER_EMAIL: email, GIT_COMMITTER_DATE: iso } });
+    };
+    commitAt(at(1, 10), "b.txt");
+    commitAt(at(2, 10), "b.txt");
+    commitAt(at(10, 10), "c.txt", "sam@example.com");
+    const all = await g.insights(d);
+    expect(all.total).toBe(4);
+    expect(all.activeDays).toBe(4);
+    expect(all.streak).toBe(3); // today, yesterday, the day before
+    expect(all.longestStreak).toBe(3);
+    expect(all.files[0]).toMatchObject({ path: "b.txt", commits: 2 });
+    expect(all.files[0]!.months.reduce((a, b) => a + b, 0)).toBe(2);
+    expect(all.hours.flat().reduce((a, b) => a + b, 0)).toBe(4);
+    expect(all.authors.map((a) => a.email)).toContain("sam@example.com");
+    expect(all.hotspots.find((h) => h.path === "b.txt")).toMatchObject({ commits: 2, lines: 1, authors: 1 });
+
+    // files that keep changing in the same commits
+    for (let i = 0; i < 3; i++) {
+      put(d, "x.ts", `x ${i}\n`);
+      put(d, "x.test.ts", `t ${i}\n`);
+      sh(d, "add", "-A");
+      sh(d, "commit", "-q", "-m", "x " + i);
+    }
+    const pairs = (await g.insights(d)).together;
+    expect(pairs[0]).toMatchObject({ a: "x.test.ts", b: "x.ts", count: 3, share: 1 });
+
+    const mine = await g.insights(d, { author: "me" });
+    expect(mine.total).toBe(6);
+    expect(Object.values(mine.dayCommits).flat().every((c) => c.author !== "X" || c.subject !== "work on c.txt")).toBe(true);
+  });
+});

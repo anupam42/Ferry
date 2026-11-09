@@ -10,6 +10,7 @@
   },
   "scripts": {
     "start": "bun src/main.ts",
+    "dev": "bun src/main.ts ui --dev",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "build": "bun build src/main.ts --compile --minify --sourcemap --outfile dist/ferry"

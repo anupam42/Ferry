@@ -95,9 +95,16 @@ The web app does what the terminal dashboard does, with buttons instead of keys:
 - **History & undo**: every sync pass, **Undo the last sync**, and **Go back** to how things were 15 minutes ago, this morning, yesterday or at a time you type. It shows what will change before doing it.
 - **Stats** and a live **Activity** feed. Pause, resume, "sync everything now" and approval of large batches are at the top.
 
+- **Settings** (the gear at the bottom of the rail):
+  - **Appearance:** light, dark or system theme, accent colour, background, interface size, motion and how times are shown.
+  - **Git:** the name and email git writes on your commits, global defaults (default branch, how to pull, signing), plus the Jira key in commit messages and AI commit message status.
+  - **Notifications**, **Connections**, **Data** (where Ferry keeps its files) and **About**.
+
+  Git settings change `git config --global`. Everything else is saved in your browser.
 - **Git client** (the branch button on the rail): clone, create or open a repository. You get:
   - **Changes:** tick files, or single lines, to commit; "✨ Write it for me" for the message; amend, undo, discard, stash.
   - **History:** every commit's changes as a change story; cherry-pick, revert, tag or branch from any commit.
+  - **Insights:** heatmaps of the last year: commits per day (click a day for its commits), what weekday and hour the work happens, and the busiest files month by month, plus streaks, commits per week, hotspots (files that are big *and* change often), files that change together, and, for repositories Ferry syncs into, the work synced between commits. Switch between everyone's commits and just yours.
   - **Branches:** switch, merge, rename, delete.
   - **Fetch, pull and push**, with an ahead / behind count and help when the two sides have diverged.
   - **Merge conflict help:** keep yours, keep theirs or keep both, then continue or abort.
@@ -218,7 +225,7 @@ The web app does what the terminal dashboard does, with buttons instead of keys:
 - **`ferry doctor`**: checks git and your git identity, optional tools (git-lfs, gh, ssh, notify-send), the data folder, held conflicts and the background service. For each pair it also checks that the source exists, that the target is a git repo, whether native file events work (with the inotify limit on Linux and `/mnt/c` inside WSL), that ssh reaches remote targets, and the sync window. Each problem comes with a fix. It exits with 1 if anything is broken.
 
 ### Connections: GitLab, Azure DevOps and Jira
-The plug button on the web app's rail connects Ferry to your accounts. Ferry checks each token by signing in once before saving it.
+Settings → Connections in the web app connects Ferry to your accounts. Ferry checks each token by signing in once before saving it.
 
 | Service | What you get | You need |
 |---|---|---|

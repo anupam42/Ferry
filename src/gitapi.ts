@@ -3,7 +3,7 @@
 //   GET  /git/repos                         repositories: opened directly, and pair targets
 //   POST /git/repos                         {"action": "clone"|"create"|"add", "url", "path"}
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
-//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|conflict|ai-message}
+//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
 //                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout}
 //
@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import * as ai from "./ai.ts";
+import { batchTime, history } from "./engine/journal.ts";
 import type { Engine } from "./engine/engine.ts";
 import * as g from "./gitclient.ts";
 import * as conn from "./integrations.ts";
@@ -127,6 +128,7 @@ export class GitApi {
         return json(await g.pullRequests(root));
       }
       case "issues": return json(await conn.jiraMyIssues());
+      case "insights": return json({ ...(await g.insights(root, { author: q.get("author") === "me" ? "me" : "" })), sync: this.syncDays(root) });
       case "ai-message": {
         const st = await g.state(root);
         const lines = st.files.filter((f) => f.staged).map((f) => `${f.x}  ${f.path}`);
@@ -193,12 +195,35 @@ export class GitApi {
     return fail("unknown action " + action, 404);
   }
 
+  /**
+   * Files Ferry wrote into this repository per day, from the pairs' journals
+   * (the last JOURNAL_KEEP syncs of each), or null when no pair syncs here.
+   */
+  private syncDays(root: string): { pairs: string[]; days: Record<string, number>; since: string } | null {
+    const pairs = this.engines.filter((e) => !e.cfg.remote && !e.cfg.cloud && inside(path.resolve(e.cfg.target), root));
+    if (!pairs.length) return null;
+    const days: Record<string, number> = {};
+    let since = "";
+    for (const e of pairs) {
+      for (const b of history(e.dataDir, e.id)) {
+        if (b.undone) continue;
+        const t = new Date(batchTime(b));
+        const day = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+        const n = b.entries.filter((x) => x.side === "target").length;
+        if (!n) continue;
+        days[day] = (days[day] ?? 0) + n;
+        if (!since || day < since) since = day;
+      }
+    }
+    return { pairs: pairs.map((e) => e.name), days, since };
+  }
+
   /** Pauses every running pair whose target is inside root; returns their names. */
   private pausePairs(root: string): string[] {
     const names: string[] = [];
     for (const e of this.engines) {
       const t = path.resolve(e.cfg.target);
-      if (e.cfg.remote || e.cfg.cloud || (t !== root && !t.startsWith(root + path.sep))) continue;
+      if (e.cfg.remote || e.cfg.cloud || !inside(t, root)) continue;
       if (!e.getStatus().userPaused) {
         e.setPaused(true);
         names.push(e.name);
@@ -207,6 +232,8 @@ export class GitApi {
     return names;
   }
 }
+
+const inside = (p: string, root: string) => p === root || p.startsWith(root + path.sep);
 
 async function body(req: Request): Promise<Record<string, unknown>> {
   try {

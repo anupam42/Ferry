@@ -33,6 +33,7 @@ cd Ferry
 bun install
 bun src/main.ts --help        # run from source
 bun src/main.ts ui            # the web app
+bun run dev                   # the web app with hot reload, for working on it
 ```
 
 Before you open a pull request, run the same checks as CI:
@@ -56,7 +57,7 @@ The [Development section of the README](README.md#development) maps the source t
 
 - `src/engine/engine.ts` is the sync loop. Each pair has a serial task queue: timers, the watcher, the dashboard and the HTTP API queue work with `do()` / `schedule()` rather than changing state directly. Keep it that way.
 - `src/config.ts` holds every pair option. A new option goes in the `Pair` type, `defaults()`, the `FIELDS` table (its YAML key), `normalize()` (validation), and usually a flag in `src/cli/runflags.ts`.
-- `src/cli/` contains the commands, `src/tui/` the terminal dashboard, `src/web/index.html` the web app (one self-contained file, no build step), and `src/api.ts` the HTTP API both use.
+- `src/cli/` contains the commands, `src/tui/` the terminal dashboard, `src/web/index.html` the web app (one self-contained file, no build step), and `src/api.ts` the HTTP API both use. While you work on the web app, `bun run dev` (`ferry ui --dev`) keeps the browser up to date: saving `src/web/index.html` swaps in new styles without a reload, or reloads the page on the same tab and scroll position for any other change, and saving a `.ts` file restarts Ferry on the same port, after which the page reloads by itself.
 - `test/` uses `bun:test`. `setup()` in `test/helpers.ts` gives you a fresh source, target and `FERRY_HOME` for each test.
 
 ## Making a change

@@ -8,9 +8,14 @@
 <script>
   // pick the theme before anything is drawn, so the page never flashes the wrong one
   (() => {
-    const saved = localStorage.getItem("ferry-theme");
-    const dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    const saved = localStorage.getItem("ferry-theme"); // light | dark | system (or unset: system)
+    const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+    const root = document.documentElement;
+    root.dataset.theme = dark ? "dark" : "light";
+    // accent colour, interface size and motion from Settings → Appearance
+    let look = {};
+    try { look = JSON.parse(localStorage.getItem("ferry-look") || "{}"); } catch {}
+    for (const k of ["accent", "bg", "size", "motion"]) if (look[k]) root.dataset[k] = look[k];
   })();
 </script>
 <style>
@@ -51,11 +56,22 @@ button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2.5px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- layout ---------- */
-.app { display: grid; grid-template-columns: 92px 320px minmax(0, 1fr); gap: 18px; padding: 18px; min-height: 100vh; }
-@media (max-width: 1100px) { .app { grid-template-columns: 92px minmax(0, 1fr); } .pairs-col { grid-column: 2; } .main { grid-column: 2; } }
-@media (max-width: 700px) { .app { grid-template-columns: 1fr; padding: 10px; } .rail { flex-direction: row; position: static; height: auto; } .rail .grow { display: none; } .pairs-col, .main { grid-column: 1; } }
+/* Interface size zooms the page; zoom also scales vh, so heights divide by it to keep fitting the window */
+:root { --zoom: 1; } [data-size="small"] { --zoom: .9; } [data-size="large"] { --zoom: 1.1; }
+body { zoom: var(--zoom); }
+.app { display: grid; grid-template-columns: 92px 320px minmax(0, 1fr); gap: 18px; padding: 18px; min-height: calc(100vh / var(--zoom)); }
+@media (max-width: 1100px) {
+  /* the list sits above the page; the rail spans both so the page starts right under the list */
+  .app { grid-template-columns: 92px minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .rail { grid-column: 1; grid-row: 1 / span 2; }
+  .pairs-col { grid-column: 2; grid-row: 1; } .main { grid-column: 2; grid-row: 2; }
+  .app.settings-mode .main { grid-row: 1 / span 2; }
+}
 
-.rail { background: var(--rail); backdrop-filter: blur(16px); border-radius: 30px; padding: 16px 0; display: flex; flex-direction: column; align-items: center; gap: 14px; position: sticky; top: 18px; height: calc(100vh - 36px); box-shadow: var(--shadow); }
+.rail { background: var(--rail); backdrop-filter: blur(16px); border-radius: 30px; padding: 16px 0; display: flex; flex-direction: column; align-items: center; gap: 14px; position: sticky; top: 18px; height: calc(100vh / var(--zoom) - 36px); box-shadow: var(--shadow);
+  overflow-y: auto; scrollbar-width: none; z-index: 5; }
+.rail::-webkit-scrollbar { display: none; }
+.rail > * { flex: none; }
 .rail .grow { flex: 1; }
 .rail-btn { width: 54px; height: 54px; border-radius: 50%; border: 0; background: var(--pill); color: var(--text); display: grid; place-items: center; cursor: pointer; position: relative; box-shadow: 0 2px 8px rgba(9,35,72,.06); transition: transform .15s; }
 .rail-btn:hover { transform: translateY(-2px); }
@@ -304,6 +320,189 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 .empty p { color: var(--muted); max-width: 480px; margin: 0 auto 16px; }
 .float { animation: bob 3.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .float { animation: none; } }
+/* ---------- settings ---------- */
+.app.settings-mode { grid-template-columns: 92px minmax(0, 1fr); }
+.app.settings-mode .pairs-col { display: none; }
+.set-page { max-width: 1120px; margin: 0 auto; padding: 14px 24px 40px; width: 100%; }
+.set-eyebrow { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.set-eyebrow svg { width: 15px; height: 15px; }
+.set-title { margin: 8px 0 4px; font-size: 30px; letter-spacing: -.01em; }
+.set-sub { margin: 0 0 22px; color: var(--muted); }
+.set-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
+.set-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 18px; }
+.set-nav-btn { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 0; border-radius: 12px; background: none; color: var(--muted); font-size: 14.5px; font-weight: 500; text-align: left; cursor: pointer; }
+.set-nav-btn svg { width: 18px; height: 18px; }
+.set-nav-btn:hover { background: var(--card2); color: var(--text); }
+.set-nav-btn.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.set-card { padding: 0; overflow: hidden; }
+.set-card-head { display: flex; align-items: center; gap: 12px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+.set-card-head h2 { margin: 0; font-size: 17px; }
+.set-chip { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.set-chip svg { width: 18px; height: 18px; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+.set-row:last-child { border-bottom: 0; }
+.set-row.tall { align-items: flex-start; }
+.set-label { min-width: 0; flex: 1; }
+.set-label b { display: block; font-size: 14.5px; font-weight: 600; }
+.set-label small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; max-width: 460px; }
+.set-control { flex: none; display: flex; justify-content: flex-end; }
+.set-control input[type=text] { width: 300px; }
+.set-control select { width: 260px; }
+.set-inline { display: flex; align-items: center; gap: 10px; }
+.set-path { max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; unicode-bidi: plaintext; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: var(--card2); }
+.set-banner { margin: 14px 22px 2px; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); color: var(--text); font-size: 13px; }
+.set-banner.warn { background: var(--amber-soft); color: var(--amber); }
+.set-group { padding: 16px 22px 0; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.set-group + .set-row { padding-top: 10px; }
+.set-note { display: flex; align-items: center; gap: 12px; padding: 14px 22px; color: var(--muted); font-size: 13px; background: var(--card2); }
+.set-note img { width: 46px; height: 34px; }
+.set-about { display: flex; align-items: center; gap: 18px; padding: 20px 22px; border-bottom: 1px solid var(--line); }
+.set-about img { width: 120px; height: 90px; } .set-about b { font-size: 18px; } .set-about p { margin: 4px 0 0; color: var(--muted); max-width: 520px; }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.swatch-btn { width: 30px; height: 30px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center; color: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); transition: transform .12s; }
+.swatch-btn:hover { transform: scale(1.08); }
+.swatch-btn.on { box-shadow: 0 0 0 2px var(--card-solid), 0 0 0 4px color-mix(in srgb, var(--text) 35%, transparent); }
+.swatch-btn svg { width: 15px; height: 15px; stroke-width: 3; }
+.switch { position: relative; display: inline-block; width: 44px; height: 26px; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 99px; background: color-mix(in srgb, var(--muted) 35%, transparent); transition: background .15s; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(18px); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-picks { display: flex; gap: 12px; }
+.theme-pick { width: 132px; padding: 8px; border-radius: 16px; border: 2px solid var(--line); background: var(--card-solid); cursor: pointer; color: var(--text); text-align: left; }
+.theme-pick.on { border-color: var(--accent); }
+.theme-name { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 4px 2px; font-weight: 600; font-size: 13.5px; }
+.theme-name svg { width: 16px; height: 16px; color: var(--accent); stroke-width: 3; }
+.theme-preview { display: grid; grid-template-columns: 18px 1fr; grid-template-rows: 1fr 1fr; gap: 5px; height: 70px; padding: 7px; border-radius: 10px; }
+.theme-preview i { border-radius: 5px; } .theme-preview i:first-child { grid-row: span 2; }
+.theme-preview.light { background: linear-gradient(135deg, #DDF6EE, #E4EEFF 50%, #ECE6FF); } .theme-preview.light i { background: #fff; } .theme-preview.light i:nth-child(2) { background: linear-gradient(135deg, #2586E6, #3CCBB0); }
+.theme-preview.dark { background: linear-gradient(135deg, #071430, #1A1844); } .theme-preview.dark i { background: #13213F; } .theme-preview.dark i:nth-child(2) { background: linear-gradient(135deg, #4C9DF5, #4FD8BD); }
+.theme-preview.system { background: linear-gradient(115deg, #E4EEFF 0 50%, #0D1E40 50% 100%); } .theme-preview.system i { background: linear-gradient(115deg, #fff 0 50%, #13213F 50%); }
+@media (max-width: 1000px) { .set-grid { grid-template-columns: 1fr; } .set-nav { position: static; flex-direction: row; flex-wrap: wrap; } .set-row { flex-wrap: wrap; } .set-control input[type=text], .set-control select { width: 100%; } }
+.bg-picks { display: grid; grid-template-columns: repeat(3, 92px); gap: 12px; }
+.bg-pick { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.bg-preview { width: 92px; height: 54px; border-radius: 12px; display: grid; place-items: center; color: var(--accent); box-shadow: inset 0 0 0 1px var(--line); }
+.bg-preview svg { width: 18px; height: 18px; stroke-width: 3; padding: 3px; border-radius: 50%; background: var(--card-solid); }
+.bg-pick.on { color: var(--text); } .bg-pick.on .bg-preview { box-shadow: 0 0 0 2px var(--card-solid), 0 0 0 4px var(--accent); }
+.bg-pick:focus-visible { outline: none; } .bg-pick:focus-visible .bg-preview { box-shadow: 0 0 0 2px var(--card-solid), 0 0 0 4px var(--text); }
+/* backgrounds: a light and a dark version of each */
+:root {
+  --bg-relay-l: linear-gradient(135deg, #DDF6EE 0%, #E4EEFF 48%, #ECE6FF 100%); --bg-relay-d: linear-gradient(135deg, #071430 0%, #0D1E40 50%, #1A1844 100%);
+  --bg-plain-l: #F3F5FA; --bg-plain-d: #0B1328;
+  --bg-sky-l: linear-gradient(160deg, #DCEBFF 0%, #EEF5FF 55%, #F7FAFF 100%); --bg-sky-d: linear-gradient(160deg, #061A36 0%, #0A2546 55%, #0C2C52 100%);
+  --bg-mint-l: linear-gradient(160deg, #D9F5EA 0%, #EAF9F3 55%, #F5FCF9 100%); --bg-mint-d: linear-gradient(160deg, #04201B 0%, #082B26 55%, #0B332E 100%);
+  --bg-lavender-l: linear-gradient(160deg, #E9E2FF 0%, #F2EEFF 55%, #F9F7FF 100%); --bg-lavender-d: linear-gradient(160deg, #130E31 0%, #1C1542 55%, #221A4E 100%);
+  --bg-sand-l: linear-gradient(160deg, #F8EBDA 0%, #FCF4EA 55%, #FFFAF4 100%); --bg-sand-d: linear-gradient(160deg, #1C140C 0%, #261B11 55%, #2D2115 100%);
+}
+[data-bg="plain"] { --bg: var(--bg-plain-l); } [data-theme="dark"][data-bg="plain"] { --bg: var(--bg-plain-d); }
+[data-bg="sky"] { --bg: var(--bg-sky-l); } [data-theme="dark"][data-bg="sky"] { --bg: var(--bg-sky-d); }
+[data-bg="mint"] { --bg: var(--bg-mint-l); } [data-theme="dark"][data-bg="mint"] { --bg: var(--bg-mint-d); }
+[data-bg="lavender"] { --bg: var(--bg-lavender-l); } [data-theme="dark"][data-bg="lavender"] { --bg: var(--bg-lavender-d); }
+[data-bg="sand"] { --bg: var(--bg-sand-l); } [data-theme="dark"][data-bg="sand"] { --bg: var(--bg-sand-d); }
+/* accents */
+[data-accent="ocean"] { --accent: #0E7CC2; --accent-2: #2BB3D9; }
+[data-accent="forest"] { --accent: #1E8C5A; --accent-2: #6DB85C; }
+[data-accent="sunset"] { --accent: #D9531F; --accent-2: #EFA233; }
+[data-accent="grape"] { --accent: #7C4DDB; --accent-2: #C94FBE; }
+[data-accent="graphite"] { --accent: #3D4A63; --accent-2: #7A8AA8; }
+[data-theme="dark"][data-accent="ocean"] { --accent: #3FA9F5; --accent-2: #5FD3F0; }
+[data-theme="dark"][data-accent="forest"] { --accent: #3CCB7F; --accent-2: #9BE07E; }
+[data-theme="dark"][data-accent="sunset"] { --accent: #FF7A45; --accent-2: #FFC15C; }
+[data-theme="dark"][data-accent="grape"] { --accent: #A47CFF; --accent-2: #F07FE3; }
+[data-theme="dark"][data-accent="graphite"] { --accent: #9AA8C7; --accent-2: #C9D3E8; }
+[data-accent] { --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent); }
+/* interface size and motion */
+[data-motion="reduce"] *, [data-motion="reduce"] *::before, [data-motion="reduce"] *::after { animation-duration: 0s !important; animation-iteration-count: 1 !important; transition: none !important; scroll-behavior: auto !important; }
+/* ---------- heatmaps (sequential blue: light → dark in light mode, flipped in dark) ---------- */
+:root, [data-theme="light"] { --heat0: rgba(9,35,72,.07); --heat1: #b7d3f6; --heat2: #6da7ec; --heat3: #2a78d6; --heat4: #184f95; }
+[data-theme="dark"] { --heat0: rgba(255,255,255,.07); --heat1: #184f95; --heat2: #2a78d6; --heat3: #5598e7; --heat4: #9ec5f4; }
+.heat { display: block; border-radius: 3px; background: var(--heat0); }
+.heat.l1 { background: var(--heat1); } .heat.l2 { background: var(--heat2); } .heat.l3 { background: var(--heat3); } .heat.l4 { background: var(--heat4); }
+.heat.future { background: transparent; }
+.heat-wrap { position: relative; padding: 6px 16px 14px; }
+.heat-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; }
+.heat-legend { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font-size: 12px; }
+.heat-legend span { margin: 0 4px; }
+.heat-legend i.heat { width: 12px; height: 12px; }
+.heat-tip { position: absolute; z-index: 6; transform: translate(-50%, -100%); padding: 7px 11px; border-radius: 10px; background: var(--text); color: var(--card-solid);
+  font-size: 12px; line-height: 1.4; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .1s; box-shadow: 0 8px 22px rgba(9,35,72,.25); }
+.heat-tip.on { opacity: 1; } .heat-tip.flip-l { transform: translate(-12px, -100%); } .heat-tip.flip-r { transform: translate(calc(-100% + 12px), -100%); }
+.heat-tip b, .heat-tip span { display: block; }
+.cal { display: grid; grid-template-columns: 30px minmax(0, 1fr); row-gap: 4px; }
+.cal-months { white-space: nowrap; display: grid; grid-template-columns: repeat(53, minmax(0, 1fr)); gap: 3px; font-size: 11px; color: var(--muted); }
+.cal-days { display: grid; grid-template-rows: repeat(7, 1fr); gap: 3px; font-size: 10.5px; color: var(--muted); }
+.cal-days span { display: flex; align-items: center; }
+.cal-grid { display: grid; grid-template-columns: repeat(53, minmax(0, 1fr)); grid-template-rows: repeat(7, auto); gap: 3px; }
+.cal-grid .heat { aspect-ratio: 1; cursor: pointer; }
+.cal-grid .heat:hover, .cal-grid .heat:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.cal-grid .heat.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-grid .heat.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.cal-grid:focus-within { outline: none; }
+.day-list { margin: 4px 16px 14px; padding: 10px; border-radius: 16px; background: var(--card2); }
+.day-head { display: flex; justify-content: space-between; gap: 10px; padding: 2px 10px 8px; font-size: 13.5px; }
+.day-commit { display: flex; gap: 12px; align-items: baseline; width: 100%; padding: 7px 10px; border: 0; border-radius: 10px; background: none; color: var(--text); text-align: left; cursor: pointer; font-size: 13.5px; }
+.day-commit:hover, .day-commit:focus-visible { background: var(--card-solid); }
+.day-commit .mono { color: var(--accent); font-size: 12px; }
+.day-commit .grow { flex: 1; } .day-commit small { color: var(--muted); }
+.hour-grid { display: grid; grid-template-columns: 34px repeat(24, minmax(0, 1fr)); gap: 3px; }
+.hour-grid .heat { height: 18px; }
+.hour-grid .hour-label { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: visible; }
+.hour-grid .row-label { font-size: 11px; color: var(--muted); display: flex; align-items: center; }
+.file-heat { display: flex; flex-direction: column; gap: 3px; }
+.fh-row { display: grid; grid-template-columns: minmax(150px, 2.2fr) repeat(12, minmax(14px, 1fr)) 92px; gap: 3px; align-items: center; }
+.fh-row .heat { height: 26px; }
+.fh-row.head { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.fh-file { min-width: 0; padding-right: 8px; overflow: hidden; }
+.fh-file b { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fh-file small { display: block; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fh-month { text-align: center; white-space: nowrap; }
+.fh-total { text-align: right; font-variant-numeric: tabular-nums; }
+.fh-total b { display: block; font-size: 13px; } .fh-total small { color: var(--muted); font-size: 11px; }
+.insight-who { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin: 2px 0 10px; font-size: 13px; }
+.insight-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.insight-tiles .tile .v { font-size: 22px; white-space: nowrap; }
+@media (max-width: 900px) { .insight-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .heat-tip { transition: none; } }
+/* ---------- insight charts ---------- */
+.chart { display: block; width: 100%; height: auto; overflow: visible; --ink: var(--accent); }
+[data-theme="light"] .chart, :root .chart { --bar: #2a78d6; } [data-theme="dark"] .chart { --bar: #5598e7; }
+.chart .grid { stroke: var(--line); stroke-width: 1; } .chart .grid.base { stroke: color-mix(in srgb, var(--muted) 45%, transparent); }
+.chart .axis { fill: var(--muted); font-size: 11px; } .chart .axis.title { font-size: 12px; font-weight: 600; }
+.chart .direct { fill: var(--text); font-size: 12px; font-weight: 600; paint-order: stroke; stroke: var(--card-solid); stroke-width: 3px; stroke-linejoin: round; }
+.chart .bar { fill: var(--bar); } .chart .bar.open { fill: color-mix(in srgb, var(--bar) 18%, transparent); stroke: var(--bar); stroke-width: 1.5; }
+.chart .avg { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; opacity: .7; }
+.chart .hit { fill: transparent; cursor: default; } .chart .hit:hover { fill: color-mix(in srgb, var(--muted) 10%, transparent); }
+.chart .zone { fill: var(--accent-soft); } .chart .zone-label { fill: var(--accent); font-size: 12px; font-weight: 700; }
+.chart .median { stroke: color-mix(in srgb, var(--muted) 55%, transparent); stroke-dasharray: 4 4; }
+.chart .dot { fill: color-mix(in srgb, var(--bar) 45%, transparent); stroke: var(--card-solid); stroke-width: 2; cursor: pointer; }
+.chart .dot.top { fill: var(--bar); }
+.chart .dot:hover, .chart .dot:focus-visible { outline: none; stroke: var(--text); }
+.chart .commit-dot { fill: var(--text); }
+.key { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+.key .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-left: 8px; }
+.key .swatch.bar { background: #2a78d6; } [data-theme="dark"] .key .swatch.bar { background: #5598e7; }
+.key .swatch.bar.open { background: transparent; border: 1.5px solid #2a78d6; } [data-theme="dark"] .key .swatch.bar.open { border-color: #5598e7; }
+.key .swatch.line { height: 2px; width: 16px; border-radius: 1px; background: var(--text); opacity: .7; }
+.key .swatch.dot { border-radius: 50%; background: color-mix(in srgb, #2a78d6 45%, transparent); } .key .swatch.dot.top { background: #2a78d6; }
+[data-theme="dark"] .key .swatch.dot { background: color-mix(in srgb, #5598e7 45%, transparent); } [data-theme="dark"] .key .swatch.dot.top { background: #5598e7; }
+.key .swatch.commit { width: 9px; height: 9px; border-radius: 50%; background: var(--text); }
+.rank-list { margin-top: 14px; padding: 10px 12px; border-radius: 16px; background: var(--card2); }
+.rank-head { font-size: 12.5px; font-weight: 700; color: var(--muted); padding: 0 4px 6px; }
+.rank-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 4px; font-size: 12.5px; }
+.rank-n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--card-solid); font-weight: 700; font-size: 11.5px; }
+.pair-list { display: flex; flex-direction: column; gap: 4px; }
+.pair-row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(80px, 1fr) 130px; gap: 14px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.pair-row:last-child { border-bottom: 0; }
+.pair-files { min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pair-files b { font-weight: 600; } .pair-files small { display: block; color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+.pair-link { margin: 0 8px; color: var(--accent); font-weight: 700; }
+.pair-bar { height: 8px; border-radius: 4px; background: var(--card2); overflow: hidden; }
+.pair-bar i { display: block; height: 100%; border-radius: 4px; background: #2a78d6; } [data-theme="dark"] .pair-bar i { background: #5598e7; }
+.pair-n { text-align: right; font-size: 12.5px; } .pair-n b { display: block; font-weight: 600; } .pair-n small { color: var(--muted); font-size: 11.5px; }
+.insight-tiles.three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
+.insight-tiles.three .tile { background: var(--card2); }
 /* Relay while something loads */
 .relay-loading { display: flex; align-items: center; gap: 18px; padding: 22px 24px; }
 .relay-loading img { width: 92px; height: 68px; flex: none; animation: bob 2.4s ease-in-out infinite; }
@@ -365,6 +564,21 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 .op-card { border: 2px solid var(--red); }
 .seg.big button { padding: 8px 18px; }
 .rp-sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* phones (kept last so it wins over the layout above): the rail becomes a bar along the top that stays in reach */
+@media (max-width: 700px) {
+  .app, .app.settings-mode { grid-template-columns: minmax(0, 1fr); padding: 10px; gap: 12px; }
+  .rail { flex-direction: row; justify-content: space-around; top: 10px; height: auto; padding: 8px 10px; border-radius: 22px; overflow: visible; }
+  .rail .grow { display: none; }
+  .rail .avatar { width: 46px; height: 46px; } .rail .avatar img { width: 38px; height: 29px; }
+  .rail-btn { width: 46px; height: 46px; }
+  .rail { grid-row: auto; }
+  .set-page { padding: 6px 4px 30px; }
+  .set-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .set-control { justify-content: flex-start; } .set-control > * { max-width: 100%; }
+  .swatches { justify-content: flex-start; }
+  .theme-picks { flex-wrap: wrap; } .theme-pick { width: calc((100% - 24px) / 3); min-width: 96px; }
+  .pairs-col, .main, .app.settings-mode .main { grid-column: 1; grid-row: auto; }
+}
 </style>
 </head>
 <body>
@@ -375,8 +589,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     <button class="rail-btn" id="nav-git" title="Git" aria-label="Git client"></button>
     <button class="rail-btn" id="nav-activity" title="Notifications" aria-label="Notifications"><span class="badge hidden" id="note-badge"></span></button>
     <div class="grow"></div>
-    <button class="rail-btn" id="nav-conn" title="Connections: GitLab, Azure DevOps, Jira" aria-label="Connections"></button>
-    <button class="rail-btn" id="nav-theme" aria-label="Switch light or dark mode"></button>
+    <button class="rail-btn" id="nav-settings" title="Settings" aria-label="Settings"></button>
   </nav>
   <aside class="pairs-col">
     <div class="card">
@@ -447,6 +660,12 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     tree: '<path d="M12 3v18M12 8l-6 4M12 12l6 4"/>',
     cloud: '<path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.5 1.5A3.5 3.5 0 0 0 7 18z"/>',
     plug: '<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    user: '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21 20a6 6 0 0 0-4-5.6"/>',
+    palette: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-4-4-7.2-9-7.2z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/>',
+    db: '<ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>',
+    check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
     ticket: '<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 5v12"/>',
   };
   function icon(name) {
@@ -500,6 +719,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   function ago(iso) {
     const t = Date.parse(iso);
     if (!t || String(iso).startsWith("0001")) return "never";
+    if (localStorage.getItem("ferry-time") === "exact") return new Date(t).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
     const d = (Date.now() - t) / 1000;
     if (d < 45) return "just now";
     if (d < 3600) return Math.round(d / 60) + " min ago";
@@ -507,16 +727,36 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     return new Date(t).toLocaleString();
   }
   const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const plural = (n, w, many) => `${n} ${n === 1 ? w : many || w + "s"}`;
 
   // ---------- state ----------
   const S = {
     info: null, pairs: [], sel: localStorage.getItem("ferry-sel") || "", tab: "files", q: "",
     log: new Map(), lastError: new Map(), cleared: new Map(), closed: new Set(JSON.parse(localStorage.getItem("ferry-closed") || "[]")),
     statsSince: "7d", ui: null, shown: "",
-    mode: localStorage.getItem("ferry-mode") === "git" ? "git" : "sync",
+    mode: ({ sync: "sync", git: "git" })[localStorage.getItem("ferry-start")] || (localStorage.getItem("ferry-mode") === "git" ? "git" : "sync"),
     repos: [], repoSel: localStorage.getItem("ferry-repo") || "", repo: null, gitTab: "changes", gitBump: 0, logSkip: 0,
   };
+  // ferry ui --dev: after a hot reload, come back to the same tab and scroll position
+  const devState = JSON.parse(sessionStorage.getItem("ferry-dev-state") || "null");
+  sessionStorage.removeItem("ferry-dev-state");
+  if (devState) Object.assign(S, { tab: devState.tab, gitTab: devState.gitTab, insightsWho: devState.insightsWho });
+  function devReload() {
+    sessionStorage.setItem("ferry-dev-state", JSON.stringify({ tab: S.tab, gitTab: S.gitTab, insightsWho: S.insightsWho, scroll: window.scrollY }));
+    location.reload();
+  }
+  /** A save that only touched <style>: swap the new styles in, nothing else changes. */
+  async function devSwapStyles() {
+    try {
+      const html = await (await fetch("/" + (token ? "?token=" + enc(token) : ""), { cache: "no-store" })).text();
+      const fresh = [...new DOMParser().parseFromString(html, "text/html").querySelectorAll("style")];
+      const mine = [...document.querySelectorAll("style")];
+      if (fresh.length !== mine.length) return devReload();
+      fresh.forEach((st, i) => { if (mine[i].textContent !== st.textContent) mine[i].textContent = st.textContent; });
+    } catch {
+      devReload();
+    }
+  }
 
   /** Relay's face and words for a pair's state. */
   function mood(p) {
@@ -587,6 +827,15 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       refreshSoon();
     };
     for (const k of ["info", "add", "update", "delete", "rename", "conflict", "resolved", "skip", "warn", "error", "synced", "paused", "resumed", "git", "commit", "kept"]) es.addEventListener(k, onEv);
+    if (S.info && S.info.dev) {
+      // the page was saved: styles swap in place, anything else reloads where you were
+      es.addEventListener("dev", (m) => { let d = {}; try { d = JSON.parse(m.data); } catch {} d.kind === "css" ? devSwapStyles() : devReload(); });
+      // ferry restarted (its code changed): reload once it answers again
+      es.onopen = async () => {
+        const info = await api("GET", "/info").catch(() => null);
+        if (info && info.dev && info.dev.boot !== S.info.dev.boot) devReload();
+      };
+    }
     es.onerror = () => refreshSoon(); // the browser reconnects by itself; just check that ferry still answers
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = "Ferry"; });
@@ -754,8 +1003,6 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     $("#nav-pairs").append(icon("home"));
     $("#nav-activity").append(icon("bell"));
     $("#nav-git").append(icon("branch"));
-    $("#nav-conn").append(icon("plug"));
-    $("#nav-conn").onclick = openConnections;
     const setMode = (m, tab) => {
       S.mode = m;
       localStorage.setItem("ferry-mode", m);
@@ -769,19 +1016,10 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     $("#nav-pairs").onclick = () => setMode("sync", "files");
     $("#nav-git").onclick = () => setMode("git");
     $("#nav-activity").onclick = openNotifications;
-    const themeBtn = $("#nav-theme");
-    const paintTheme = () => {
-      const dark = document.documentElement.dataset.theme === "dark";
-      themeBtn.replaceChildren(icon(dark ? "sun" : "moon"));
-      themeBtn.title = dark ? "Switch to light mode" : "Switch to dark mode";
-    };
-    themeBtn.onclick = () => {
-      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-      document.documentElement.dataset.theme = next;
-      localStorage.setItem("ferry-theme", next);
-      paintTheme();
-    };
-    paintTheme();
+    $("#nav-settings").onclick = () => { S.setShown = ""; setMode("settings"); };
+    paintMe();
+    // "System" follows the computer's light or dark mode as it changes
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themeChoice() === "system") { setTheme("system"); render(); } });
     const paintAdd = () => {
       $("#add-btn").replaceChildren(icon("plus"), S.mode === "git" ? "Add repository" : "New pair");
       $(".pairs-head h2").textContent = S.mode === "git" ? "Repositories" : "Folder pairs";
@@ -790,11 +1028,220 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     $("#add-btn").onclick = () => (S.mode === "git" ? openAddRepo() : openAdd());
   }
 
+  // ---------- look: theme, accent, size, motion ----------
+  const themeChoice = () => localStorage.getItem("ferry-theme") || "system";
+  function setTheme(choice) {
+    localStorage.setItem("ferry-theme", choice);
+    const dark = choice === "dark" || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  }
+  const getLook = () => { try { return JSON.parse(localStorage.getItem("ferry-look") || "{}"); } catch { return {}; } };
+  function setLook(k, v) {
+    const look = getLook();
+    if (v) look[k] = v; else delete look[k];
+    localStorage.setItem("ferry-look", JSON.stringify(look));
+    if (v) document.documentElement.dataset[k] = v; else delete document.documentElement.dataset[k];
+  }
+  /** The rail's Settings button. */
+  function paintMe() {
+    $("#nav-settings").replaceChildren(icon("gear"));
+  }
+
+  // ---------- settings ----------
+  const SETTINGS = [
+    ["appearance", "Appearance", "palette"], ["git", "Git", "branch"], ["notifications", "Notifications", "bell"],
+    ["connections", "Connections", "plug"], ["data", "Data", "db"], ["about", "About", "info"]];
+
+  async function renderSettings() {
+    const ok = (id) => SETTINGS.some(([x]) => x === id);
+    const sec = ok(S.setSec) ? S.setSec : (S.setSec = ok(localStorage.getItem("ferry-settings-sec")) ? localStorage.getItem("ferry-settings-sec") : "appearance");
+    const key = sec + "|" + (S.settings ? "1" : "0") + "|" + document.documentElement.dataset.theme;
+    if (S.setShown === key) return;
+    S.setShown = key;
+    const main = $("#main");
+    const nav = h("nav", { class: "set-nav", "aria-label": "Settings sections" }, ...SETTINGS.map(([id, name, ic]) =>
+      h("button", { class: "set-nav-btn" + (id === sec ? " on" : ""), "aria-current": id === sec ? "page" : null, onclick: () => { S.setSec = id; localStorage.setItem("ferry-settings-sec", id); render(); } }, icon(ic), name)));
+    const [, title, ic] = SETTINGS.find(([id]) => id === sec);
+    const card = h("section", { class: "card set-card", "aria-labelledby": "set-title" },
+      h("header", { class: "set-card-head" }, h("span", { class: "set-chip" }, icon(ic)), h("h2", { id: "set-title" }, title)));
+    main.replaceChildren(h("div", { class: "set-page" },
+      h("div", { class: "set-eyebrow" }, icon("gear"), "Preferences"),
+      h("h1", { class: "set-title" }, "Settings"),
+      h("p", { class: "set-sub" }, "How Ferry looks, and how it works with git on this computer."),
+      h("div", { class: "set-grid" }, nav, card)));
+    if (!S.settings && sec !== "appearance" && sec !== "notifications" && sec !== "about") {
+      card.append(relayLoading("Looking at your settings", { card: false }));
+      S.settings = await api("GET", "/settings").catch((e) => ({ error: e.message }));
+      paintMe();
+      S.setShown = "";
+      return render();
+    }
+    ({ appearance: setAppearance, git: setGit, notifications: setNotifications, connections: setConnections, data: setData, about: setAbout })[sec](card);
+  }
+
+  /** One settings row: what it is on the left, the control on the right. */
+  const setRow = (label, hint, control, extra) => h("div", { class: "set-row" + (extra ? " " + extra : "") },
+    h("div", { class: "set-label" }, h("b", {}, label), hint ? h("small", {}, hint) : null), h("div", { class: "set-control" }, control));
+  function setSwitch(on, onChange, label) {
+    const el = h("input", { type: "checkbox", role: "switch", "aria-label": label, checked: on ? true : null });
+    el.onchange = () => onChange(el.checked, el);
+    return h("label", { class: "switch" }, el, h("span", { "aria-hidden": "true" }));
+  }
+  function setSelect(options, value, onChange, label) {
+    const el = h("select", { "aria-label": label }, ...options.map(([v, t]) => h("option", { value: v, selected: v === value ? true : null }, t)));
+    el.onchange = () => onChange(el.value);
+    return el;
+  }
+  function setSeg(options, value, onChange, label) {
+    const seg = h("div", { class: "seg", role: "radiogroup", "aria-label": label });
+    const paint = (v) => seg.replaceChildren(...options.map(([id, t]) => h("button", { class: v === id ? "on" : "", role: "radio", "aria-checked": v === id ? "true" : "false", onclick: () => { paint(id); onChange(id); } }, t)));
+    paint(value);
+    return seg;
+  }
+  const settingsError = (card) => S.settings && S.settings.error ? (card.append(h("div", { class: "set-row" }, h("span", { class: "muted" }, "Couldn't read your settings: " + S.settings.error))), true) : false;
+
+  /** Saves git settings (git config --global) and keeps the page in step. */
+  async function saveGitSetting(body, done) {
+    try {
+      const git = await api("POST", "/settings/git", body);
+      S.settings.git = git;
+      paintMe();
+      toast(done, false, "wink");
+      return true;
+    } catch (e) {
+      toast(e.message, true);
+      return false;
+    }
+  }
+  /** A text field that saves on Enter or when you leave it. */
+  function setText(value, placeholder, save, label) {
+    const el = h("input", { type: "text", value: value || "", placeholder, "aria-label": label, spellcheck: "false" });
+    let last = el.value;
+    const commit = async () => {
+      if (el.value.trim() === last.trim()) return;
+      if (await save(el.value.trim())) last = el.value; else el.value = last;
+    };
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") el.blur(); if (e.key === "Escape") { el.value = last; el.blur(); } });
+    el.addEventListener("blur", commit);
+    return el;
+  }
+
+  function setAppearance(card) {
+    const look = getLook();
+    // the theme picker: a little preview of each, so the choice is obvious before you click
+    const themes = h("div", { class: "theme-picks", role: "radiogroup", "aria-label": "Theme" });
+    const paintThemes = (v) => themes.replaceChildren(...[["light", "Light"], ["dark", "Dark"], ["system", "System"]].map(([id, name]) =>
+      h("button", { class: "theme-pick" + (v === id ? " on" : ""), role: "radio", "aria-checked": v === id ? "true" : "false", onclick: () => { setTheme(id); paintThemes(id); render(); } },
+        h("span", { class: "theme-preview " + id, "aria-hidden": "true" }, h("i"), h("i"), h("i")), h("span", { class: "theme-name" }, name, v === id ? icon("check") : null))));
+    paintThemes(themeChoice());
+    const ACCENTS = [["", "Relay", "#2586E6", "#3CCBB0"], ["ocean", "Ocean", "#0E7CC2", "#2BB3D9"], ["forest", "Forest", "#1E8C5A", "#7CC46A"], ["sunset", "Sunset", "#E0592A", "#F2A93B"], ["grape", "Grape", "#7C4DDB", "#D058C4"], ["graphite", "Graphite", "#3D4A63", "#8A98B4"]];
+    const accents = h("div", { class: "swatches", role: "radiogroup", "aria-label": "Accent colour" });
+    const paintAcc = (v) => accents.replaceChildren(...ACCENTS.map(([id, name, a, b]) => h("button", { class: "swatch-btn" + (v === id ? " on" : ""), role: "radio", "aria-checked": v === id ? "true" : "false", "aria-label": name, title: name,
+      style: { background: `linear-gradient(135deg, ${a}, ${b})` }, onclick: () => { setLook("accent", id); paintAcc(id); } }, v === id ? icon("check") : null)));
+    paintAcc(look.accent || "");
+    // backgrounds: the previews use the same colours as the page (see --bg-* in the styles)
+    const BACKGROUNDS = [["", "Relay"], ["plain", "Plain"], ["sky", "Sky"], ["mint", "Mint"], ["lavender", "Lavender"], ["sand", "Sand"]];
+    const mode = document.documentElement.dataset.theme === "dark" ? "d" : "l";
+    const backgrounds = h("div", { class: "bg-picks", role: "radiogroup", "aria-label": "Background" });
+    const paintBg = (v) => backgrounds.replaceChildren(...BACKGROUNDS.map(([id, name]) => h("button", { class: "bg-pick" + (v === id ? " on" : ""), role: "radio", "aria-checked": v === id ? "true" : "false", onclick: () => { setLook("bg", id); paintBg(id); } },
+      h("span", { class: "bg-preview", style: { background: `var(--bg-${id || "relay"}-${mode})` } }, v === id ? icon("check") : null), h("span", {}, name))));
+    paintBg(look.bg || "");
+    card.append(
+      setRow("Theme", "System follows your computer's light or dark mode", themes, "tall"),
+      setRow("Accent colour", "Buttons, highlights and Relay's glow. Charts keep their own colours so they read the same", accents),
+      setRow("Background", "Behind everything. Each one has a light and a dark version that follows the theme", backgrounds, "tall"),
+      setRow("Interface size", "Makes everything smaller or bigger, text included", setSeg([["small", "Small"], ["", "Default"], ["large", "Large"]], look.size || "", (v) => setLook("size", v), "Interface size")),
+      setRow("Motion", "Relay's animations, drawers sliding in, and other movement", setSelect([["", "Follow my system"], ["reduce", "Reduce motion"]], look.motion || "", (v) => setLook("motion", v), "Motion")),
+      setRow("Times", "How the app shows when things happened", setSelect([["relative", "Relative (5 min ago)"], ["exact", "Exact (9 Nov, 2:05 PM)"]], localStorage.getItem("ferry-time") || "relative",
+        (v) => { localStorage.setItem("ferry-time", v); toast(v === "exact" ? "Showing exact times" : "Showing relative times", false, "wink"); }, "Times")),
+      h("div", { class: "set-note" }, h("img", { src: face("wink"), alt: "" }), h("span", {}, "More themes and backgrounds are coming. This is where you'll pick them.")));
+  }
+
+  function setGit(card) {
+    if (settingsError(card)) return;
+    const g = S.settings.git;
+    const missing = !g.name || !g.email;
+    card.append(
+      h("div", { class: "set-banner" + (missing ? " warn" : "") }, missing
+        ? "Git needs a name and an email before it can make a commit. They're not an account: git just writes them on each commit, and GitHub or GitLab use the email to link commits to you."
+        : "These are your global git settings (git config --global), so they apply to every repository, in Ferry and anywhere else you use git."),
+      h("div", { class: "set-group" }, "Commit identity"),
+      setRow("Name", "Written on every commit you make", setText(g.name, "Your name", (v) => saveGitSetting({ name: v }, "Saved your name"), "Name")),
+      setRow("Email", "Use the one your GitHub or GitLab account knows, so commits link to you", setText(g.email, "you@example.com", (v) => saveGitSetting({ email: v }, "Saved your email"), "Email")),
+      h("div", { class: "set-group" }, "Defaults"),
+      setRow("Default branch", "The first branch of a repository you create", setText(g.default_branch, "main", (v) => saveGitSetting({ default_branch: v }, v ? `New repositories start on ${v}` : "Using git's default branch name"), "Default branch")),
+      setRow("When pulling", "If both you and the remote have new commits", setSelect([["", "Ask me each time"], ["merge", "Merge both histories"], ["rebase", "Rebase: mine on top"]], g.pull,
+        (v) => saveGitSetting({ pull: v }, v ? `Pulling will ${v}` : "I'll ask when it matters"), "When pulling")),
+      setRow("Sign commits", "Needs a GPG or SSH signing key set up in git", setSwitch(g.sign, async (on, el) => { if (!(await saveGitSetting({ sign: on }, on ? "Commits will be signed" : "Commits won't be signed"))) el.checked = !on; }, "Sign commits")),
+      setRow("Jira issue key in commits", "On a branch named after an issue (SHOP-42-…), start each commit message with its key", setSwitch(localStorage.getItem("ferry-jira-prefix") !== "off",
+        (on) => { localStorage.setItem("ferry-jira-prefix", on ? "on" : "off"); toast(on ? "Issue keys go into commit messages" : "Commit messages stay as you write them", false, "wink"); }, "Jira issue key in commits")),
+      setRow("AI commit messages", S.settings.ai.configured ? "“Write it for me” uses your Anthropic API key" : "Set ANTHROPIC_API_KEY in your terminal, then start ferry again",
+        h("span", { class: "pill " + (S.settings.ai.configured ? "green" : "amber") }, S.settings.ai.configured ? "Ready" : "Not set up")));
+  }
+
+  function setNotifications(card) {
+    const save = () => localStorage.setItem("ferry-note-prefs", JSON.stringify(S.prefs));
+    card.append(
+      setRow("Desktop pop-ups", "Conflicts and errors, while this tab is in the background", setSwitch(S.prefs.desktop, async (on, el) => {
+        if (on && "Notification" in window && Notification.permission !== "granted" && (await Notification.requestPermission()) !== "granted") {
+          el.checked = false;
+          return toast("Your browser didn't allow pop-ups. You can allow them in its site settings.", true);
+        }
+        S.prefs.desktop = on; save();
+      }, "Desktop pop-ups")),
+      setRow("Routine activity", "Show every sync in the notifications list, not just what needs you", setSwitch(S.prefs.routine, (on) => { S.prefs.routine = on; save(); }, "Routine activity")),
+      setRow("Open Ferry on", "What you see first when the page opens", setSelect([["", "Where I left off"], ["sync", "Folder pairs"], ["git", "Git"]], localStorage.getItem("ferry-start") || "",
+        (v) => v ? localStorage.setItem("ferry-start", v) : localStorage.removeItem("ferry-start"), "Open Ferry on")),
+      setRow("Unread notifications", null, h("button", { class: "btn small", onclick: () => { S.lastRead = Date.now(); localStorage.setItem("ferry-read", String(S.lastRead)); paintBadge(); toast("All caught up", false, "happy"); } }, "Mark all as read")));
+  }
+
+  function setConnections(card) {
+    const c = S.conns || {};
+    const row = (id, name, what) => {
+      const x = c[id] || {};
+      return setRow(name, x.connected ? `Connected as ${x.user}${x.fromEnv ? " (from an environment variable)" : ""}` : what,
+        h("div", { class: "set-inline" }, h("span", { class: "pill " + (x.connected ? "green" : "") }, x.connected ? "Connected" : "Not connected"),
+          h("button", { class: "btn small", onclick: openConnections }, x.connected ? "Manage" : "Connect")));
+    };
+    card.append(
+      setRow("GitHub", "Pull requests come from the GitHub CLI (gh). Sign in with “gh auth login” in a terminal", h("span", { class: "pill" }, "Uses gh")),
+      row("gitlab", "GitLab", "Merge requests, pipelines and approvals"), row("azure", "Azure DevOps", "Pull requests, votes and builds"), row("jira", "Jira", "Your issues, and branches named after them"));
+  }
+
+  function setData(card) {
+    if (settingsError(card)) return;
+    const copyBtn = (v) => h("button", { class: "btn small", onclick: async () => { try { await navigator.clipboard.writeText(v); toast("Copied", false, "wink"); } catch { toast("Couldn't copy; select the text instead", true); } } }, "Copy");
+    const path = (v) => h("div", { class: "set-inline" }, h("code", { class: "set-path", title: v }, v), copyBtn(v));
+    card.append(
+      S.settings.config_file ? setRow("Config file", "Your folder pairs and opened repositories", path(S.settings.config_file)) : "",
+      setRow("Data folder", "History, backups, connection tokens (readable only by you)", path(S.settings.data_dir)),
+      setRow("This browser", "Theme, accent and other choices on this page are saved in this browser only",
+        h("button", { class: "btn small ghost danger", onclick: async () => {
+          const ok = await relayAsk({ mood: "worried", title: "Reset this page's settings?", text: "Theme, accent, notification choices and what's collapsed go back to how they started. Your pairs, repositories and git settings stay as they are.", yes: "Reset", no: "Keep them", yesMood: "sad" });
+          if (!ok) return;
+          for (const k of Object.keys(localStorage)) if (k.startsWith("ferry-")) localStorage.removeItem(k);
+          location.reload();
+        } }, "Reset to defaults")));
+  }
+
+  function setAbout(card) {
+    const v = S.info ? S.info.version : "";
+    card.append(
+      h("div", { class: "set-about" }, h("img", { class: "float", src: face("happy"), alt: "Relay" }),
+        h("div", {}, h("b", {}, "Ferry " + v), h("p", {}, "Relay, the sync spirit: a friendly, floating companion that keeps your files and projects in flow."))),
+      setRow("Version", null, h("code", {}, v || "unknown")),
+      setRow("Running on", null, h("span", {}, S.info ? `${S.info.platform}${S.info.dev ? " · dev mode (hot reload)" : ""}` : "")),
+      setRow("Source and issues", "Report a bug or suggest an idea", h("a", { class: "btn small", href: "https://github.com/anupam42/Ferry", target: "_blank", rel: "noopener noreferrer" }, "Open on GitHub")));
+  }
+
   // ---------- rendering ----------
   function render() {
     $("#nav-pairs").classList.toggle("on", S.mode === "sync");
     $("#nav-git").classList.toggle("on", S.mode === "git");
     $("#nav-activity").classList.toggle("on", !!S.noteDrawer);
+    $("#nav-settings").classList.toggle("on", S.mode === "settings");
+    document.querySelector(".app").classList.toggle("settings-mode", S.mode === "settings");
+    if (S.mode === "settings") { renderSettings(); return; }
     if (S.mode === "git") {
       $("#add-btn").classList.toggle("hidden", !!S.info && !S.info.can_open_repos);
       renderRepos();
@@ -1724,7 +2171,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     renderOperation(st);
 
     const n = st ? st.files.filter((f) => !f.conflicted).length : 0;
-    const tabs = [["changes", "Changes", "files", n], ["history", "History", "clock", 0], ["branches", "Branches", "branch", 0], ["stashes", "Stashes", "box", st ? st.stashes : 0],
+    const tabs = [["changes", "Changes", "files", n], ["history", "History", "clock", 0], ["insights", "Insights", "chart", 0], ["branches", "Branches", "branch", 0], ["stashes", "Stashes", "box", st ? st.stashes : 0],
       ["prs", "Pull requests", "pr", 0], ["issues", "Jira", "ticket", 0], ["tags", "Tags", "tag", 0], ["worktrees", "Worktrees", "tree", 0]]
       .filter(([id]) => id !== "issues" || (S.conns && S.conns.jira.connected));
     if (!tabs.some(([id]) => id === S.gitTab)) S.gitTab = "changes";
@@ -1812,7 +2259,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     if (S.gshown === key || (typing && S.gshown.startsWith(S.repoSel + "|" + S.gitTab))) return;
     S.gshown = key;
     if (!st) { ui.body.replaceChildren(S.repoError ? h("div", { class: "card empty-row" }, S.repoError) : relayLoading("Opening the repository", { sub: "Looking at branches and changes." })); return; }
-    ({ changes: gitChanges, history: gitHistory, branches: gitBranches, stashes: gitStashes, prs: gitPRs, issues: gitIssues, tags: gitTags, worktrees: gitWorktrees })[S.gitTab](ui.body, st);
+    ({ changes: gitChanges, history: gitHistory, insights: gitInsights, branches: gitBranches, stashes: gitStashes, prs: gitPRs, issues: gitIssues, tags: gitTags, worktrees: gitWorktrees })[S.gitTab](ui.body, st);
   }
 
   const STATUS = (f) => f.conflicted ? ["Conflict", "red"] : f.untracked ? ["New", "solid-green"] : (f.x === "A" ? ["New", "solid-green"] : f.x === "R" ? ["Renamed", "solid-violet"] : (f.x === "D" || f.y === "D") ? ["Deleted", "solid-red"] : ["Modified", "solid-blue"]);
@@ -1865,7 +2312,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     const issueKey = (st.branch.match(/^([A-Z][A-Z0-9_]+-\d+)/) || [])[1];
     if (issueKey && S.conns && S.conns.jira.connected) msg.placeholder = `${issueKey}: what did you change?`;
     commitBtn.onclick = async () => {
-      if (issueKey && msg.value.trim() && !msg.value.includes(issueKey)) msg.value = `${issueKey}: ${msg.value.trim()}`;
+      if (issueKey && localStorage.getItem("ferry-jira-prefix") !== "off" && msg.value.trim() && !msg.value.includes(issueKey)) msg.value = `${issueKey}: ${msg.value.trim()}`;
       const coAuthors = coAuth.value.split(/,(?=[^>]*(?:<|$))/).map((x) => x.trim()).filter(Boolean);
       const r = await tryAct("commit", { message: msg.value, amend: amend.checked, co_authors: coAuthors }, (r) => amend.checked ? `Updated the last commit (${r.commit})` : `Committed ${r.commit}`, "party");
       if (r) { msg.value = ""; coAuth.value = ""; }
@@ -2147,6 +2594,327 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   }
 
   // ---------- worktrees ----------
+  // ---------- insights: heatmaps of commits and files ----------
+
+  /**
+   * Splits non-zero values into four levels by quartile, so a few huge days
+   * don't wash everything else out. When values repeat (every day has one
+   * commit) the levels spread out instead of all landing on the palest.
+   */
+  function heatScale(values) {
+    const v = values.filter((x) => x > 0).sort((a, b) => a - b);
+    const q = (p) => v[Math.min(v.length - 1, Math.floor(p * v.length))];
+    const cuts = v.length ? [...new Set([q(0.25), q(0.5), q(0.75)])].filter((c) => c < v[v.length - 1]) : [];
+    const level = (x) => {
+      if (x <= 0) return 0;
+      if (!cuts.length) return 3;
+      return 1 + Math.round((cuts.filter((c) => x > c).length * 3) / cuts.length);
+    };
+    // what each level means, for the legend ("3–5 commits")
+    const ranges = [[0, 0], null, null, null, null];
+    for (const x of v) { const l = level(x); ranges[l] = ranges[l] ? [ranges[l][0], x] : [x, x]; }
+    return { level, ranges };
+  }
+
+  /** One floating label for a whole heatmap: cells carry data-tip, the label follows pointer and focus. */
+  function heatTips(wrap) {
+    const tip = h("div", { class: "heat-tip", role: "tooltip" });
+    wrap.append(tip);
+    const show = (cell) => {
+      if (!cell || !cell.dataset.tip) { tip.classList.remove("on"); return; }
+      const [b, ...rest] = cell.dataset.tip.split("\n");
+      tip.replaceChildren(h("b", {}, b), ...rest.map((r) => h("span", {}, r)));
+      const wr = wrap.getBoundingClientRect(), cr = cell.getBoundingClientRect();
+      const x = cr.left - wr.left + cr.width / 2;
+      tip.style.left = Math.max(8, Math.min(wr.width - 8, x)) + "px";
+      tip.style.top = cr.top - wr.top - 8 + "px";
+      tip.classList.toggle("flip-l", x < 120);
+      tip.classList.toggle("flip-r", x > wr.width - 120);
+      tip.classList.add("on");
+    };
+    wrap.addEventListener("pointerover", (e) => show(e.target.closest("[data-tip]")));
+    wrap.addEventListener("pointerleave", () => show(null));
+    wrap.addEventListener("focusin", (e) => show(e.target.closest("[data-tip]")));
+    wrap.addEventListener("focusout", () => show(null));
+    return show;
+  }
+
+  const heatLegend = (scale, unit) => h("div", { class: "heat-legend", "aria-label": "Colour scale" }, h("span", {}, "Less"),
+    ...scale.ranges.map((r, k) => h("i", { class: "heat l" + k, title: !r ? "" : r[0] === 0 ? `no ${unit}s` : r[0] === r[1] ? plural(r[0], unit) : `${r[0]}–${r[1]} ${unit}s` })),
+    h("span", {}, "More"));
+
+  const dayName = (day, opts = { weekday: "short", day: "numeric", month: "short" }) => new Date(day + "T12:00:00").toLocaleDateString(undefined, opts);
+  const hourName = (hr) => new Date(2000, 0, 1, hr).toLocaleTimeString([], { hour: "numeric" });
+  const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  /** SVG element builder (same shape as h). */
+  function sv(tag, attrs, ...kids) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [k, v] of Object.entries(attrs || {})) if (v != null && v !== false) el.setAttribute(k, v);
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+    return el;
+  }
+  /** A round axis maximum and its step: 7 → 8 (step 2), 130 → 150 (step 50). */
+  function niceMax(v) {
+    if (v <= 4) return { max: Math.max(1, Math.ceil(v)), step: 1 };
+    const mag = Math.pow(10, Math.floor(Math.log10(v / 3)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((x) => v / x <= 4) || mag * 10;
+    return { max: Math.ceil(v / step) * step, step };
+  }
+  const ymdLocal = (t) => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  const short2 = (p) => { const name = p.split("/").pop(); return { name, dir: p.slice(0, p.length - name.length) }; };
+
+  /** Pace: commits per week with a 4-week average. */
+  function insightWeekly(d, first, today) {
+    const weeks = [];
+    for (let w = 0; w < 53; w++) {
+      const start = new Date(first); start.setDate(first.getDate() + w * 7);
+      let n = 0;
+      for (let r = 0; r < 7; r++) { const t = new Date(start); t.setDate(start.getDate() + r); if (t <= today) n += d.days[ymdLocal(t)] || 0; }
+      weeks.push({ start, n });
+    }
+    weeks.forEach((wk, i) => { const win = weeks.slice(Math.max(0, i - 3), i + 1); wk.avg = win.reduce((a, b) => a + b.n, 0) / win.length; });
+    const W = 1000, H = 190, L = 34, R = 8, T = 12, B = 24, pw = W - L - R, ph = H - T - B;
+    const { max, step } = niceMax(Math.max(...weeks.map((w) => w.n), 1));
+    const x = (i) => L + (i / 53) * pw, y = (v) => T + ph - (v / max) * ph, bw = pw / 53;
+    const g = sv("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": `Commits per week for the last year, at most ${Math.max(...weeks.map((w) => w.n))} in a week.` });
+    for (let v = 0; v <= max; v += step) g.append(sv("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), class: "grid" + (v === 0 ? " base" : "") }), sv("text", { x: L - 8, y: y(v) + 4, class: "axis", "text-anchor": "end" }, v));
+    let lastM = -1;
+    weeks.forEach((wk, i) => {
+      if (wk.start.getMonth() !== lastM && i < 51) { lastM = wk.start.getMonth(); g.append(sv("text", { x: x(i), y: H - 6, class: "axis" }, wk.start.toLocaleDateString(undefined, { month: "short" }))); }
+      if (wk.n) g.append(sv("rect", { x: x(i) + 1, y: y(wk.n), width: Math.max(1, bw - 2), height: y(0) - y(wk.n), rx: Math.min(4, (bw - 2) / 2), class: "bar" }));
+    });
+    const pts = weeks.map((wk, i) => `${(x(i) + bw / 2).toFixed(1)},${y(wk.avg).toFixed(1)}`).join(" ");
+    g.append(sv("polyline", { points: pts, class: "avg" }));
+    // hit targets: a full-height column per week
+    weeks.forEach((wk, i) => g.append(sv("rect", { x: x(i), y: T, width: bw, height: ph, class: "hit", "data-tip": `${plural(wk.n, "commit")}\nWeek of ${dayName(ymdLocal(wk.start), { day: "numeric", month: "short", year: "numeric" })}\n4-week average: ${wk.avg.toFixed(1)}` })));
+    const recent = weeks.slice(-4).reduce((a, b) => a + b.n, 0), before = weeks.slice(-8, -4).reduce((a, b) => a + b.n, 0);
+    const trend = !before ? "" : recent > before * 1.15 ? `The last 4 weeks are busier than the 4 before (${recent} vs ${before} commits).` : recent < before * 0.85 ? `The last 4 weeks are quieter than the 4 before (${recent} vs ${before} commits).` : `The last 4 weeks are about as busy as the 4 before (${recent} vs ${before} commits).`;
+    const wrap = h("div", { class: "heat-wrap" }, g, h("div", { class: "heat-foot" }, h("span", { class: "muted" }, trend), h("span", { class: "key" }, h("i", { class: "swatch bar" }), "commits per week", h("i", { class: "swatch line" }), "4-week average")));
+    heatTips(wrap);
+    return wrap;
+  }
+
+  /** Hotspots: how often a file changes against how big it is. Big and busy = where bugs live. */
+  function insightHotspots(d) {
+    const pts = d.hotspots.filter((p) => p.lines > 0);
+    if (pts.length < 3) return h("div", { class: "empty-row" }, "Not enough files have changed yet to find hotspots.");
+    const W = 1000, H = 330, L = 48, R = 16, T = 16, B = 44, pw = W - L - R, ph = H - T - B;
+    const lx = (v) => Math.log10(Math.max(1, v));
+    const x0 = Math.floor(lx(Math.min(...pts.map((p) => p.lines)))), x1 = Math.max(x0 + 1, Math.ceil(lx(Math.max(...pts.map((p) => p.lines)))));
+    const { max, step } = niceMax(Math.max(...pts.map((p) => p.commits)));
+    const x = (lines) => L + ((lx(lines) - x0) / (x1 - x0)) * pw, y = (c) => T + ph - (c / max) * ph;
+    const med = (arr) => { const a = arr.slice().sort((p, q) => p - q); return a[Math.floor(a.length / 2)]; };
+    const mx = med(pts.map((p) => p.lines)), my = med(pts.map((p) => p.commits));
+    const score = (p) => p.commits * lx(p.lines + 1);
+    const top = pts.slice().sort((a, b) => score(b) - score(a)).slice(0, 5);
+    const g = sv("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": `Files by size and how often they change. Biggest hotspots: ${top.map((p) => short2(p.path).name).join(", ")}.` });
+    g.append(sv("rect", { x: x(mx), y: T, width: W - R - x(mx), height: y(my) - T, class: "zone" }),
+      sv("text", { x: W - R - 8, y: T + 16, class: "zone-label", "text-anchor": "end" }, "Big and changing often: look here first"));
+    for (let v = 0; v <= max; v += step) g.append(sv("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), class: "grid" + (v === 0 ? " base" : "") }), sv("text", { x: L - 8, y: y(v) + 4, class: "axis", "text-anchor": "end" }, v));
+    for (let e = x0; e <= x1; e++) g.append(sv("line", { x1: x(10 ** e), x2: x(10 ** e), y1: T, y2: T + ph, class: "grid" }), sv("text", { x: x(10 ** e), y: T + ph + 16, class: "axis", "text-anchor": e === x0 ? "start" : e === x1 ? "end" : "middle" }, (10 ** e >= 1000 ? 10 ** e / 1000 + "k" : 10 ** e) + " lines"));
+    g.append(sv("line", { x1: x(mx), x2: x(mx), y1: T, y2: T + ph, class: "median" }), sv("line", { x1: L, x2: W - R, y1: y(my), y2: y(my), class: "median" }));
+    g.append(sv("text", { x: L + pw / 2, y: H - 4, class: "axis title", "text-anchor": "middle" }, "Size of the file today (lines, log scale) →"));
+    g.append(sv("text", { x: 12, y: T + ph / 2, class: "axis title", "text-anchor": "middle", transform: `rotate(-90 12 ${T + ph / 2})` }, "Commits this year →"));
+    const isTop = new Set(top.map((p) => p.path));
+    for (const p of pts.slice().sort((a, b) => Number(isTop.has(a.path)) - Number(isTop.has(b.path)))) {
+      g.append(sv("circle", { cx: x(p.lines), cy: y(p.commits), r: isTop.has(p.path) ? 7 : 5, class: "dot" + (isTop.has(p.path) ? " top" : ""),
+        "data-tip": `${p.path}\n${plural(p.commits, "commit")} · ${p.lines.toLocaleString()} lines\n${plural(p.authors, "person", "people")} changed it`, tabindex: "0" }));
+    }
+    // direct labels for the top five, skipping any that would sit on another
+    const placed = [];
+    for (const p of top) {
+      const lx2 = x(p.lines), ly2 = y(p.commits);
+      if (placed.some(([a, b]) => Math.abs(a - lx2) < 110 && Math.abs(b - ly2) < 16)) continue;
+      placed.push([lx2, ly2]);
+      const right = lx2 < W - 140;
+      g.append(sv("text", { x: lx2 + (right ? 11 : -11), y: ly2 + 4, class: "direct", "text-anchor": right ? "start" : "end" }, short2(p.path).name));
+    }
+    const list = h("div", { class: "rank-list" }, h("div", { class: "rank-head" }, "Look here first"),
+      ...top.map((p, i) => { const { name, dir } = short2(p.path); return h("div", { class: "rank-row" }, h("span", { class: "rank-n" }, i + 1), h("span", { class: "fh-file" }, h("b", {}, name), dir ? h("small", {}, dir) : null),
+        h("span", { class: "muted" }, `${plural(p.commits, "commit")} · ${p.lines.toLocaleString()} lines · ${plural(p.authors, "person", "people")}`)); }));
+    const wrap = h("div", { class: "heat-wrap" }, g,
+      h("div", { class: "heat-foot" }, h("span", { class: "muted" }, "Each dot is a file. Files that are both big and often changed are where bugs tend to hide; they're worth splitting up or covering with tests."), h("span", { class: "key" }, h("i", { class: "swatch dot top" }), "top hotspots", h("i", { class: "swatch dot" }), "other files")), list);
+    heatTips(wrap);
+    return wrap;
+  }
+
+  /** Files that keep landing in the same commits. */
+  function insightTogether(d) {
+    if (!d.together.length) return h("div", { class: "empty-row" }, "No two files have changed together often enough yet (3 commits or more).");
+    return h("div", { class: "heat-wrap" },
+      h("p", { class: "muted", style: { margin: "0 0 10px", fontSize: "13px" } }, "When one of these changes, the other usually does too. That's fine for a component and its test; if it surprises you, they may depend on each other more than they should."),
+      h("div", { class: "pair-list" }, ...d.together.map((t) => {
+        const a = short2(t.a), b = short2(t.b), pct = Math.round(t.share * 100);
+        return h("div", { class: "pair-row" },
+          h("span", { class: "pair-files", title: `${t.a}\n${t.b}` }, h("b", {}, a.name), h("span", { class: "pair-link", "aria-label": "and" }, "⇄"), h("b", {}, b.name),
+            h("small", {}, a.dir === b.dir ? a.dir || "top folder" : `${a.dir || "./"} · ${b.dir || "./"}`)),
+          h("span", { class: "pair-bar", role: "img", "aria-label": `${pct}% of the time` }, h("i", { style: { width: pct + "%" } })),
+          h("span", { class: "pair-n" }, h("b", {}, plural(t.count, "commit")), h("small", {}, `${pct}% of the time`)));
+      })));
+  }
+
+  /** Ferry's own record: files synced each day, and whether a commit followed. */
+  function insightSync(d, st) {
+    const sync = d.sync;
+    const today = new Date(d.today + "T12:00:00");
+    const days = [];
+    for (let i = 55; i >= 0; i--) { const t = new Date(today); t.setDate(today.getDate() - i); const key = ymdLocal(t); if (!sync.since || key >= sync.since) days.push({ key, files: sync.days[key] || 0, commits: d.days[key] || 0 }); }
+    const synced = days.filter((x) => x.files), lonely = synced.filter((x) => !x.commits);
+    const open = st && st.files ? st.files.length : 0;
+    const W = 1000, H = 200, L = 34, R = 8, T = 12, B = 46, pw = W - L - R, ph = H - T - B;
+    const { max, step } = niceMax(Math.max(1, ...days.map((x) => x.files)));
+    const bw = pw / Math.max(1, days.length), x = (i) => L + i * bw, y = (v) => T + ph - (v / max) * ph;
+    const g = sv("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": `Files Ferry synced each day. ${lonely.length} of ${synced.length} days with syncs had no commit.` });
+    for (let v = 0; v <= max; v += step) g.append(sv("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), class: "grid" + (v === 0 ? " base" : "") }), sv("text", { x: L - 8, y: y(v) + 4, class: "axis", "text-anchor": "end" }, v));
+    const rowY = T + ph + 16;
+    g.append(sv("text", { x: L - 8, y: rowY + 4, class: "axis", "text-anchor": "end" }, "git"));
+    days.forEach((dd, i) => {
+      if (dd.files) g.append(sv("rect", { x: x(i) + 2, y: y(dd.files), width: Math.max(1, bw - 4), height: y(0) - y(dd.files), rx: Math.min(4, (bw - 4) / 2), class: "bar" + (dd.commits ? "" : " open") }));
+      if (dd.commits) g.append(sv("circle", { cx: x(i) + bw / 2, cy: rowY, r: 4.5, class: "commit-dot" }));
+      const t = new Date(dd.key + "T12:00:00");
+      if (t.getDay() === 1) g.append(sv("text", { x: x(i), y: H - 6, class: "axis" }, dayName(dd.key, { day: "numeric", month: "short" })));
+      g.append(sv("rect", { x: x(i), y: T, width: bw, height: ph + 26, class: "hit",
+        "data-tip": `${dayName(dd.key, { weekday: "long", day: "numeric", month: "long" })}\n${dd.files ? plural(dd.files, "file") + " synced" : "Nothing synced"}\n${dd.commits ? plural(dd.commits, "commit") : dd.files ? "No commit that day" : "No commits"}` }));
+    });
+    const tiles = h("div", { class: "insight-tiles three" },
+      h("div", { class: "tile" }, h("div", { class: "v" }, open), h("div", { class: "l" }, open === 1 ? "file changed since the last commit" : "files changed since the last commit")),
+      h("div", { class: "tile" }, h("div", { class: "v" }, `${lonely.length} of ${synced.length}`), h("div", { class: "l" }, "days with syncs had no commit")),
+      h("div", { class: "tile" }, h("div", { class: "v" }, synced.reduce((a, b) => a + b.files, 0).toLocaleString()), h("div", { class: "l" }, `files synced since ${dayName(days[0].key, { day: "numeric", month: "short" })}`)));
+    const wrap = h("div", { class: "heat-wrap" }, tiles, g,
+      h("div", { class: "heat-foot" }, h("span", { class: "muted" }, `From ${sync.pairs.length > 1 ? "the pairs" : "the pair"} ${sync.pairs.join(", ")}. Only Ferry sees this work: git only knows about what you commit.`),
+        h("span", { class: "key" }, h("i", { class: "swatch bar" }), "synced, then committed", h("i", { class: "swatch bar open" }), "synced, no commit", h("i", { class: "swatch commit" }), "a commit")));
+    heatTips(wrap);
+    return wrap;
+  }
+
+  async function gitInsights(body, st) {
+    const who = S.insightsWho || "all";
+    body.replaceChildren(relayLoading("Reading a year of history", { mood: "thinking", sub: "Counting commits by day, hour and file." }));
+    const d = await act(null, () => api("GET", gitURL("insights") + (who === "me" ? "?author=me" : "")));
+    if (!d || S.gitTab !== "insights") return;
+    const mine = who === "me";
+    const seg = h("div", { class: "seg", role: "group", "aria-label": "Whose commits" },
+      ...[["all", "Everyone"], ["me", "Just me"]].map(([id, name]) => h("button", { class: who === id ? "on" : "", "aria-pressed": who === id ? "true" : "false", onclick: () => { S.insightsWho = id; S.gshown = ""; renderGitBody(st); } }, name)));
+    const showSeg = d.authors.length > 1 || mine;
+    if (!d.total) {
+      body.replaceChildren(h("div", { class: "card empty" }, h("img", { class: "float", src: face("sleepy"), alt: "" }),
+        h("h2", {}, mine ? "No commits from you this year." : "No commits in the last year."),
+        h("p", {}, mine ? `I looked for commits by ${d.me || "your git email"} on ${st.branch || "this branch"}.` : "Once there are commits on this branch, I'll show when and where the work happens."),
+        showSeg ? seg : null));
+      return;
+    }
+
+    // ----- the story, in words first
+    const busiest = Object.entries(d.days).sort((a, b) => b[1] - a[1])[0];
+    const wdSum = d.hours.map((r) => r.reduce((a, b) => a + b, 0));
+    const hrSum = Array.from({ length: 24 }, (_, hr) => d.hours.reduce((a, r) => a + r[hr], 0));
+    const favDay = wdSum.indexOf(Math.max(...wdSum)), favHour = hrSum.indexOf(Math.max(...hrSum));
+    const hot = d.files[0];
+    const subject = mine ? "You" : "This project";
+    const say = `${subject} ${mine ? "made" : "had"} ${plural(d.total, "commit")} on ${plural(d.activeDays, "day")} this year.`;
+    const hint = [`The busiest day was ${dayName(busiest[0], { weekday: "long", day: "numeric", month: "long" })} with ${plural(busiest[1], "commit")}.`,
+      `Most commits land on ${WEEKDAYS[favDay]}s around ${hourName(favHour)}.`,
+      hot ? `${hot.path.split("/").pop()} changes most (${plural(hot.commits, "commit")}).` : ""].join(" ");
+    const tile = (v, l) => h("div", { class: "tile" }, h("div", { class: "v" }, v), h("div", { class: "l" }, l));
+    const k = (n) => n >= 10000 ? Math.round(n / 1000) + "k" : n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+
+    // ----- calendar: 53 weeks of days, Monday at the top
+    const today = new Date(d.today + "T12:00:00");
+    const lastMonday = new Date(today); lastMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const first = new Date(lastMonday); first.setDate(lastMonday.getDate() - 52 * 7);
+    const cal = heatScale(Object.values(d.days));
+    const grid = h("div", { class: "cal-grid", role: "grid", "aria-label": `Commits per day for the last year. Use the arrow keys to move between days and Enter to list a day's commits.` });
+    const months = h("div", { class: "cal-months", "aria-hidden": "true" });
+    const cells = [];
+    let lastMonth = -1;
+    for (let w = 0; w < 53; w++) {
+      for (let r = 0; r < 7; r++) {
+        const day = new Date(first); day.setDate(first.getDate() + w * 7 + r);
+        const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+        if (r === 0 && day.getMonth() !== lastMonth && (w < 52 || day.getDate() <= 7)) {
+          lastMonth = day.getMonth();
+          if (w <= 50) months.append(h("span", { style: { gridColumn: `${w + 1} / span 3` } }, day.toLocaleDateString(undefined, { month: "short" })));
+        }
+        if (day > today) { grid.append(h("span", { class: "heat future", style: { gridColumn: w + 1, gridRow: r + 1 } })); continue; }
+        const n = d.days[key] || 0;
+        const cell = h("span", { class: "heat l" + cal.level(n) + (key === d.today ? " today" : ""), role: "gridcell", tabindex: "-1", "data-day": key,
+          "data-tip": `${n ? plural(n, "commit") : "No commits"}\n${dayName(key, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`,
+          "aria-label": `${dayName(key, { weekday: "long", day: "numeric", month: "long" })}: ${n ? plural(n, "commit") : "no commits"}`,
+          style: { gridColumn: w + 1, gridRow: r + 1 } });
+        cells.push(cell);
+        grid.append(cell);
+      }
+    }
+    const dayList = h("div", { class: "day-list" });
+    let at = cells.length - 1;
+    const pickDay = (key) => {
+      cells.forEach((c) => c.classList.toggle("on", c.dataset.day === key));
+      const list = d.dayCommits[key] || [];
+      const n = d.days[key] || 0;
+      dayList.replaceChildren(h("div", { class: "day-head" }, h("b", {}, dayName(key, { weekday: "long", day: "numeric", month: "long", year: "numeric" })), h("span", { class: "muted" }, n ? plural(n, "commit") : "no commits")),
+        ...list.map((c) => h("button", { class: "day-commit", onclick: () => showCommit(c.hash) }, h("span", { class: "mono" }, c.short), h("span", { class: "grow" }, c.subject), mine ? null : h("small", {}, c.author))),
+        n > list.length ? h("div", { class: "muted", style: { fontSize: "12.5px", padding: "6px 10px" } }, `and ${n - list.length} more; see History for all of them.`) : "");
+    };
+    const focusCell = (i) => { at = Math.max(0, Math.min(cells.length - 1, i)); cells.forEach((c, j) => c.tabIndex = j === at ? 0 : -1); cells[at].focus(); };
+    cells[at].tabIndex = 0;
+    grid.addEventListener("click", (e) => { const c = e.target.closest("[data-day]"); if (c) { at = cells.indexOf(c); pickDay(c.dataset.day); } });
+    grid.addEventListener("keydown", (e) => {
+      const step = { ArrowDown: 1, ArrowUp: -1, ArrowRight: 7, ArrowLeft: -7, Home: -9999, End: 9999 }[e.key];
+      if (step) { e.preventDefault(); focusCell(at + step); }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickDay(cells[at].dataset.day); }
+    });
+    pickDay(busiest[0]);
+    const calWrap = h("div", { class: "heat-wrap" },
+      h("div", { class: "cal" }, h("span"), months,
+        h("div", { class: "cal-days", "aria-hidden": "true" }, ...["Mon", "", "Wed", "", "Fri", "", ""].map((t) => h("span", {}, t))), grid),
+      h("div", { class: "heat-foot" }, h("span", { class: "muted" }, `On ${st.branch || "this branch"}, merges left out. Click a day to see its commits.`), heatLegend(cal, "commit")));
+    heatTips(calWrap);
+
+    // ----- when: weekday × hour
+    const hs = heatScale(d.hours.flat());
+    const hourGrid = h("div", { class: "hour-grid", role: "img", "aria-label": `Commits by weekday and hour. Most on ${WEEKDAYS[favDay]}s around ${hourName(favHour)}.` },
+      h("span"), ...Array.from({ length: 24 }, (_, hr) => h("span", { class: "hour-label" }, hr % 3 === 0 ? hourName(hr) : "")),
+      ...d.hours.flatMap((row, wd) => [h("span", { class: "row-label" }, WEEKDAYS[wd].slice(0, 3)),
+        ...row.map((n, hr) => h("span", { class: "heat l" + hs.level(n), "data-tip": `${n ? plural(n, "commit") : "No commits"}\n${WEEKDAYS[wd]}s, ${hourName(hr)}–${hourName((hr + 1) % 24)}` }))]));
+    const hourWrap = h("div", { class: "heat-wrap" }, hourGrid,
+      h("div", { class: "heat-foot" }, h("span", { class: "muted" }, "In each author's own time zone."), heatLegend(hs, "commit")));
+    heatTips(hourWrap);
+
+    // ----- where: the busiest files, month by month
+    const fs = heatScale(d.files.flatMap((f) => f.months));
+    const monthLabel = (m, i) => { const dt = new Date(m + "-15T12:00:00"); const name = dt.toLocaleDateString(undefined, { month: "short" }); return i === 0 || dt.getMonth() === 0 ? `${name} ’${m.slice(2, 4)}` : name; };
+    const fileGrid = h("div", { class: "file-heat", role: "table", "aria-label": "Commits per file per month" },
+      h("div", { class: "fh-row head", role: "row" }, h("span", { role: "columnheader" }, "File"), ...d.months.map((m, i) => h("span", { class: "fh-month", role: "columnheader" }, monthLabel(m, i))), h("span", { role: "columnheader", class: "fh-total" }, "Commits")),
+      ...d.files.map((f) => {
+        const name = f.path.split("/").pop(), dir = f.path.slice(0, f.path.length - name.length);
+        return h("div", { class: "fh-row", role: "row" },
+          h("span", { class: "fh-file", role: "rowheader", title: f.path }, h("b", {}, name), dir ? h("small", {}, dir) : null),
+          ...f.months.map((n, i) => h("span", { class: "heat l" + fs.level(n), role: "cell", "aria-label": `${monthLabel(d.months[i], 0)}: ${n}`, "data-tip": `${name}\n${n ? plural(n, "commit") : "No commits"} in ${new Date(d.months[i] + "-15T12:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" })}` })),
+          h("span", { class: "fh-total", role: "cell" }, h("b", {}, f.commits), h("small", {}, `+${k(f.added)} −${k(f.removed)}`)));
+      }));
+    const fileWrap = h("div", { class: "heat-wrap" }, fileGrid,
+      h("div", { class: "heat-foot" }, h("span", { class: "muted" }, "The files changed in the most commits this year."), heatLegend(fs, "commit")));
+    heatTips(fileWrap);
+
+    body.replaceChildren(
+      h("div", { class: "card hero" }, h("img", { class: "float", src: face(d.streak >= 3 ? "party" : "thinking"), alt: "" }),
+        h("div", { class: "bubble", role: "status" }, h("div", { class: "say" }, say), h("div", { class: "hint" }, hint))),
+      showSeg ? h("div", { class: "insight-who" }, h("span", { class: "muted" }, "Showing commits from"), seg) : "",
+      h("div", { class: "insight-tiles" },
+        tile(k(d.total), "commits this year"), tile(d.activeDays, "days with commits"),
+        tile(plural(d.streak, "day"), d.streak ? "current streak" : "no streak right now"), tile(plural(d.longestStreak, "day"), "longest streak"),
+        tile(`+${k(d.added)} −${k(d.removed)}`, "lines added, removed")),
+      d.partial ? h("div", { class: "callout amber" }, `This branch has a lot of history, so I read the newest ${(20000).toLocaleString()} commits of the year.`) : "",
+      section("i-cal", "Commits in the last year", d.total, "blue", h("div", {}, calWrap, dayList)),
+      section("i-weeks", "Commits per week", null, "", insightWeekly(d, first, today)),
+      section("i-hours", "When the work happens", null, "", hourWrap),
+      d.sync ? section("i-sync", "Work between commits", null, "", insightSync(d, st)) : "",
+      section("i-files", "Busiest files", d.files.length, "", fileWrap),
+      section("i-hot", "Hotspots", d.hotspots.length ? null : 0, "", insightHotspots(d)),
+      section("i-together", "Files that change together", d.together.length || null, "", insightTogether(d)));
+  }
+
   async function gitWorktrees(body, st) {
     const list = await act(null, () => api("GET", gitURL("worktrees")));
     if (!list || S.gitTab !== "worktrees") return;
@@ -2236,7 +3004,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   ];
 
   async function openConnections() {
-    const dr = drawer({ title: "Connections", sub: "Let Ferry talk to the services you use" });
+    // closing it brings Settings → Connections up to date with whatever changed
+    const dr = drawer({ title: "Connections", sub: "Let Ferry talk to the services you use", onClose: () => { if (S.mode === "settings") { S.setShown = ""; render(); } } });
     const paint = async () => {
       S.conns = await api("GET", "/connections").catch(() => S.conns);
       const c = S.conns || {};
@@ -2398,6 +3167,9 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     S.conns = await api("GET", "/connections").catch(() => null);
     await refresh();
     S.notes = await api("GET", "/events/recent").catch(() => []);
+    S.settings = S.settings || (await api("GET", "/settings").catch(() => null));
+    paintMe();
+    if (devState && devState.scroll) for (const ms of [0, 300, 900]) setTimeout(() => window.scrollTo(0, devState.scroll), ms);
     paintBadge();
     connectEvents();
     setInterval(refresh, 3000);

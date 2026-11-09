@@ -892,3 +892,143 @@ export async function checkoutPullRequest(root: string, number: unknown): Promis
   const r = await exec(cmd, { cwd: root, timeoutMs: 5 * 60_000, env: env() });
   if (r.code !== 0) throw new GitClientError(cleanMessage(r.stderr || r.error || "checkout failed"));
 }
+
+// ---------- insights: heatmaps of commits and files ----------
+
+export interface Insights {
+  /** the day the year ends on (today, in this computer's time zone), YYYY-MM-DD */
+  today: string;
+  /** commits per author-local day, YYYY-MM-DD → count */
+  days: Record<string, number>;
+  /** a few commits per day, newest first, for "what happened that day" */
+  dayCommits: Record<string, { hash: string; short: string; subject: string; author: string }[]>;
+  /** commits by weekday (0 = Monday) and hour (0–23, in the author's own time zone) */
+  hours: number[][];
+  /** the last 12 months, oldest first, YYYY-MM */
+  months: string[];
+  /** the files changed in the most commits, with commits per month (same order as months) */
+  files: { path: string; commits: number; added: number; removed: number; months: number[] }[];
+  authors: { name: string; email: string; commits: number }[];
+  /** files by how often they change against how big they are now (lines), for the hotspot chart */
+  hotspots: { path: string; commits: number; lines: number; authors: number }[];
+  /** pairs of files that keep landing in the same commits */
+  together: { a: string; b: string; count: number; share: number }[];
+  me: string;
+  total: number;
+  added: number;
+  removed: number;
+  activeDays: number;
+  streak: number;
+  longestStreak: number;
+  /** true when the year had more commits than were read */
+  partial: boolean;
+}
+
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const MAX_INSIGHT_COMMITS = 20_000;
+
+/** A year of commits on the current branch, summed for heatmaps. author "me" keeps only your own (by git's user.email). */
+export async function insights(root: string, o: { author?: string } = {}): Promise<Insights> {
+  const now = new Date();
+  const today = ymd(now);
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 371);
+  const months: string[] = [];
+  for (let k = 11; k >= 0; k--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  const me = (await exec(["git", "-C", root, "config", "user.email"], { env: env() })).stdout.trim().toLowerCase();
+  const out: Insights = {
+    today, days: {}, dayCommits: {}, hours: Array.from({ length: 7 }, () => Array(24).fill(0)), months, files: [], authors: [], hotspots: [], together: [], me,
+    total: 0, added: 0, removed: 0, activeDays: 0, streak: 0, longestStreak: 0, partial: false,
+  };
+  if (!(await gitOk(root, ["rev-parse", "--verify", "-q", "HEAD"]))) return out;
+  const text = await git(root, ["log", "--no-merges", "--no-renames", `--since=${ymd(start)}`, `-n${MAX_INSIGHT_COMMITS + 1}`,
+    "--format=%x1e%H%x1f%h%x1f%aI%x1f%an%x1f%ae%x1f%s", "--numstat", "--"], { timeoutMs: 120_000 });
+  const files = new Map<string, { commits: number; added: number; removed: number; months: number[]; people: Set<string> }>();
+  const pairs = new Map<string, number>();
+  const authors = new Map<string, { name: string; email: string; commits: number }>();
+  let read = 0;
+  for (const rec of text.split("\x1e")) {
+    if (!rec.trim()) continue;
+    if (++read > MAX_INSIGHT_COMMITS) { out.partial = true; break; }
+    const [head, ...stats] = rec.split("\n");
+    const [hash, short, date, name, email, subject] = head!.split("\x1f");
+    if (!hash || !date) continue;
+    const mail = (email ?? "").toLowerCase();
+    const a = authors.get(mail) ?? { name: name ?? "", email: mail, commits: 0 };
+    a.commits++;
+    authors.set(mail, a);
+    if (o.author === "me" && mail !== me) continue;
+    // the author's own calendar day and hour, as written in the commit
+    const day = date.slice(0, 10), hour = Number(date.slice(11, 13));
+    const wd = (new Date(day + "T00:00:00Z").getUTCDay() + 6) % 7;
+    out.total++;
+    out.days[day] = (out.days[day] ?? 0) + 1;
+    const that = (out.dayCommits[day] ??= []);
+    if (that.length < 8) that.push({ hash, short: short ?? "", subject: subject ?? "", author: name ?? "" });
+    if (hour >= 0 && hour < 24) out.hours[wd]![hour]!++;
+    const mi = months.indexOf(day.slice(0, 7));
+    const touched: string[] = [];
+    for (const line of stats) {
+      const m = /^(\d+|-)\t(\d+|-)\t(.+)$/.exec(line);
+      if (!m) continue;
+      const add = m[1] === "-" ? 0 : Number(m[1]), del = m[2] === "-" ? 0 : Number(m[2]);
+      out.added += add;
+      out.removed += del;
+      const f = files.get(m[3]!) ?? { commits: 0, added: 0, removed: 0, months: Array(12).fill(0), people: new Set<string>() };
+      f.commits++;
+      f.people.add(mail);
+      touched.push(m[3]!);
+      f.added += add;
+      f.removed += del;
+      if (mi >= 0) f.months[mi]++;
+      files.set(m[3]!, f);
+    }
+    // big sweeping commits (formatting, renames) say little about which files belong together
+    if (touched.length >= 2 && touched.length <= 30) {
+      touched.sort();
+      for (let i = 0; i < touched.length; i++) for (let j = i + 1; j < touched.length; j++) {
+        const key = touched[i] + "\0" + touched[j];
+        pairs.set(key, (pairs.get(key) ?? 0) + 1);
+      }
+    }
+  }
+  out.files = [...files].map(([path, { people: _, ...f }]) => ({ path, ...f })).sort((a, b) => b.commits - a.commits || b.added + b.removed - (a.added + a.removed)).slice(0, 20);
+  out.authors = [...authors.values()].sort((a, b) => b.commits - a.commits).slice(0, 12);
+  // hotspots: the most-changed files that still exist, with their size today
+  for (const [p, f] of [...files].sort((a, b) => b[1].commits - a[1].commits).slice(0, 80)) {
+    const lines = countLines(path.join(root, p));
+    if (lines > 0) out.hotspots.push({ path: p, commits: f.commits, lines, authors: f.people.size });
+  }
+  out.together = [...pairs].filter(([, n]) => n >= 3).map(([key, n]) => {
+    const [a, b] = key.split("\0") as [string, string];
+    return { a, b, count: n, share: n / Math.min(files.get(a)!.commits, files.get(b)!.commits) };
+  }).sort((x, y) => y.count - x.count || y.share - x.share).slice(0, 12);
+  // streaks: consecutive days with a commit (today may still be empty without breaking the current one)
+  const active = new Set(Object.keys(out.days));
+  out.activeDays = active.size;
+  let run = 0;
+  for (let d = new Date(start); ymd(d) <= today; d.setDate(d.getDate() + 1)) {
+    run = active.has(ymd(d)) ? run + 1 : 0;
+    out.longestStreak = Math.max(out.longestStreak, run);
+  }
+  const back = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (active.has(today) ? 0 : 1));
+  while (active.has(ymd(back))) { out.streak++; back.setDate(back.getDate() - 1); }
+  return out;
+}
+
+/** Lines in a text file in the work tree; 0 when it's missing, binary or huge. */
+function countLines(abs: string): number {
+  try {
+    const st = fs.statSync(abs);
+    if (!st.isFile() || st.size > 8 * 1024 * 1024) return 0;
+    const buf = fs.readFileSync(abs);
+    if (buf.subarray(0, 8000).includes(0)) return 0;
+    let n = 0;
+    for (const c of buf) if (c === 10) n++;
+    return buf.length && buf[buf.length - 1] !== 10 ? n + 1 : n;
+  } catch {
+    return 0;
+  }
+}

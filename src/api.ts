@@ -11,6 +11,7 @@
 //   GET  /events/recent              the last 300 notable events (for notifications after a reload)
 //   GET  /connections                who is connected to GitLab, Azure DevOps and Jira (no secrets)
 //   POST /connections/{gitlab|azure|jira}[/remove]   connect (checks the token first) or disconnect
+//   GET  /settings · POST /settings/git     your git identity and defaults (git config --global); ferry ui only
 //   POST /pairs/{name}/restore       {"at": "2h ago"}: undo every batch after that time
 //   POST /pairs/{name}/ignore        {"path": "..."}: add the file to the source's .syncignore
 //   GET  /pairs/{name}/stats?since=7d   history totals (JSON)
@@ -34,8 +35,10 @@ import { statusJSON } from "./engine/engine.ts";
 import { batchesSince } from "./engine/journal.ts";
 import { eventJSON, parseChoice, type Event } from "./engine/types.ts";
 import { MAX_DIFF_LINES } from "./gitclient.ts";
+import type { PageChange, PageWatcher } from "./devreload.ts";
 import { GitApi, type RepoManager } from "./gitapi.ts";
 import * as conn from "./integrations.ts";
+import { readSettings, saveGit, SettingsError } from "./settingsapi.ts";
 import { errMsg, parseWhen } from "./util.ts";
 import webPage from "./web/index.html" with { type: "text" };
 import logoSVG from "../assets/logo/icon.svg" with { type: "text" };
@@ -84,6 +87,8 @@ export interface ApiOptions {
   version?: string;
   manager?: PairManager | null;
   repos?: RepoManager | null;
+  /** ferry ui --dev: the page comes from the source tree and browsers are told when it changes */
+  dev?: PageWatcher | null;
 }
 
 type Sub = (chunk: string) => void;
@@ -117,6 +122,17 @@ export class ApiServer {
     for (const s of this.subs) s(chunk);
   }
 
+  /** ferry ui --dev: tells open pages that the page changed ("css" can be swapped in without a reload). */
+  pageChanged(kind: PageChange): void {
+    const chunk = `event: dev\ndata: ${JSON.stringify({ kind })}\n\n`;
+    for (const s of this.subs) s(chunk);
+  }
+
+  /** The port it's listening on. */
+  get port(): number {
+    return this.server?.port ?? 0;
+  }
+
   /** Starts listening on "host:port" (":port" means every interface). */
   listen(addr: string): void {
     const i = addr.lastIndexOf(":");
@@ -144,7 +160,7 @@ export class ApiServer {
       return text("bad path", 400);
     }
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
-      return new Response(PAGE, {
+      return new Response(this.opts.dev ? this.opts.dev.page() : PAGE, {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
@@ -173,12 +189,13 @@ export class ApiServer {
       const m = this.opts.manager;
       return json({
         version: this.opts.version ?? "", can_add: !!m, can_open_repos: !!this.opts.repos, config_file: m?.configFile ?? "",
-        home: os.homedir(), platform: process.platform, sep: path.sep,
+        home: os.homedir(), platform: process.platform, sep: path.sep, ...(this.opts.dev ? { dev: { boot: this.opts.dev.boot } } : {}),
       });
     }
     if (req.method === "GET" && url.pathname === "/fs") return this.listDir(url);
     if (parts[0] === "git" && parts.length >= 2) return this.git.handle(req, url, parts);
     if (parts[0] === "connections") return this.connections(req, parts);
+    if (parts[0] === "settings") return this.settings(req, parts);
     if (req.method === "GET" && url.pathname === "/events") return this.events(req);
     if (req.method === "GET" && url.pathname === "/events/recent") return json(this.recent);
     if (req.method === "POST" && url.pathname === "/pairs") return this.addPair(req);
@@ -281,6 +298,25 @@ export class ApiServer {
   }
 
   /** GitLab, Azure DevOps and Jira: who is connected, connect, disconnect. Tokens are never sent back. */
+  private async settings(req: Request, parts: string[]): Promise<Response> {
+    try {
+      if (req.method === "GET" && parts.length === 1) return json(await readSettings(this.opts.manager?.configFile ?? ""));
+      if (req.method === "POST" && parts[1] === "git" && parts.length === 2) {
+        // changing your global git config is for the app running on your own computer
+        if (!this.opts.repos) return text("changing git settings needs ferry ui", 405);
+        let body: Record<string, unknown> = {};
+        try {
+          const b = await req.json();
+          if (b && typeof b === "object" && !Array.isArray(b)) body = b as Record<string, unknown>;
+        } catch {}
+        return json(await saveGit(body));
+      }
+      return text("404 page not found", 404);
+    } catch (e) {
+      return text(errMsg(e), e instanceof SettingsError ? 400 : 500);
+    }
+  }
+
   private async connections(req: Request, parts: string[]): Promise<Response> {
     if (req.method === "GET" && parts.length === 1) return json(conn.status());
     const p = parts[1] as conn.Provider;
