@@ -80,6 +80,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .pair:hover { background: var(--accent-soft); }
 .pair.sel { background: var(--card-solid); box-shadow: 0 4px 14px rgba(9,35,72,.08); }
 .pair img { width: 44px; height: 32px; }
+.pair > div { min-width: 0; }
+a.btn { text-decoration: none; }
+.pill svg { width: 14px; height: 14px; flex: none; }
 .pair .name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pair .sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pair-empty { padding: 4px 18px 18px; color: var(--muted); font-size: 13px; }
@@ -268,6 +271,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 .hold .prog { position: absolute; inset: 0; background: var(--red-soft); transform-origin: left; transform: scaleX(var(--p, 0)); }
 .hold span { position: relative; }
 .ask .note { font-size: 12px; color: var(--faint); margin-top: 10px; }
+.ask-fields { text-align: left; margin: 0 0 16px; }
 @media (prefers-reduced-motion: reduce) { .ask, .ask-wrap { transition: none; } .ask .face.bob { animation: none; } }
 
 /* ---------- misc ---------- */
@@ -286,6 +290,46 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 .toast img { width: 44px; height: 32px; flex: none; background: var(--card-solid); border-radius: 99px; padding: 2px 4px; }
 .toast.bad { background: #C8343F; color: #fff; }
 .batch.undone { opacity: .55; }
+/* notifications */
+.rail-btn .badge { position: absolute; top: 4px; right: 2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: #E5484D; color: #fff; font-size: 11.5px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--rail); }
+.note-group { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 4px 6px; font-weight: 700; }
+.note { display: grid; grid-template-columns: 50px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 18px; position: relative; }
+.note:hover { background: var(--accent-soft); }
+.note.unread { background: var(--card2); }
+.note.unread::before { content: ""; position: absolute; left: -2px; top: 50%; margin-top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.note img { width: 50px; height: 37px; }
+.note .t { font-weight: 550; overflow-wrap: anywhere; }
+.note.unread .t { font-weight: 750; }
+.note .d { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; margin-top: 1px; }
+.note .meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: 12px; color: var(--faint); }
+.note .acts { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.filters button { border: 0; border-radius: 99px; padding: 6px 14px; background: var(--card2); color: var(--text); cursor: pointer; font-weight: 600; display: inline-flex; gap: 6px; align-items: center; }
+.filters button.on { background: var(--text); color: var(--card-solid); }
+.filters .n { font-size: 11px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--card-solid); color: var(--text); display: inline-grid; place-items: center; }
+.note-prefs { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.note-prefs .check { margin: 2px 0; }
+/* git client */
+.ln.pick { grid-template-columns: 30px 54px 22px 1fr; cursor: pointer; }
+.ln .cb { display: grid; place-items: center; padding-top: 2px; }
+.ln .cb input { accent-color: var(--accent); width: 15px; height: 15px; }
+.ln.pick.off { opacity: .45; }
+.ln.pick.off .tx { text-decoration: none; }
+.hunk { border: 2px solid var(--line); border-radius: 18px; margin-bottom: 12px; overflow: hidden; }
+.hunk-head { display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: var(--card2); font-size: 13px; }
+.hunk-head input { accent-color: var(--accent); width: 16px; height: 16px; }
+.table td.cbcell { width: 36px; }
+.table input[type=checkbox] { accent-color: var(--accent); width: 17px; height: 17px; cursor: pointer; }
+.refpill { font-size: 11px; padding: 1px 8px; margin-left: 6px; }
+.commit-meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 13px; margin-bottom: 14px; }
+.commit-meta b { color: var(--muted); font-weight: 500; }
+.commit-body { white-space: pre-wrap; background: var(--card2); border-radius: 14px; padding: 10px 14px; margin-bottom: 14px; font-size: 13.5px; }
+.files-list .row-file { display: flex; gap: 10px; align-items: center; width: 100%; border: 0; background: none; padding: 9px 12px; border-radius: 12px; cursor: pointer; text-align: left; }
+.files-list .row-file:hover, .files-list .row-file.on { background: var(--accent-soft); }
+.files-list .row-file .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.op-card { border: 2px solid var(--red); }
+.seg.big button { padding: 8px 18px; }
+.rp-sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -293,7 +337,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   <nav class="rail" aria-label="Ferry">
     <div class="avatar" title="Relay"><img id="rail-face" src="/mascot/happy.svg" alt="Relay"><span class="dot" id="conn-dot"></span></div>
     <button class="rail-btn on" id="nav-pairs" title="Folder pairs" aria-label="Folder pairs"></button>
-    <button class="rail-btn" id="nav-activity" title="Activity" aria-label="Activity"></button>
+    <button class="rail-btn" id="nav-git" title="Git" aria-label="Git client"></button>
+    <button class="rail-btn" id="nav-activity" title="Notifications" aria-label="Notifications"><span class="badge hidden" id="note-badge"></span></button>
     <div class="grow"></div>
     <button class="rail-btn" id="nav-theme" aria-label="Switch light or dark mode"></button>
   </nav>
@@ -357,6 +402,14 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     caret: '<path d="m6 9 6 6 6-6"/>',
     close: '<path d="M6 6l12 12M18 6 6 18"/>',
     folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    branch: '<circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="7" r="2.5"/><path d="M6 7.5v9M18 9.5c0 5-6 4.5-11 7.5"/>',
+    down: '<path d="M12 4v13M6 11l6 6 6-6M5 20h14"/>',
+    up: '<path d="M12 20V7M6 13l6-6 6 6M5 4h14"/>',
+    tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>',
+    box: '<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/>',
+    pr: '<circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M6 7.5v9M18 16.5V9a3 3 0 0 0-3-3h-4M13 3l-2 3 2 3"/>',
+    tree: '<path d="M12 3v18M12 8l-6 4M12 12l6 4"/>',
+    cloud: '<path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.5 1.5A3.5 3.5 0 0 0 7 18z"/>',
   };
   function icon(name) {
     const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -372,7 +425,13 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     if (body !== undefined) headers["Content-Type"] = "application/json";
     const res = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const text = await res.text();
-    if (!res.ok) throw new Error(text.trim() || res.statusText);
+    if (!res.ok) {
+      let msg = text.trim() || res.statusText, code = "";
+      try { const j = JSON.parse(text); msg = j.error || msg; code = j.code || ""; } catch {}
+      const err = new Error(msg);
+      err.code = code;
+      throw err;
+    }
     return (res.headers.get("Content-Type") || "").includes("json") ? JSON.parse(text) : text;
   }
   const pairURL = (name, action) => `/pairs/${enc(name)}/${action}`;
@@ -410,6 +469,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     info: null, pairs: [], sel: localStorage.getItem("ferry-sel") || "", tab: "files", q: "",
     log: new Map(), lastError: new Map(), cleared: new Map(), closed: new Set(JSON.parse(localStorage.getItem("ferry-closed") || "[]")),
     statsSince: "7d", ui: null, shown: "",
+    mode: localStorage.getItem("ferry-mode") === "git" ? "git" : "sync",
+    repos: [], repoSel: localStorage.getItem("ferry-repo") || "", repo: null, gitTab: "changes", gitBump: 0, logSkip: 0,
   };
 
   /** Relay's face and words for a pair's state. */
@@ -439,6 +500,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       return;
     }
     if (!S.pairs.some((p) => p.name === S.sel)) S.sel = S.pairs[0] ? S.pairs[0].name : "";
+    if (S.mode === "git") await loadRepos();
     render();
     if (S.pairs.some((p) => p.comparing)) {
       clearTimeout(S.fast);
@@ -470,6 +532,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       list.push(ev);
       if (list.length > 400) list.splice(0, list.length - 400);
       S.log.set(ev.pair, list);
+      if (NOTABLE.has(ev.kind)) addNote(ev);
       if (ev.kind === "error") {
         S.lastError.set(ev.pair, { at: Date.now(), msg: (ev.message || "error") + (ev.path ? " (" + ev.path + ")" : "") });
         toast(`${ev.pair}: ${ev.message || "error"}`, true);
@@ -483,12 +546,182 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = "Ferry"; });
 
+  // ---------- notifications ----------
+  const NOTABLE = new Set(["conflict", "resolved", "error", "warn", "skip", "commit", "synced", "paused", "resumed", "info"]);
+  S.notes = [];
+  S.lastRead = Number(localStorage.getItem("ferry-read") || 0);
+  S.prefs = JSON.parse(localStorage.getItem("ferry-note-prefs") || '{"desktop":false,"routine":false}');
+  S.noteFilter = "all";
+
+  /** What an event means for a person: category, Relay's face, a sentence, and something to do about it. Null for noise. */
+  function describe(ev) {
+    const file = ev.path ? ev.path.split("/").pop() : "";
+    const goPair = (tab) => () => { closeNotes(); S.mode = "sync"; localStorage.setItem("ferry-mode", "sync"); S.sel = ev.pair; S.tab = tab; S.shown = ""; S.ui = null; refresh(); };
+    const seeChanges = ev.path ? { label: "See changes", run: () => { const p = S.pairs.find((x) => x.name === ev.pair); if (p) { closeNotes(); showDiff(p, ev.path, false); } } } : null;
+    const m = ev.message || "";
+    switch (ev.kind) {
+      case "conflict":
+        return ev.held
+          ? { cat: "needs", mood: "worried", title: `${file} changed in both folders`, detail: "Pick which version to keep. Nothing is overwritten until you do.", action: { label: "Resolve", run: goPair("files") } }
+          : { cat: "sync", mood: "thinking", title: `Settled a conflict in ${file}`, detail: m };
+      case "resolved": return { cat: "sync", mood: "happy", title: `${file}: sorted out`, detail: m };
+      case "error": return { cat: "errors", mood: "sad", title: cap(m.split(":")[0]) || "Something went wrong", detail: (ev.path ? ev.path + " · " : "") + m, action: { label: "Details", run: goPair("activity") } };
+      case "warn":
+        if (/possible secret/i.test(m)) return { cat: "needs", mood: "surprised", title: `${file} might contain a password or key`, detail: "Check it before you commit. " + m.replace(/^possible secret: /i, "Found: ").replace(/ — check before committing$/, "."), action: seeChanges };
+        if (/waiting for approval|large batch/i.test(m)) return { cat: "needs", mood: "surprised", title: m.replace(/ \(press y in the dashboard\)/, ""), detail: "A big batch of changes is waiting. Approve it when you're ready.", action: { label: "Review", run: goPair("files") } };
+        if (/merged with \d+ conflict/i.test(m)) return { cat: "needs", mood: "worried", title: `${file} has conflict markers`, detail: m, action: seeChanges };
+        return { cat: "errors", mood: "thinking", title: cap(m.split(":")[0]), detail: m };
+      case "skip":
+        return /secret/i.test(m)
+          ? { cat: "needs", mood: "surprised", title: `Held back ${file}: it looks like a secret`, detail: m }
+          : { cat: "sync", mood: "thinking", title: `Skipped ${file}`, detail: m };
+      case "commit": {
+        if (/^pushed /.test(m)) return { cat: "commits", mood: "party", title: `Pushed ${m.slice(7)}`, detail: "Your commits are on the remote." };
+        if (/^opened pull request /.test(m)) return { cat: "commits", mood: "excited", title: "Opened a pull request", detail: m.slice(20), action: { label: "Open", run: () => window.open(m.slice(20), "_blank", "noopener") } };
+        const [hash, ...rest] = m.split(" ");
+        return { cat: "commits", mood: "party", title: `Committed: ${rest.join(" ")}`, detail: "commit " + hash };
+      }
+      case "synced": {
+        const n = Object.fromEntries([...m.matchAll(/([+~\-↻!])(\d+)/g)].map((x) => [x[1], +x[2]]));
+        const parts = [n["+"] && `${n["+"]} added`, n["~"] && `${n["~"]} updated`, n["-"] && `${n["-"]} deleted`, n["↻"] && `${n["↻"]} renamed`].filter(Boolean);
+        const total = (n["+"] || 0) + (n["~"] || 0) + (n["-"] || 0) + (n["↻"] || 0);
+        if (n["!"]) return { cat: "errors", mood: "sad", title: `${plural(n["!"], "file")} couldn't be copied`, detail: parts.join(", "), action: { label: "Details", run: goPair("activity") } };
+        return { cat: "sync", mood: "happy", title: `Copied ${plural(total, "file")}`, detail: parts.join(", "), action: { label: "See files", run: goPair("files") } };
+      }
+      case "paused": return { cat: "sync", mood: "sleepy", title: m === "paused by user" ? "Paused" : "Paused for a moment", detail: m === "paused by user" ? "Syncing stopped until you resume." : m };
+      case "resumed": return { cat: "sync", mood: "happy", title: "Back to syncing", detail: m === "resumed" ? "" : m };
+      case "info":
+        if (/^(undid|restored to|pulled|pushed|uploaded|ignored|pruned)/i.test(m) || /ignored from now on/.test(m)) return { cat: "sync", mood: "wink", title: (ev.path ? ev.path + ": " : "") + m.charAt(0).toUpperCase() + m.slice(1), detail: "" };
+        return null;
+    }
+    return null;
+  }
+
+  const CAT = { needs: "Needs you", errors: "Errors", commits: "Commits", sync: "Syncs" };
+  const cap = (x) => (x ? x.charAt(0).toUpperCase() + x.slice(1) : x);
+  /** Today: "5 min ago"; earlier days sit under their own heading, so just the time. */
+  const noteTime = (iso) => (new Date(iso).toDateString() === new Date().toDateString() ? ago(iso) : new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+  const important = (d) => d && d.cat !== "sync";
+  function unread() { return S.notes.filter((ev) => Date.parse(ev.time) > S.lastRead && important(describe(ev))).length; }
+  function paintBadge() {
+    const n = unread();
+    const b = $("#note-badge");
+    if (!b) return;
+    b.textContent = n > 99 ? "99+" : n;
+    b.classList.toggle("hidden", n === 0);
+    $("#nav-activity").title = n ? `Notifications: ${n} new` : "Notifications";
+  }
+
+  function addNote(ev) {
+    S.notes.push(ev);
+    if (S.notes.length > 500) S.notes.splice(0, S.notes.length - 500);
+    paintBadge();
+    S.noteDrawer?.paint();
+    const d = describe(ev);
+    if (d && (d.cat === "needs" || d.cat === "errors") && S.prefs.desktop && document.hidden && "Notification" in window && Notification.permission === "granted") {
+      const n = new Notification("Ferry · " + ev.pair, { body: d.title + (d.detail ? "\n" + d.detail : ""), icon: "/logo.svg", tag: ev.pair + "|" + (ev.path || ev.kind) });
+      n.onclick = () => { window.focus(); d.action?.run(); n.close(); };
+    }
+  }
+
+  function closeNotes() { S.noteDrawer?.close(); }
+
+  function openNotifications() {
+    if (S.noteDrawer) return closeNotes();
+    const seenBefore = S.lastRead;
+    const dr = drawer({ title: "Notifications", sub: "What Ferry did, and anything that needs you", onClose: () => {
+      // everything shown up to now counts as read
+      const newest = S.notes.reduce((t, ev) => Math.max(t, Date.parse(ev.time) || 0), S.lastRead);
+      S.lastRead = newest;
+      localStorage.setItem("ferry-read", String(newest));
+      S.noteDrawer = null;
+      paintBadge();
+      render();
+    } });
+    const head = h("div");
+    const filters = h("div", { class: "filters", role: "group", "aria-label": "Show" });
+    const list = h("div", { role: "list" });
+    dr.body.append(head, filters, list);
+
+    const desktop = h("input", { type: "checkbox", checked: S.prefs.desktop ? true : null });
+    desktop.onchange = async () => {
+      if (desktop.checked && "Notification" in window && Notification.permission !== "granted") {
+        const p = await Notification.requestPermission();
+        if (p !== "granted") { desktop.checked = false; toast("Your browser didn't allow pop-ups. You can allow them in its site settings.", true); }
+      }
+      S.prefs.desktop = desktop.checked;
+      localStorage.setItem("ferry-note-prefs", JSON.stringify(S.prefs));
+    };
+    const routine = h("input", { type: "checkbox", checked: S.prefs.routine ? true : null });
+    routine.onchange = () => { S.prefs.routine = routine.checked; localStorage.setItem("ferry-note-prefs", JSON.stringify(S.prefs)); paint(); };
+    const markAll = h("button", { class: "btn small", onclick: () => { S.lastRead = Date.now(); localStorage.setItem("ferry-read", String(S.lastRead)); paint(); paintBadge(); } }, "Mark all as read");
+    dr.foot.replaceChildren(h("div", { class: "note-prefs left" },
+      h("label", { class: "check" }, desktop, h("span", {}, "Pop up on my desktop when something needs me", h("small", { class: "hint" }, "Only while this tab is in the background."))),
+      h("label", { class: "check" }, routine, h("span", {}, "Include routine syncs under “All”"))), markAll);
+
+    function paint() {
+      const items = S.notes.map((ev) => ({ ev, d: describe(ev) })).filter((x) => x.d).reverse();
+      const counts = { all: 0, needs: 0, errors: 0, commits: 0, sync: 0 };
+      for (const x of items) { counts[x.d.cat]++; if (x.d.cat !== "sync" || S.prefs.routine) counts.all++; }
+      const needsNow = items.filter((x) => x.d.cat === "needs" && Date.parse(x.ev.time) > seenBefore).length;
+      const errorsNow = items.filter((x) => x.d.cat === "errors" && Date.parse(x.ev.time) > seenBefore).length;
+      const open = S.pairs.reduce((n, p) => n + p.conflicts.length, 0);
+      const mood = open || needsNow ? "worried" : errorsNow ? "sad" : items.length ? "happy" : "sleepy";
+      const say = open ? `${plural(open, "conflict")} still ${open === 1 ? "needs" : "need"} your decision.` : needsNow ? `${plural(needsNow, "thing")} ${needsNow === 1 ? "needs" : "need"} you.` : errorsNow ? `${plural(errorsNow, "problem")} since you last looked.` : items.length ? "You're all caught up!" : "It's quiet here.";
+      const hint = open || needsNow ? "They're at the top of the list." : items.length ? "Everything below is just so you know." : "Notifications appear here as Ferry syncs, commits and pushes.";
+      head.replaceChildren(h("div", { class: "narrator" }, h("img", { src: face(mood), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, say), h("div", { class: "hint" }, hint))));
+      filters.replaceChildren(...["all", "needs", "errors", "commits", "sync"].map((f) => h("button", { class: S.noteFilter === f ? "on" : "", "aria-pressed": S.noteFilter === f ? "true" : "false", onclick: () => { S.noteFilter = f; paint(); } },
+        f === "all" ? "All" : CAT[f], counts[f] ? h("span", { class: "n" }, counts[f]) : null)));
+      let shown = items.filter((x) => S.noteFilter === "all" ? (x.d.cat !== "sync" || S.prefs.routine) : x.d.cat === S.noteFilter);
+      // what needs you comes first; then newest first
+      if (S.noteFilter === "all") shown = [...shown.filter((x) => x.d.cat === "needs"), ...shown.filter((x) => x.d.cat !== "needs")];
+      list.replaceChildren();
+      if (!shown.length) {
+        list.append(h("div", { class: "empty-row", style: { textAlign: "center" } }, S.noteFilter === "all" && counts.sync && !S.prefs.routine ? `Nothing important. ${plural(counts.sync, "routine sync")} hidden: see “Syncs”.` : "Nothing here."));
+        return;
+      }
+      const day = (t) => {
+        const d = new Date(t), today = new Date();
+        const y = new Date(); y.setDate(today.getDate() - 1);
+        if (d.toDateString() === today.toDateString()) return "Today";
+        if (d.toDateString() === y.toDateString()) return "Yesterday";
+        return d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+      };
+      let group = "";
+      for (const { ev, d } of shown.slice(0, 200)) {
+        const g = S.noteFilter === "all" && d.cat === "needs" ? "Needs you" : day(ev.time);
+        if (g !== group) { group = g; list.append(h("div", { class: "note-group" }, g)); }
+        const fresh = Date.parse(ev.time) > seenBefore;
+        list.append(h("div", { class: "note" + (fresh ? " unread" : ""), role: "listitem" },
+          h("img", { src: face(d.mood), alt: "" }),
+          h("div", {}, h("div", { class: "t" }, d.title), d.detail ? h("div", { class: "d" }, d.detail) : "",
+            h("div", { class: "meta" }, h("span", { class: "pill" }, ev.pair), h("span", {}, noteTime(ev.time)), h("span", {}, "· " + CAT[d.cat]))),
+          h("div", { class: "acts" }, d.action ? h("button", { class: "btn small" + (d.cat === "needs" ? " brand" : ""), onclick: d.action.run }, d.action.label) : "")));
+      }
+    }
+    S.noteDrawer = { close: dr.close, paint };
+    paint();
+    render();
+  }
+
   // ---------- rail ----------
   function setupRail() {
     $("#nav-pairs").append(icon("home"));
     $("#nav-activity").append(icon("bell"));
-    $("#nav-pairs").onclick = () => { S.tab = "files"; S.shown = ""; render(); };
-    $("#nav-activity").onclick = () => { S.tab = "activity"; S.shown = ""; render(); };
+    $("#nav-git").append(icon("branch"));
+    const setMode = (m, tab) => {
+      S.mode = m;
+      localStorage.setItem("ferry-mode", m);
+      if (tab) S.tab = tab;
+      S.shown = "";
+      S.ui = null;
+      S.gui = null;
+      paintAdd();
+      refresh();
+    };
+    $("#nav-pairs").onclick = () => setMode("sync", "files");
+    $("#nav-git").onclick = () => setMode("git");
+    $("#nav-activity").onclick = openNotifications;
     const themeBtn = $("#nav-theme");
     const paintTheme = () => {
       const dark = document.documentElement.dataset.theme === "dark";
@@ -502,20 +735,32 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       paintTheme();
     };
     paintTheme();
-    $("#add-btn").append(icon("plus"), "New pair");
-    $("#add-btn").onclick = openAdd;
+    const paintAdd = () => {
+      $("#add-btn").replaceChildren(icon("plus"), S.mode === "git" ? "Add repository" : "New pair");
+      $(".pairs-head h2").textContent = S.mode === "git" ? "Repositories" : "Folder pairs";
+    };
+    paintAdd();
+    $("#add-btn").onclick = () => (S.mode === "git" ? openAddRepo() : openAdd());
   }
 
   // ---------- rendering ----------
   function render() {
+    $("#nav-pairs").classList.toggle("on", S.mode === "sync");
+    $("#nav-git").classList.toggle("on", S.mode === "git");
+    $("#nav-activity").classList.toggle("on", !!S.noteDrawer);
+    if (S.mode === "git") {
+      $("#add-btn").classList.toggle("hidden", !!S.info && !S.info.can_open_repos);
+      renderRepos();
+      renderRepo();
+      return;
+    }
+    $("#add-btn").classList.remove("hidden");
     renderPairs();
     renderMain();
     const p = current();
     const m = p ? mood(p) : null;
     const want = face(m ? (m.anim ? "focused" : m.face) : "happy");
     if ($("#rail-face").getAttribute("src") !== want) $("#rail-face").src = want;
-    $("#nav-pairs").classList.toggle("on", S.tab !== "activity");
-    $("#nav-activity").classList.toggle("on", S.tab === "activity");
   }
 
   function renderPairs() {
@@ -850,7 +1095,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 
   // ---------- drawer ----------
   /** A panel that slides in from the right. */
-  function drawer({ title, sub, wide }) {
+  function drawer({ title, sub, wide, onClose }) {
     const scrim = h("div", { class: "scrim" });
     const titleEl = h("h2", {}, title);
     const closeBtn = h("button", { class: "btn icon ghost", "aria-label": "Close" }, icon("close"));
@@ -860,6 +1105,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       h("div", { class: "drawer-head" }, h("div", { style: { flex: 1, minWidth: 0 } }, titleEl, h("div", { class: "sub" }, sub || "")), closeBtn), body, foot);
     const prevFocus = document.activeElement;
     const close = () => {
+      onClose?.();
       panel.classList.remove("open");
       scrim.classList.remove("open");
       document.removeEventListener("keydown", onKey);
@@ -881,15 +1127,22 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
    * you are about to click. With hold: true the risky choice has to be
    * pressed and held, so a slip of the mouse can't do it. Resolves true/false.
    */
-  function relayAsk({ mood: m = "thinking", title, text, yes = "Yes", no = "Cancel", hold = false, yesMood = "sad", noMood = "happy" }) {
+  function relayAsk({ mood: m = "thinking", title, text, yes = "Yes", no = "Cancel", hold = false, yesMood = "sad", noMood = "happy", fields = null }) {
     return new Promise((resolve) => {
       const img = h("img", { class: "face bob", src: face(m), alt: "Relay" });
       const say = h("h3", {}, title);
       const sub = h("p", {}, text);
+      const inputs = {};
+      const form = fields ? h("div", { class: "ask-fields" }, fields.map((f) => {
+        const el = f.type === "check" ? h("input", { type: "checkbox", checked: f.value ? true : null }) : h("input", { type: "text", value: f.value || "", placeholder: f.placeholder || "" });
+        inputs[f.name] = el;
+        return f.type === "check" ? h("label", { class: "check" }, el, h("span", {}, f.label)) : h("label", { class: "field" }, h("span", { class: "label" }, f.label), el, f.hint ? h("small", {}, f.hint) : null);
+      })) : null;
+      const values = () => Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.type === "checkbox" ? el.checked : el.value.trim()]));
       const noBtn = h("button", { class: "btn brand" }, no);
       const yesBtn = h("button", { class: "btn" + (hold ? " hold danger" : "") }, h("i", { class: "prog" }), h("span", {}, hold ? "Hold to " + yes.toLowerCase() : yes));
       const wrap = h("div", { class: "ask-wrap", role: "alertdialog", "aria-modal": "true", "aria-label": title },
-        h("div", { class: "ask" }, img, say, sub, h("div", { class: "row" }, noBtn, yesBtn),
+        h("div", { class: "ask" }, img, say, sub, form, h("div", { class: "row" }, noBtn, yesBtn),
           hold ? h("div", { class: "note" }, "Press and hold for a second (or hold Space), so a slip of the mouse can't do it.") : null));
       let done = false;
       const finish = (v, last) => {
@@ -906,7 +1159,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       noBtn.onmouseenter = noBtn.onfocus = () => { if (!done) img.src = face(noMood); };
       yesBtn.onmouseenter = yesBtn.onfocus = () => { if (!done) img.src = face(yesMood); };
       [noBtn, yesBtn].forEach((b) => { b.onmouseleave = () => { if (!done) img.src = face(m); }; });
-      if (!hold) yesBtn.onclick = () => finish(true);
+      if (!hold) yesBtn.onclick = () => finish(fields ? values() : true);
+      if (fields) Object.values(inputs).forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter") yesBtn.click(); }));
       else {
         let start = 0, raf = 0;
         const tick = () => {
@@ -937,7 +1191,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
         ["pointerup", "pointerleave", "pointercancel", "keyup", "blur"].forEach((ev) => yesBtn.addEventListener(ev, up));
       }
       document.body.append(wrap);
-      requestAnimationFrame(() => { wrap.classList.add("open"); noBtn.focus(); });
+      requestAnimationFrame(() => { wrap.classList.add("open"); (fields ? Object.values(inputs)[0] : noBtn).focus(); });
     });
   }
 
@@ -1041,6 +1295,15 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       dr.body.replaceChildren(h("div", { class: "narrator" }, h("img", { src: face("sad"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, "I couldn't compare this file."), h("div", { class: "hint" }, e.message))));
       return;
     }
+    const extra = conflict ? [
+      ["source", "kept your working folder's version", "Keep mine"], ["target", "kept the target's version", "Keep target's"],
+      ["both", "kept both versions", "Keep both"], ["merge", "merged", "Merge"],
+    ].map(([choice, label, text]) => h("button", { class: "btn small" + (choice === "merge" ? " brand" : ""), onclick: () => { resolve(p, file, choice, label); dr.close(); } }, text)) : null;
+    storyInto(dr.body, dr.foot, d, file.split("/").pop(), extra, dr.panel);
+  }
+
+  /** Renders a diff (from /diff?format=json or the Git client) as Relay's change story into body. */
+  function storyInto(body, foot, d, file, extra, keys) {
     const parsed = parseDiff(d.lines);
     const st = story(parsed, file.split("/").pop());
     let view = "story", at = 0;
@@ -1122,18 +1385,11 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     }
     top.push(h("div", { class: "sides" }, h("div", { class: "side" }, h("b", {}, "Before"), d.before), h("div", { class: "side" }, h("b", {}, "After"), d.after)));
     top.push(h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } }, h("span", { class: "muted", style: { fontSize: "12.5px" } }, "Tip: press J and K to jump between changes."), seg));
-    dr.body.replaceChildren(...top, content);
-
-    dr.foot.replaceChildren(h("span", { class: "left" }, counter), prev, next);
-    if (conflict) {
-      const pick = (choice, label) => { resolve(p, file, choice, label); dr.close(); };
-      dr.foot.append(
-        h("button", { class: "btn small", onclick: () => pick("source", "kept your working folder's version") }, "Keep mine"),
-        h("button", { class: "btn small", onclick: () => pick("target", "kept the target's version") }, "Keep target's"),
-        h("button", { class: "btn small", onclick: () => pick("both", "kept both versions") }, "Keep both"),
-        h("button", { class: "btn small brand", title: "Combine both edits; overlaps get <<<<<<< markers", onclick: () => pick("merge", "merged") }, "Merge"));
-    }
-    dr.panel.addEventListener("keydown", (e) => {
+    body.replaceChildren(...top, content);
+    const nav = [h("span", { class: "left" }, counter), prev, next];
+    if (foot) foot.replaceChildren(...nav, ...(extra || []));
+    else body.prepend(h("div", { class: "inline", style: { justifyContent: "flex-end", marginBottom: "10px" } }, ...nav));
+    keys.addEventListener("keydown", (e) => {
       if (e.target.closest("input, textarea, select")) return;
       if (e.key === "j") go(at + 1);
       if (e.key === "k") go(at - 1);
@@ -1197,49 +1453,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       openPicker(which === "source" ? "Choose your working folder" : "Choose where the files should go", typed && !/^(s3:\/\/|ssh:\/\/|[^/\\]+@)/.test(typed) ? typed : S.info.home, (dir) => { F(which).value = dir; showError(which, ""); });
     }));
 
-    function openPicker(title, start, pick) {
-      const oldTitle = dr.titleEl.textContent;
-      dr.titleEl.textContent = title;
-      formView.classList.add("hidden");
-      pickerView.classList.remove("hidden");
-      let showHidden = false, cur = null;
-      const back = () => { dr.titleEl.textContent = oldTitle; pickerView.classList.add("hidden"); formView.classList.remove("hidden"); dr.foot.replaceChildren(...formFoot); };
-      const choose = h("button", { class: "btn brand", type: "button", onclick: () => { if (cur) { pick(cur); back(); } } }, "Choose this folder");
-      dr.foot.replaceChildren(h("button", { class: "btn ghost left", type: "button", onclick: back }, "← Back"), choose);
-      const go = async (dir) => {
-        let r;
-        try {
-          r = await api("GET", "/fs?path=" + enc(dir) + (showHidden ? "&hidden=1" : ""));
-        } catch (e) {
-          if (dir !== S.info.home) return go(S.info.home);
-          pickerView.replaceChildren(h("p", { class: "muted" }, e.message));
-          return;
-        }
-        cur = r.path;
-        choose.textContent = `Choose “${r.path.split(/[\\/]/).filter(Boolean).pop() || r.path}”`;
-        const sep = S.info.sep, parts = r.path.split(/[\\/]/).filter(Boolean), win = /^[A-Za-z]:/.test(r.path);
-        const crumbs = h("div", { class: "crumbpath" });
-        parts.forEach((part, i) => {
-          const full = (win ? "" : sep) + parts.slice(0, i + 1).join(sep) + (win && i === 0 ? sep : "");
-          if (i > 0 || !win) crumbs.append(h("span", { class: "sep" }, sep));
-          const last = i === parts.length - 1;
-          crumbs.append(h("button", { type: "button", class: last ? "here" : "", onclick: last ? null : () => go(full) }, part));
-        });
-        const hid = h("input", { type: "checkbox", checked: showHidden ? true : null });
-        hid.addEventListener("change", () => { showHidden = hid.checked; go(r.path); });
-        const join = (n) => r.path.replace(/[\\/]+$/, "") + sep + n;
-        pickerView.replaceChildren(crumbs,
-          h("div", { class: "dirs" },
-            r.parent ? h("button", { type: "button", class: "dir", onclick: () => go(r.parent) }, "↑", h("span", { class: "muted" }, "Up one level")) : "",
-            r.dirs.length ? r.dirs.map((n) => h("button", { type: "button", class: "dir", onclick: () => go(join(n)) }, icon("folder"), h("span", {}, n), h("span", { class: "chev" }, "›"))) : h("div", { class: "dir muted", style: { cursor: "default" } }, "This folder has no sub-folders.")),
-          h("div", { class: "inline", style: { marginTop: "12px", gap: "14px", flexWrap: "wrap" } },
-            r.is_git ? h("span", { class: "pill green" }, "this folder is a git repo") : "",
-            h("button", { type: "button", class: "btn small", onclick: () => go(r.home) }, "Home folder"),
-            h("label", { class: "check", style: { margin: 0 } }, hid, "show hidden folders")),
-          h("p", { class: "hint" }, "Click a folder to open it, then press “Choose” below."));
-      };
-      go(start);
-    }
+    const openPicker = (title, start, pick) => pickFolder(dr, formView, pickerView, () => dr.foot.replaceChildren(...formFoot), title, start, pick);
 
     submit.onclick = async () => {
       const lines = (s) => s.split("\n").map((x) => x.trim()).filter(Boolean);
@@ -1271,6 +1485,678 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     setTimeout(() => F("source").focus(), 320);
   }
 
+  // =====================================================================
+  // ---------- Git client ----------
+  // =====================================================================
+  const gitURL = (action) => `/git/${S.repoSel}/${action}`;
+  const curRepo = () => S.repos.find((r) => r.id === S.repoSel);
+
+  async function loadRepos() {
+    try {
+      S.repos = await api("GET", "/git/repos");
+    } catch {
+      S.repos = [];
+    }
+    if (!S.repos.some((r) => r.id === S.repoSel)) S.repoSel = S.repos[0] ? S.repos[0].id : "";
+    if (S.repoSel) {
+      try {
+        S.repo = await api("GET", gitURL("state"));
+      } catch (e) {
+        S.repo = null;
+        S.repoError = e.message;
+      }
+    } else S.repo = null;
+  }
+  const refreshGit = async () => { S.gitBump++; S.gshown = ""; await loadRepos(); render(); };
+
+  /** Runs a Git action, tells the user how it went, and refreshes. */
+  async function gitAct(action, body, okText, mood = "happy") {
+    try {
+      const r = await api("POST", gitURL(action), body || {});
+      const text = typeof okText === "function" ? okText(r) : okText;
+      if (text) toast(text, false, mood);
+      if (r.paused && r.paused.length) toast(`I paused syncing ${r.paused.join(", ")} while you do this. Resume it when you're ready.`, false, "sleepy");
+      if (r.conflicts && r.conflicts.length) toast(`${plural(r.conflicts.length, "file")} need your decision: see the top of the page.`, true, "worried");
+      await refreshGit();
+      return r;
+    } catch (e) {
+      await refreshGit();
+      throw e;
+    }
+  }
+  const tryAct = (...a) => gitAct(...a).catch((e) => { toast(e.message, true); return null; });
+
+  /** Relay's take on a repository's state. */
+  function repoMood(st) {
+    if (!st) return { face: "sad", say: "I can't read this repository.", hint: S.repoError || "", tone: "red", label: "error" };
+    const conflicts = st.files.filter((f) => f.conflicted).length;
+    if (st.operation) {
+      const what = { merge: `Merging ${st.operationBranch || "a branch"} into ${st.branch}`, rebase: "Rebasing", "cherry-pick": "Cherry-picking a commit", revert: "Reverting a commit" }[st.operation];
+      return conflicts
+        ? { face: "worried", say: `${what}: ${plural(conflicts, "file")} ${conflicts === 1 ? "needs" : "need"} you.`, hint: "Choose which version to keep for each file below, then press Continue.", tone: "red", label: st.operation + " in progress" }
+        : { face: "thinking", say: `${what}: all conflicts are settled.`, hint: "Press Continue to finish, or Abort to go back.", tone: "amber", label: st.operation + " in progress" };
+    }
+    const staged = st.files.filter((f) => f.staged).length;
+    if (st.behind) return { face: "thinking", say: `There ${st.behind === 1 ? "is 1 new commit" : `are ${st.behind} new commits`} on ${st.upstream}.`, hint: "Pull to catch up" + (st.files.length ? `. You also have ${plural(st.files.length, "changed file")}.` : "."), tone: "amber", label: `${st.behind} behind` };
+    if (st.files.length) return { face: "focused", say: `${plural(st.files.length, "file")} changed${staged ? `, ${staged} ready to commit` : ""}.`, hint: staged ? "Write a message and commit when you're ready." : "Tick the files (or lines) you want in the next commit.", tone: "blue", label: plural(st.files.length, "change") };
+    if (st.ahead) return { face: "wink", say: `${plural(st.ahead, "commit")} ready to push.`, hint: `Push to share them on ${st.upstream}.`, tone: "blue", label: `${st.ahead} to push` };
+    if (!st.head) return { face: "excited", say: "A brand-new repository!", hint: "Add some files, then make your first commit.", tone: "green", label: "empty" };
+    return { face: "happy", say: "Everything's committed.", hint: st.upstream ? `In step with ${st.upstream}.` : "This branch isn't on a remote yet: push to publish it.", tone: "green", label: "clean" };
+  }
+
+  function renderRepos() {
+    const box = $("#pairs");
+    $("#pair-count").textContent = S.repos.length;
+    box.replaceChildren();
+    for (const r of S.repos) {
+      const sel = r.id === S.repoSel;
+      const st = sel ? S.repo : null;
+      const sub = st ? `⎇ ${st.branch || "detached"} · ${st.files.length ? plural(st.files.length, "change") : "clean"}` : short(r.path);
+      box.append(h("button", { class: "pair" + (sel ? " sel" : ""), title: r.path, onclick: () => { S.repoSel = r.id; localStorage.setItem("ferry-repo", r.id); S.gui = null; refreshGit(); } },
+        h("img", { src: face(st ? repoMood(st).face : "happy"), alt: "" }),
+        h("div", {}, h("div", { class: "name" }, r.name), h("div", { class: "sub" }, sub), r.pairs.length ? h("div", { class: "rp-sub" }, "synced by " + r.pairs.join(", ")) : null)));
+    }
+    if (!S.repos.length) box.append(h("div", { class: "pair-empty" }, "No repositories yet. Clone one, create one, or open a folder you already have."));
+  }
+
+  function renderRepo() {
+    const main = $("#main");
+    const r = curRepo();
+    if (!r) {
+      S.gui = null;
+      main.replaceChildren(h("div", { class: "card empty" },
+        h("img", { src: face("excited"), alt: "Relay", class: "float" }),
+        h("h2", {}, "Let's open a repository."),
+        h("p", {}, "I can clone one from GitHub or GitLab, create a new one, or open a folder that's already a git repository. Repositories your folder pairs sync into show up here by themselves."),
+        h("p", {}, "Click “Add repository” on the left.")));
+      return;
+    }
+    if (!S.gui || S.gui.id !== r.id || !main.contains(S.gui.body)) buildRepo(r);
+    updateRepo(r, S.repo);
+  }
+
+  function buildRepo(r) {
+    const ui = { id: r.id };
+    ui.crumbs = h("div", { class: "crumbs" });
+    ui.h1 = h("h1");
+    ui.branch = h("button", { class: "pill blue", style: { border: 0, cursor: "pointer", fontSize: "14px", padding: "6px 14px" }, onclick: () => { S.gitTab = "branches"; S.gshown = ""; render(); } });
+    ui.sync = h("span");
+    ui.actions = h("div", { class: "actions" });
+    ui.paths = h("div", { class: "paths" });
+    ui.face = h("img", { alt: "Relay", class: "float" });
+    ui.say = h("div", { class: "say" });
+    ui.hint = h("div", { class: "hint" });
+    ui.op = h("div");
+    ui.tabs = h("div", { class: "toolbar" });
+    ui.body = h("div", { class: "body" });
+    $("#main").replaceChildren(ui.crumbs, h("div", { class: "title-row" }, ui.h1, ui.branch, ui.sync, h("div", { class: "grow" }), ui.actions), ui.paths,
+      h("div", { class: "card hero" }, ui.face, h("div", { class: "bubble", role: "status" }, ui.say, ui.hint)), ui.op, ui.tabs, ui.body);
+    S.gui = ui;
+    S.gshown = "";
+  }
+
+  function updateRepo(r, st) {
+    const ui = S.gui;
+    const m = repoMood(st);
+    ui.crumbs.replaceChildren(h("span", {}, "Repositories"), h("span", {}, "›"), h("b", {}, r.name));
+    ui.h1.textContent = r.name;
+    ui.branch.replaceChildren(icon("branch"), st ? (st.branch || `detached at ${st.head}`) : "…");
+    ui.sync.replaceChildren(
+      st && st.ahead ? h("span", { class: "pill blue", title: "commits to push" }, `↑ ${st.ahead}`) : "",
+      " ", st && st.behind ? h("span", { class: "pill amber", title: "commits to pull" }, `↓ ${st.behind}`) : "");
+    if (ui.face.getAttribute("src") !== face(m.face)) ui.face.src = face(m.face);
+    ui.say.textContent = m.say;
+    ui.hint.textContent = m.hint;
+    ui.paths.replaceChildren(h("code", {}, short(r.path)),
+      ...r.pairs.map((n) => h("span", { class: "pill violet", title: "a folder pair syncs into this repository" }, "synced by " + n)),
+      st && st.upstream ? h("span", {}, "tracking " + st.upstream) : "",
+      r.standalone ? h("button", { class: "btn small ghost", onclick: () => removeRepo(r) }, "Remove from list") : "");
+    const busy = (btn, f) => async () => { btn.disabled = true; try { await f(); } finally { btn.disabled = false; } };
+    const fetchBtn = h("button", { class: "btn" }, icon("cloud"), "Fetch");
+    fetchBtn.onclick = busy(fetchBtn, () => tryAct("fetch", {}, "Fetched the latest from the remote", "happy"));
+    const pullBtn = h("button", { class: "btn" }, icon("down"), st && st.behind ? `Pull ${st.behind}` : "Pull");
+    pullBtn.onclick = busy(pullBtn, () => doPull());
+    const pushBtn = h("button", { class: "btn" + (st && st.ahead ? " brand" : "") }, icon("up"), st && !st.upstream ? "Publish branch" : st && st.ahead ? `Push ${st.ahead}` : "Push");
+    pushBtn.onclick = busy(pushBtn, () => doPush(false));
+    ui.actions.replaceChildren(fetchBtn, pullBtn, pushBtn);
+    renderOperation(st);
+
+    const n = st ? st.files.filter((f) => !f.conflicted).length : 0;
+    const tabs = [["changes", "Changes", "files", n], ["history", "History", "clock", 0], ["branches", "Branches", "branch", 0], ["stashes", "Stashes", "box", st ? st.stashes : 0],
+      ["prs", "Pull requests", "pr", 0], ["tags", "Tags", "tag", 0], ["worktrees", "Worktrees", "tree", 0]];
+    ui.tabs.replaceChildren(...tabs.map(([id, name, ic, c]) => h("button", { class: "tab" + (S.gitTab === id ? " on" : ""), "aria-pressed": S.gitTab === id ? "true" : "false", onclick: () => { S.gitTab = id; S.gshown = ""; render(); } },
+      icon(ic), name, c ? h("span", { class: "count blue" }, c) : null)));
+    renderGitBody(st);
+  }
+
+  async function doPull(strategy) {
+    try {
+      await gitAct("pull", { strategy: strategy || "" }, "Pulled the latest commits", "party");
+    } catch (e) {
+      if (e.code === "diverged") {
+        const choice = await relayAsk({ mood: "thinking", title: "Both sides have new commits.", text: "Your branch and the remote have each moved on. Merge keeps both histories as they are; rebase replays your commits on top of the remote's, for a straight line.", yes: "Rebase my commits", no: "Merge them", yesMood: "wink", noMood: "happy" });
+        await tryAct("pull", { strategy: choice ? "rebase" : "merge" }, "Caught up with the remote", "party");
+      } else if (e.code !== "conflicts") toast(e.message, true);
+    }
+  }
+
+  async function doPush(force) {
+    try {
+      await gitAct("push", { force }, (r) => `Pushed ${r.branch}`, "party");
+    } catch (e) {
+      if (e.code === "rejected" && !force) {
+        const st = S.repo;
+        const rewrote = st && st.lastCommit && st.lastCommit.pushed === false;
+        const ok = await relayAsk({ mood: "worried", title: "The remote has commits you don't have.", text: rewrote ? "Pull first to bring them in. If you rewrote commits on purpose (amend, undo), you can force-push instead, which replaces the remote's version." : "Pull first to bring them in, then push again.", yes: "Pull now", no: "Not now" });
+        if (ok) await doPull();
+      } else toast(e.message, true);
+    }
+  }
+
+  async function removeRepo(r) {
+    const ok = await relayAsk({ mood: "thinking", title: `Remove ${r.name} from the list?`, text: "Only the list entry goes. The repository and its files stay exactly where they are.", yes: "Remove", no: "Keep it" });
+    if (!ok) return;
+    await act("Removed from the list", () => api("POST", "/git/repos/remove", { id: r.id }), "wink");
+    S.repoSel = "";
+    refreshGit();
+  }
+
+  /** The "merge in progress" card: conflicted files with one-click choices, plus Continue and Abort. */
+  function renderOperation(st) {
+    const ui = S.gui;
+    if (!st || !st.operation) { ui.op.replaceChildren(); return; }
+    const conflicts = st.files.filter((f) => f.conflicted);
+    const rows = conflicts.map((f) => h("tr", {},
+      h("td", { class: "file" }, f.path, h("small", {}, "changed on both branches")),
+      h("td", { class: "end" },
+        h("button", { class: "btn small brand", onclick: () => showConflict(f.path) }, icon("eye"), "See both"), " ",
+        h("button", { class: "btn small", onclick: () => tryAct("resolve", { path: f.path, choice: "ours" }, `${f.path}: kept your version`) }, "Keep mine"), " ",
+        h("button", { class: "btn small", onclick: () => tryAct("resolve", { path: f.path, choice: "theirs" }, `${f.path}: kept theirs`) }, "Keep theirs"), " ",
+        h("button", { class: "btn small", title: "Keep every line from both sides", onclick: () => tryAct("resolve", { path: f.path, choice: "both" }, `${f.path}: kept both`) }, "Keep both"), " ",
+        h("button", { class: "btn small ghost", title: "I fixed it in my editor", onclick: () => tryAct("resolve", { path: f.path, choice: "done" }, `${f.path}: marked as resolved`) }, "I fixed it")),
+    ));
+    const cont = h("button", { class: "btn brand", disabled: conflicts.length ? true : null, onclick: () => tryAct("finish", { action: "continue" }, "Done! Finished the " + st.operation, "party") }, "Continue");
+    const abort = h("button", { class: "btn ghost danger", onclick: async () => {
+      const ok = await relayAsk({ mood: "worried", title: `Abort the ${st.operation}?`, text: "I'll put everything back the way it was before it started.", yes: "Abort", no: "Keep going", yesMood: "sad" });
+      if (ok) tryAct("finish", { action: "abort" }, `Aborted the ${st.operation}`, "sleepy");
+    } }, "Abort");
+    const title = { merge: `Merging ${st.operationBranch || "a branch"}`, rebase: "Rebase in progress", "cherry-pick": "Cherry-pick in progress", revert: "Revert in progress" }[st.operation];
+    ui.op.replaceChildren(h("div", { class: "card section op-card" },
+      h("div", { class: "section-head" }, h("span", { class: "section-title" }, title, conflicts.length ? h("span", { class: "count red" }, conflicts.length) : null), h("div", { class: "grow" }), abort, cont),
+      conflicts.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "Every conflict is settled. Press Continue to finish.")));
+  }
+
+  async function showConflict(file) {
+    const dr = drawer({ title: file.split("/").pop(), sub: "Changed on both branches", wide: true });
+    try {
+      const d = await api("GET", gitURL("conflict") + "?path=" + enc(file));
+      const pick = (choice, text) => { tryAct("resolve", { path: file, choice }, `${file}: ${text}`); dr.close(); };
+      storyInto(dr.body, dr.foot, d, file.split("/").pop(), [
+        h("button", { class: "btn small", onclick: () => pick("ours", "kept your version") }, "Keep mine"),
+        h("button", { class: "btn small", onclick: () => pick("theirs", "kept theirs") }, "Keep theirs"),
+        h("button", { class: "btn small brand", onclick: () => pick("both", "kept both") }, "Keep both")], dr.panel);
+    } catch (e) {
+      dr.body.replaceChildren(h("p", { class: "muted" }, e.message));
+    }
+  }
+
+  function renderGitBody(st) {
+    const ui = S.gui;
+    const key = [S.repoSel, S.gitTab, S.gitBump, S.gitTab === "changes" ? JSON.stringify(st && st.files) + (st && st.lastCommit && st.lastCommit.hash) : ""].join("|");
+    const typing = ui.body.contains(document.activeElement) && document.activeElement.tagName === "INPUT" && document.activeElement.type === "text";
+    if (S.gshown === key || (typing && S.gshown.startsWith(S.repoSel + "|" + S.gitTab))) return;
+    S.gshown = key;
+    if (!st) { ui.body.replaceChildren(h("div", { class: "card empty-row" }, S.repoError || "Loading…")); return; }
+    ({ changes: gitChanges, history: gitHistory, branches: gitBranches, stashes: gitStashes, prs: gitPRs, tags: gitTags, worktrees: gitWorktrees })[S.gitTab](ui.body, st);
+  }
+
+  const STATUS = (f) => f.conflicted ? ["Conflict", "red"] : f.untracked ? ["New", "solid-green"] : (f.x === "A" ? ["New", "solid-green"] : f.x === "R" ? ["Renamed", "solid-violet"] : (f.x === "D" || f.y === "D") ? ["Deleted", "solid-red"] : ["Modified", "solid-blue"]);
+
+  // ---------- changes ----------
+  function gitChanges(body, st) {
+    const files = st.files.filter((f) => !f.conflicted);
+    const rows = files.map((f) => {
+      const cb = h("input", { type: "checkbox", "aria-label": "Include " + f.path + " in the next commit" });
+      cb.checked = f.staged;
+      cb.indeterminate = f.staged && f.unstaged && !f.untracked;
+      cb.onchange = () => tryAct(cb.checked ? "stage" : "unstage", { files: [f.path] });
+      const [word, cls] = STATUS(f);
+      const folder = f.path.includes("/") ? f.path.slice(0, f.path.lastIndexOf("/") + 1) : "top folder";
+      return h("tr", {},
+        h("td", { class: "cbcell" }, cb),
+        h("td", { class: "file" }, f.path.split("/").pop(), h("small", {}, f.from ? `renamed from ${f.from}` : folder)),
+        h("td", {}, h("span", { class: "pill " + cls }, word), cb.indeterminate ? h("span", { class: "pill amber refpill" }, "partly staged") : ""),
+        h("td", { class: "end" },
+          h("button", { class: "btn small", onclick: () => reviewFile(f) }, icon("eye"), "Review & pick lines"), " ",
+          h("button", { class: "btn small ghost danger", onclick: () => discardFiles([f.path], f.path) }, "Discard")));
+    });
+    const staged = files.filter((f) => f.staged).length;
+    const headBtns = files.length ? h("span", { class: "inline" },
+      h("button", { class: "btn small", onclick: () => tryAct("stage", { files: [] }, "Everything is ready to commit") }, "Select all"),
+      h("button", { class: "btn small ghost", onclick: () => tryAct("unstage", { files: [] }) }, "Clear"),
+      h("button", { class: "btn small ghost", onclick: async () => {
+        const v = await relayAsk({ mood: "thinking", title: "Put these changes aside?", text: "I'll stash them (tuck them away safely) so you get a clean folder. Bring them back any time from the Stashes tab.", yes: "Stash them", no: "Cancel", yesMood: "wink", fields: [{ name: "message", label: "A note to remember them by (optional)", placeholder: "e.g. half-done login page" }] });
+        if (v) tryAct("stash", { message: v.message }, "Tucked away in Stashes", "wink");
+      } }, "Stash all"),
+      h("button", { class: "btn small ghost danger", onclick: () => discardFiles([], "every change") }, "Discard all")) : null;
+
+    const msg = h("input", { type: "text", placeholder: "What did you change? (e.g. Fix the login button)" });
+    const coAuth = h("input", { type: "text", placeholder: "Co-authors (optional): Name <email>, Name <email>" });
+    const amend = h("input", { type: "checkbox" });
+    const aiBtn = h("button", { class: "btn small", title: "Claude reads the staged changes and writes a message", onclick: async () => {
+      aiBtn.disabled = true;
+      aiBtn.textContent = "Writing…";
+      try {
+        const r = await api("GET", gitURL("ai-message"));
+        msg.value = r.message;
+      } catch (e) { toast(e.message, true); }
+      aiBtn.disabled = false;
+      aiBtn.textContent = "✨ Write it for me";
+    } }, "✨ Write it for me");
+    amend.onchange = () => {
+      if (amend.checked && !msg.value && st.lastCommit) msg.value = st.lastCommit.subject;
+    };
+    const commitBtn = h("button", { class: "btn primary", disabled: !staged && !st.head ? true : null }, icon("commit"), staged ? `Commit ${plural(staged, "file")} to ${st.branch || "HEAD"}` : "Commit");
+    commitBtn.onclick = async () => {
+      const coAuthors = coAuth.value.split(/,(?=[^>]*(?:<|$))/).map((x) => x.trim()).filter(Boolean);
+      const r = await tryAct("commit", { message: msg.value, amend: amend.checked, co_authors: coAuthors }, (r) => amend.checked ? `Updated the last commit (${r.commit})` : `Committed ${r.commit}`, "party");
+      if (r) { msg.value = ""; coAuth.value = ""; }
+    };
+    const last = st.lastCommit;
+    const undoBtn = last ? h("button", { class: "btn small ghost", onclick: async () => {
+      const ok = await relayAsk({ mood: last.pushed ? "worried" : "thinking", title: `Undo “${last.subject}”?`, text: (last.pushed ? "This commit is already on the remote, so after undoing you'd need to force-push. " : "") + "The commit goes away but its changes stay, ready to commit again.", yes: "Undo it", no: "Keep it", yesMood: "wink" });
+      if (ok) tryAct("undo", {}, (r) => `Undid “${r.subject}”; the changes are still here`, "wink");
+    } }, "↶ Undo last commit") : null;
+    const form = h("div", { style: { padding: "4px 16px 14px" } },
+      h("div", { class: "field" }, h("div", { class: "inline", style: { justifyContent: "space-between", marginBottom: "6px" } }, h("span", { class: "label", style: { margin: 0 } }, "Message"), aiBtn), msg),
+      h("label", { class: "field" }, coAuth),
+      last ? h("label", { class: "check" }, amend, h("span", {}, `Add to the last commit instead (“${last.subject}”)`, last.pushed ? h("small", { class: "hint" }, "It's already pushed: you'd need to force-push afterwards.") : null)) : null,
+      h("div", { class: "inline", style: { justifyContent: "space-between" } }, commitBtn, undoBtn));
+    body.replaceChildren(
+      section("g-changes", "Changes", files.length, "blue", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "No changes. Edit some files and they show up here."), headBtns),
+      section("g-commit", "Commit", null, "", form));
+  }
+
+  async function discardFiles(files, label) {
+    const ok = await relayAsk({ mood: "worried", hold: files.length === 0, title: `Discard ${files.length ? label : "every change"}?`, text: "The file goes back to how it was in the last commit. Your current version goes to the Trash, so you can still get it back.", yes: "Discard", no: "Keep my changes", yesMood: "sad" });
+    if (ok) tryAct("discard", { files }, (r) => `Discarded ${plural(r.discarded, "file")} (copies are in the Trash)`, "wink");
+  }
+
+  /** Review a changed file and stage single lines (or whole changes). */
+  async function reviewFile(f) {
+    const dr = drawer({ title: f.path.split("/").pop(), sub: f.path.includes("/") ? f.path.slice(0, f.path.lastIndexOf("/") + 1) : "top folder", wide: true });
+    let staged = false;
+    const seg = h("div", { class: "seg big", role: "group", "aria-label": "Which changes" });
+    const content = h("div");
+    dr.body.append(h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", gap: "12px", flexWrap: "wrap" } },
+      h("span", { class: "muted" }, "Tick the lines you want in the next commit. Lines you leave unticked stay changed in your folder."), seg), content);
+    const load = async () => {
+      seg.replaceChildren(
+        h("button", { class: !staged ? "on" : "", onclick: () => { staged = false; load(); } }, "Not staged yet"),
+        h("button", { class: staged ? "on" : "", onclick: () => { staged = true; load(); } }, "Staged"));
+      content.replaceChildren(h("p", { class: "muted" }, "Loading…"));
+      let d;
+      try {
+        d = await api("GET", gitURL("diff") + "?path=" + enc(f.path) + (staged ? "&staged=1" : ""));
+      } catch (e) { content.replaceChildren(h("p", { class: "muted" }, e.message)); return; }
+      if (staged) {
+        storyInto(content, null, d, f.path.split("/").pop(), null, dr.panel);
+        dr.foot.replaceChildren(h("button", { class: "btn", onclick: async () => { await tryAct("unstage", { files: [f.path] }, "Unstaged " + f.path); load(); } }, "Unstage this file"));
+        return;
+      }
+      if (!d.lines.some((l) => l.op === "+" || l.op === "-")) {
+        content.replaceChildren(h("div", { class: "narrator" }, h("img", { src: face("happy"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, "Nothing left to stage here."), h("div", { class: "hint" }, d.lines[0] ? d.lines[0].text : "Everything in this file is already staged."))));
+        dr.foot.replaceChildren();
+        return;
+      }
+      // one card per change; every changed line has its own tick box
+      const picks = new Map();
+      const cards = [];
+      let group = null, newNo = 1, oldNo = 1, k = 0;
+      d.lines.forEach((l, i) => {
+        if (l.op === "@") {
+          const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(l.text);
+          if (m) { oldNo = +m[1]; newNo = +m[2]; }
+          group = { el: h("div", { class: "lines" }), boxes: [], at: newNo };
+          const all = h("input", { type: "checkbox", checked: true, "aria-label": "Include this whole change" });
+          all.onchange = () => group.boxes.forEach((b) => { b.checked = all.checked; b.dispatchEvent(new Event("change")); });
+          group.all = all;
+          cards.push(h("div", { class: "hunk" }, h("div", { class: "hunk-head" }, all, h("b", {}, `Change ${++k}`), h("span", { class: "muted" }, `near line ${newNo}`)), group.el));
+          return;
+        }
+        if (!group) return;
+        const g = group;
+        if (l.op === " ") { g.el.append(h("div", { class: "ln ctx pick" }, h("span", {}), h("span", { class: "no" }, newNo), h("span", { class: "op" }), h("span", { class: "tx" }, l.text || " "))); oldNo++; newNo++; return; }
+        const cb = h("input", { type: "checkbox", checked: true, "aria-label": (l.op === "+" ? "add: " : "remove: ") + l.text });
+        picks.set(i, cb);
+        g.boxes.push(cb);
+        const row = h("div", { class: "ln pick " + (l.op === "+" ? "add" : "del") }, h("span", { class: "cb" }, cb), h("span", { class: "no" }, l.op === "+" ? newNo : oldNo), h("span", { class: "op" }, l.op === "+" ? "+" : "−"), h("span", { class: "tx" }, l.text || " "));
+        row.onclick = (e) => { if (e.target !== cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event("change")); } };
+        cb.onchange = () => { row.classList.toggle("off", !cb.checked); g.all.checked = g.boxes.every((b) => b.checked); g.all.indeterminate = !g.all.checked && g.boxes.some((b) => b.checked); count(); };
+        g.el.append(row);
+        if (l.op === "+") newNo++; else oldNo++;
+      });
+      const stageBtn = h("button", { class: "btn brand" });
+      const count = () => {
+        const n = [...picks.values()].filter((b) => b.checked).length;
+        stageBtn.textContent = n === picks.size ? "Stage the whole file" : `Stage ${plural(n, "picked line")}`;
+        stageBtn.disabled = n === 0;
+      };
+      stageBtn.onclick = async () => {
+        const chosen = [...picks].filter(([, b]) => b.checked).map(([i]) => i);
+        const r = chosen.length === picks.size
+          ? await tryAct("stage", { files: [f.path] }, "Staged " + f.path)
+          : await tryAct("stage-lines", { path: f.path, lines: chosen }, `Staged ${plural(chosen.length, "line")}`);
+        if (r) load();
+      };
+      count();
+      content.replaceChildren(...cards);
+      dr.foot.replaceChildren(h("button", { class: "btn ghost danger left", onclick: () => { dr.close(); discardFiles([f.path], f.path); } }, "Discard this file"), stageBtn);
+    };
+    load();
+  }
+
+  // ---------- history ----------
+  async function gitHistory(body, st) {
+    if (!st.head) { body.replaceChildren(section("g-hist", "History", 0, "", h("div", { class: "empty-row" }, "No commits yet. Your first commit will show up here."))); return; }
+    body.replaceChildren(h("div", { class: "card empty-row" }, "Loading history…"));
+    const commits = await act(null, () => api("GET", gitURL("log") + "?limit=" + (50 + S.logSkip)));
+    if (!commits || S.gitTab !== "history") return;
+    const rows = commits.map((c) => h("tr", { style: { cursor: "pointer" }, onclick: () => showCommit(c.hash) },
+      h("td", { class: "file" }, c.subject, ...c.refs.map((ref) => h("span", { class: "pill refpill " + (ref.startsWith("tag: ") ? "amber" : ref.includes("/") ? "violet" : "blue") }, ref.replace("tag: ", "🏷 ")))),
+      h("td", { class: "opt muted" }, c.author),
+      h("td", { class: "opt muted" }, ago(c.date)),
+      h("td", { class: "end mono muted" }, c.short)));
+    const more = commits.length >= 50 + S.logSkip ? h("button", { class: "btn small", onclick: () => { S.logSkip += 50; S.gshown = ""; renderGitBody(S.repo); } }, "Show older commits") : null;
+    body.replaceChildren(section("g-hist", "History", commits.length, "", h("table", { class: "table" }, h("tbody", {}, rows)), more));
+  }
+
+  async function showCommit(hash) {
+    const dr = drawer({ title: "Commit", sub: hash.slice(0, 7), wide: true });
+    let c;
+    try {
+      c = await api("GET", gitURL("commit") + "?hash=" + enc(hash));
+    } catch (e) { dr.body.append(h("p", { class: "muted" }, e.message)); return; }
+    dr.titleEl.textContent = c.subject;
+    const pane = h("div");
+    const list = h("div", { class: "files-list" });
+    const open = async (f, btn) => {
+      list.querySelectorAll(".row-file").forEach((b) => b.classList.toggle("on", b === btn));
+      pane.replaceChildren(h("p", { class: "muted" }, "Loading…"));
+      try {
+        const d = await api("GET", gitURL("commit-diff") + "?hash=" + enc(c.hash) + "&path=" + enc(f.path));
+        storyInto(pane, null, d, f.path.split("/").pop(), null, dr.panel);
+      } catch (e) { pane.replaceChildren(h("p", { class: "muted" }, e.message)); }
+    };
+    const statusPill = { A: ["Added", "solid-green"], M: ["Modified", "solid-blue"], D: ["Deleted", "solid-red"], R: ["Renamed", "solid-violet"], C: ["Copied", "violet"] };
+    c.files.forEach((f, i) => {
+      const [w, cls] = statusPill[f.status] || [f.status, ""];
+      const btn = h("button", { class: "row-file" }, h("span", { class: "pill " + cls }, w), h("span", { class: "grow" }, f.path, f.from ? h("small", { class: "muted" }, "  from " + f.from) : ""), h("span", { class: "pill green" }, "+" + f.added), h("span", { class: "pill red" }, "−" + f.removed));
+      btn.onclick = () => open(f, btn);
+      list.append(btn);
+      if (i === 0) setTimeout(() => open(f, btn));
+    });
+    dr.body.append(
+      h("div", { class: "commit-meta" }, h("b", {}, "Author"), h("span", {}, `${c.author} <${c.email}>`), h("b", {}, "When"), h("span", {}, new Date(c.date).toLocaleString()),
+        h("b", {}, "Commit"), h("span", { class: "mono" }, c.hash), c.parents.length > 1 ? h("b", {}, "Merge of") : "", c.parents.length > 1 ? h("span", { class: "mono" }, c.parents.map((x) => x.slice(0, 7)).join(" + ")) : ""),
+      c.body ? h("div", { class: "commit-body" }, c.body) : "",
+      section("c-files", "Files in this commit", c.files.length, "", list), h("div", { style: { marginTop: "14px" } }, pane));
+    const st = S.repo;
+    dr.foot.replaceChildren(
+      h("button", { class: "btn small left", onclick: () => { navigator.clipboard?.writeText(c.hash); toast("Copied the commit id", false, "wink"); } }, "Copy id"),
+      h("button", { class: "btn small", onclick: async () => {
+        const v = await relayAsk({ mood: "thinking", title: "New branch from this commit", text: "Start a branch here, for example to fix something in an older version.", yes: "Create branch", no: "Cancel", yesMood: "excited", fields: [{ name: "name", label: "Branch name", placeholder: "e.g. hotfix-login" }, { name: "checkout", type: "check", label: "Switch to it now", value: true }] });
+        if (v) { dr.close(); tryAct("branch-create", { name: v.name, from: c.hash, checkout: v.checkout }, (r) => `Created ${r.branch}`, "excited"); }
+      } }, icon("branch"), "Branch from here"),
+      h("button", { class: "btn small", onclick: async () => {
+        const v = await relayAsk({ mood: "thinking", title: "Tag this commit", text: "A tag is a name for a commit that never moves, like v1.2.0.", yes: "Create tag", no: "Cancel", yesMood: "excited", fields: [{ name: "name", label: "Tag name", placeholder: "e.g. v1.2.0" }, { name: "message", label: "Note (optional)", placeholder: "e.g. First public release" }] });
+        if (v) { dr.close(); tryAct("tag-create", { name: v.name, message: v.message, at: c.hash }, (r) => `Tagged ${r.tag}`, "party"); }
+      } }, icon("tag"), "Tag"),
+      h("button", { class: "btn small", onclick: async () => {
+        const ok = await relayAsk({ mood: "thinking", title: "Revert this commit?", text: "I'll make a new commit that undoes exactly what this one did. History stays as it is, so it's safe even after pushing.", yes: "Revert", no: "Cancel", yesMood: "wink" });
+        if (ok) { dr.close(); tryAct("revert", { hash: c.hash }, "Reverted: a new commit undoes it", "wink"); }
+      } }, "Revert"),
+      h("button", { class: "btn small brand", onclick: async () => {
+        const ok = await relayAsk({ mood: "excited", title: `Copy this commit onto ${st && st.branch ? st.branch : "the current branch"}?`, text: "Cherry-picking applies the same change again as a new commit on your current branch.", yes: "Cherry-pick", no: "Cancel", yesMood: "party" });
+        if (ok) { dr.close(); tryAct("cherry-pick", { hash: c.hash }, "Cherry-picked onto " + (st ? st.branch : "your branch"), "party"); }
+      } }, "Cherry-pick"));
+  }
+
+  // ---------- branches ----------
+  async function gitBranches(body, st) {
+    body.replaceChildren(h("div", { class: "card empty-row" }, "Loading branches…"));
+    const b = await act(null, () => api("GET", gitURL("branches")));
+    if (!b || S.gitTab !== "branches") return;
+    const local = b.local.map((x) => h("tr", {},
+      h("td", { class: "file" }, x.name, x.current ? h("span", { class: "pill solid-green refpill" }, "you're here") : "", x.gone ? h("span", { class: "pill red refpill" }, "gone from remote") : "", h("small", {}, x.subject + " · " + ago(x.date))),
+      h("td", { class: "opt muted" }, x.upstream ? h("span", {}, x.upstream, " ", x.ahead ? h("span", { class: "pill blue" }, "↑" + x.ahead) : "", " ", x.behind ? h("span", { class: "pill amber" }, "↓" + x.behind) : "") : "not on a remote"),
+      h("td", { class: "end" },
+        x.current ? "" : h("button", { class: "btn small brand", onclick: () => tryAct("branch-switch", { name: x.name }, (r) => `Switched to ${r.branch}`, "wink") }, "Switch"), " ",
+        x.current ? "" : h("button", { class: "btn small", onclick: async () => {
+          const ok = await relayAsk({ mood: "thinking", title: `Merge ${x.name} into ${st.branch}?`, text: `Everything committed on ${x.name} comes into ${st.branch}. If both changed the same lines, I'll help you choose.`, yes: "Merge", no: "Cancel", yesMood: "excited" });
+          if (ok) tryAct("merge", { branch: x.name }, (r) => r.conflicts.length ? "" : `Merged ${x.name} into ${st.branch}`, "party");
+        } }, "Merge into " + st.branch), " ",
+        h("button", { class: "btn small ghost", onclick: async () => {
+          const v = await relayAsk({ mood: "thinking", title: `Rename ${x.name}`, text: "Only the local name changes; a branch on the remote keeps its old name until you push again.", yes: "Rename", no: "Cancel", fields: [{ name: "to", label: "New name", value: x.name }] });
+          if (v) tryAct("branch-rename", { from: x.name, to: v.to }, "Renamed to " + v.to, "wink");
+        } }, "Rename"), " ",
+        x.current ? "" : h("button", { class: "btn small ghost danger", onclick: async () => {
+          const ok = await relayAsk({ mood: "worried", title: `Delete ${x.name}?`, text: "Only your local branch goes; a copy on the remote is left alone.", yes: "Delete", no: "Keep it", yesMood: "sad" });
+          if (!ok) return;
+          try {
+            await gitAct("branch-delete", { name: x.name }, "Deleted " + x.name, "sleepy");
+          } catch (e) {
+            if (e.code !== "unmerged") return toast(e.message, true);
+            const force = await relayAsk({ mood: "worried", hold: true, title: `${x.name} has unmerged commits.`, text: "Those commits aren't on any other branch. Deleting the branch could lose them.", yes: "Delete anyway", no: "Keep it" });
+            if (force) tryAct("branch-delete", { name: x.name, force: true }, "Deleted " + x.name, "sleepy");
+          }
+        } }, "Delete"))));
+    const remote = b.remote.map((x) => h("tr", {},
+      h("td", { class: "file" }, x.name, h("small", {}, x.subject + " · " + ago(x.date))),
+      h("td", { class: "end" }, h("button", { class: "btn small", onclick: () => tryAct("branch-switch", { name: x.name }, (r) => `Checked out ${r.branch}`, "wink") }, "Check out"))));
+    const newBtn = h("button", { class: "btn small brand", onclick: async () => {
+      const v = await relayAsk({ mood: "excited", title: "New branch", text: `It starts from where you are now (${st.branch || st.head}).`, yes: "Create branch", no: "Cancel", yesMood: "party", fields: [{ name: "name", label: "Branch name", placeholder: "e.g. new-login-page" }, { name: "checkout", type: "check", label: "Switch to it now", value: true }] });
+      if (v) tryAct("branch-create", { name: v.name, checkout: v.checkout }, (r) => `Created ${r.branch}`, "party");
+    } }, icon("plus"), "New branch");
+    body.replaceChildren(
+      section("g-local", "Your branches", b.local.length, "blue", h("table", { class: "table" }, h("tbody", {}, local)), newBtn),
+      section("g-remote", "Only on the remote", b.remote.length, "", remote.length ? h("table", { class: "table" }, h("tbody", {}, remote)) : h("div", { class: "empty-row" }, "Every remote branch has a local copy. Press Fetch to look for new ones.")));
+  }
+
+  // ---------- stashes ----------
+  async function gitStashes(body, st) {
+    const list = await act(null, () => api("GET", gitURL("stashes")));
+    if (!list || S.gitTab !== "stashes") return;
+    const rows = list.map((x) => h("tr", {},
+      h("td", { class: "file" }, x.message || "(no note)", h("small", {}, `on ${x.branch} · ${ago(x.when)}`)),
+      h("td", { class: "end" },
+        h("button", { class: "btn small brand", onclick: () => tryAct("stash-apply", { ref: x.ref, pop: true }, "Brought them back (and removed the stash)", "happy") }, "Bring back"), " ",
+        h("button", { class: "btn small", title: "Bring back and keep a copy in the list", onclick: () => tryAct("stash-apply", { ref: x.ref, pop: false }, "Brought them back (the stash stays too)", "happy") }, "Apply, keep copy"), " ",
+        h("button", { class: "btn small ghost danger", onclick: async () => {
+          const ok = await relayAsk({ mood: "worried", title: "Throw this stash away?", text: "These changes aren't anywhere else.", yes: "Throw away", no: "Keep it", yesMood: "sad" });
+          if (ok) tryAct("stash-drop", { ref: x.ref }, "Stash thrown away", "sleepy");
+        } }, "Throw away"))));
+    body.replaceChildren(section("g-stash", "Stashes", list.length, "", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "Nothing stashed. “Stash all” on the Changes tab tucks your changes away here.")));
+  }
+
+  // ---------- pull requests ----------
+  async function gitPRs(body) {
+    body.replaceChildren(h("div", { class: "card empty-row" }, "Asking for your pull requests…"));
+    let res;
+    try {
+      res = await api("GET", gitURL("prs"));
+    } catch (e) {
+      body.replaceChildren(h("div", { class: "card hero" }, h("img", { src: face("thinking"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, e.code === "no-cli" ? "I need a little helper for this." : "I couldn't get the pull requests."), h("div", { class: "hint" }, e.message))));
+      return;
+    }
+    if (S.gitTab !== "prs") return;
+    const rows = res.items.map((p) => {
+      const c = p.checks;
+      const checks = c.items.length ? h("button", { class: "pill " + (c.failed ? "red" : c.pending ? "amber" : "green"), style: { border: 0, cursor: "pointer" }, onclick: () => showChecks(p) },
+        c.failed ? `✗ ${c.failed} failing` : c.pending ? `… ${c.pending} running` : `✓ ${c.passed} passing`) : h("span", { class: "muted" }, "no checks");
+      const review = { APPROVED: ["approved", "green"], CHANGES_REQUESTED: ["changes requested", "red"], REVIEW_REQUIRED: ["review needed", "amber"] }[p.review];
+      return h("tr", {},
+        h("td", { class: "file" }, `#${p.number} ${p.title}`, p.draft ? h("span", { class: "pill refpill" }, "draft") : "", h("small", {}, `${p.branch} → ${p.base} · ${p.author} · ${ago(p.updated)}`)),
+        h("td", {}, checks, " ", review ? h("span", { class: "pill " + review[1] }, review[0]) : ""),
+        h("td", { class: "end" },
+          h("a", { class: "btn small", href: p.url, target: "_blank", rel: "noopener noreferrer" }, "Open"), " ",
+          h("button", { class: "btn small brand", onclick: () => tryAct("pr-checkout", { number: p.number }, `Checked out #${p.number} so you can try it`, "excited") }, "Check out")));
+    });
+    body.replaceChildren(section("g-prs", res.provider === "GitLab" ? "Merge requests" : "Pull requests", res.items.length, "blue", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "No open pull requests.")));
+  }
+
+  function showChecks(p) {
+    const dr = drawer({ title: `Checks for #${p.number}`, sub: p.title });
+    const order = { failed: 0, pending: 1, passed: 2 };
+    dr.body.append(h("div", { class: "files-list" }, p.checks.items.sort((a, b) => order[a.state] - order[b.state]).map((c) => h("div", { class: "row-file" },
+      h("span", { class: "pill " + (c.state === "failed" ? "solid-red" : c.state === "pending" ? "amber" : "solid-green") }, c.state === "failed" ? "✗ failed" : c.state === "pending" ? "… running" : "✓ passed"),
+      h("span", { class: "grow" }, c.name), c.url ? h("a", { class: "btn small", href: c.url, target: "_blank", rel: "noopener noreferrer" }, "Details") : ""))));
+  }
+
+  // ---------- tags ----------
+  async function gitTags(body, st) {
+    const list = await act(null, () => api("GET", gitURL("tags")));
+    if (!list || S.gitTab !== "tags") return;
+    const rows = list.map((t) => h("tr", {},
+      h("td", { class: "file" }, "🏷 " + t.name, h("small", {}, (t.message ? t.message + " · " : "") + ago(t.date))),
+      h("td", { class: "opt mono muted" }, t.commit),
+      h("td", { class: "end" },
+        h("button", { class: "btn small", onclick: () => tryAct("tag-push", { name: t.name }, `Pushed ${t.name}`, "party") }, icon("up"), "Push"), " ",
+        h("button", { class: "btn small ghost danger", onclick: async () => {
+          const ok = await relayAsk({ mood: "worried", title: `Delete the tag ${t.name}?`, text: "Only your local tag goes; if it's already on the remote it stays there.", yes: "Delete", no: "Keep it", yesMood: "sad" });
+          if (ok) tryAct("tag-delete", { name: t.name }, `Deleted ${t.name}`, "sleepy");
+        } }, "Delete"))));
+    const add = h("button", { class: "btn small brand", onclick: async () => {
+      const v = await relayAsk({ mood: "excited", title: "Tag where you are now", text: `A tag names this exact commit (${st.head}) forever, like v1.2.0.`, yes: "Create tag", no: "Cancel", yesMood: "party", fields: [{ name: "name", label: "Tag name", placeholder: "e.g. v1.2.0" }, { name: "message", label: "Note (optional)", placeholder: "e.g. First public release" }] });
+      if (v) tryAct("tag-create", { name: v.name, message: v.message }, (r) => `Tagged ${r.tag}`, "party");
+    } }, icon("plus"), "New tag");
+    const pushAll = list.length ? h("button", { class: "btn small", onclick: () => tryAct("tag-push", {}, "Pushed all tags", "party") }, "Push all tags") : null;
+    body.replaceChildren(section("g-tags", "Tags", list.length, "", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "No tags yet. Tags mark releases, like v1.0."), h("span", { class: "inline" }, pushAll, add)));
+  }
+
+  // ---------- worktrees ----------
+  async function gitWorktrees(body, st) {
+    const list = await act(null, () => api("GET", gitURL("worktrees")));
+    if (!list || S.gitTab !== "worktrees") return;
+    const rows = list.map((w) => h("tr", {},
+      h("td", { class: "file" }, short(w.path), w.main ? h("span", { class: "pill refpill" }, "main") : "", h("small", {}, w.detached ? `detached at ${w.head}` : `⎇ ${w.branch}`)),
+      h("td", { class: "end" },
+        w.main ? "" : h("button", { class: "btn small", onclick: async () => { await act("Opened " + short(w.path), () => api("POST", "/git/repos", { action: "add", path: w.path }), "wink"); refreshGit(); } }, "Open here"), " ",
+        w.main ? "" : h("button", { class: "btn small ghost danger", onclick: async () => {
+          const ok = await relayAsk({ mood: "worried", title: "Remove this worktree?", text: "Its folder is deleted. Commits stay in the repository; uncommitted changes in that folder would be lost.", yes: "Remove", no: "Keep it", yesMood: "sad" });
+          if (ok) tryAct("worktree-remove", { path: w.path }, "Removed the worktree", "sleepy");
+        } }, "Remove"))));
+    const add = h("button", { class: "btn small brand", onclick: async () => {
+      const v = await relayAsk({ mood: "excited", title: "New worktree", text: "A worktree is a second folder for the same repository, checked out on another branch, so you can work on two branches at once.", yes: "Create it", no: "Cancel", yesMood: "party", fields: [
+        { name: "branch", label: "Branch", placeholder: "e.g. hotfix" }, { name: "create", type: "check", label: "It's a new branch", value: true },
+        { name: "path", label: "Folder", placeholder: st.root + "-hotfix", hint: "Leave empty to put it next to this repository." }, { name: "open", type: "check", label: "Open it in Ferry too", value: true }] });
+      if (!v) return;
+      const dir = v.path || `${st.root}-${(v.branch || "worktree").replace(/[^\w.-]+/g, "-")}`;
+      tryAct("worktree-add", { path: dir, branch: v.branch, create: v.create, open: v.open }, (r) => "Created " + short(r.path), "party");
+    } }, icon("plus"), "New worktree");
+    body.replaceChildren(section("g-wt", "Worktrees", list.length, "", h("table", { class: "table" }, h("tbody", {}, rows)), add));
+  }
+
+  // ---------- add a repository ----------
+  function openAddRepo() {
+    if (!S.info || !S.info.can_open_repos) return toast("Start ferry with “ferry ui” to open repositories here.", true);
+    const dr = drawer({ title: "Add a repository", sub: "Clone, create, or open one you already have." });
+    let mode = "clone";
+    const seg = h("div", { class: "seg big", role: "group", "aria-label": "How" });
+    const formView = h("div");
+    const pickerView = h("div", { class: "hidden" });
+    const go = h("button", { class: "btn brand" });
+    const cancel = h("button", { class: "btn ghost", onclick: dr.close }, "Cancel");
+    const restore = () => dr.foot.replaceChildren(cancel, go);
+    const url = h("input", { type: "text", placeholder: "https://github.com/owner/repo.git  or  git@gitlab.com:owner/repo.git" });
+    const parent = h("input", { type: "text", value: S.info.home + S.info.sep + "code" });
+    const name = h("input", { type: "text", placeholder: "folder name" });
+    const existing = h("input", { type: "text", placeholder: "the repository's folder" });
+    url.addEventListener("input", () => { const m = /([^/:]+?)(\.git)?\/?$/.exec(url.value.trim()); if (m && !name.dataset.touched) name.value = m[1]; });
+    name.addEventListener("input", () => { name.dataset.touched = "1"; });
+    const chooser = (input, title) => h("button", { class: "btn small", type: "button", onclick: () => pickFolder(dr, formView, pickerView, restore, title, input.value || S.info.home, (dir) => { input.value = dir; }) }, "Choose…");
+    const paint = () => {
+      seg.replaceChildren(...[["clone", "Clone"], ["create", "Create new"], ["add", "Open existing"]].map(([id, label]) => h("button", { class: mode === id ? "on" : "", onclick: () => { mode = id; paint(); } }, label)));
+      const say = { clone: "Paste the address of a repository on GitHub, GitLab or anywhere else.", create: "I'll make a fresh repository with a main branch.", add: "Pick a folder that's already a git repository." }[mode];
+      formView.replaceChildren(
+        h("div", { class: "narrator" }, h("img", { src: face("excited"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, { clone: "Which repository should I copy?", create: "Let's start something new!", add: "Which repository is it?" }[mode]), h("div", { class: "hint" }, say))),
+        h("div", { style: { marginBottom: "16px" } }, seg),
+        mode === "clone" ? h("label", { class: "field" }, h("span", { class: "label" }, "Repository address"), url, h("small", {}, "Private repositories use your usual git login (SSH keys or a credential helper).")) : "",
+        mode !== "add" ? h("div", { class: "field" }, h("span", { class: "label" }, "Put it inside"), h("div", { class: "inline" }, parent, chooser(parent, "Choose where to put it"))) : "",
+        mode !== "add" ? h("label", { class: "field" }, h("span", { class: "label" }, "Folder name"), name) : "",
+        mode === "add" ? h("div", { class: "field" }, h("span", { class: "label" }, "Repository folder"), h("div", { class: "inline" }, existing, chooser(existing, "Choose the repository"))) : "");
+      go.textContent = { clone: "Clone it", create: "Create it", add: "Open it" }[mode];
+    };
+    go.onclick = async () => {
+      const dest = parent.value.replace(/[\\/]+$/, "") + S.info.sep + name.value.trim();
+      const body = mode === "clone" ? { action: "clone", url: url.value.trim(), path: dest } : mode === "create" ? { action: "create", path: dest } : { action: "add", path: existing.value.trim() };
+      if ((mode === "clone" && !body.url) || (mode !== "add" && !name.value.trim()) || (mode === "add" && !body.path)) return toast("Fill in the empty field first", true);
+      go.disabled = true;
+      go.textContent = mode === "clone" ? "Cloning…" : "Working…";
+      const r = await act(null, () => api("POST", "/git/repos", body));
+      go.disabled = false;
+      paint();
+      if (!r) return;
+      toast({ clone: "Cloned! ", create: "Created! ", add: "Opened " }[mode] + short(r.path), false, "party");
+      dr.close();
+      S.repoSel = r.id;
+      localStorage.setItem("ferry-repo", r.id);
+      S.gui = null;
+      refreshGit();
+    };
+    dr.body.append(formView, pickerView);
+    restore();
+    paint();
+  }
+
+  /**
+   * Swaps a drawer's form for a folder browser. pick(dir) gets the chosen
+   * folder; restoreFoot puts the form's buttons back.
+   */
+  function pickFolder(dr, formView, pickerView, restoreFoot, title, start, pick) {
+    const oldTitle = dr.titleEl.textContent;
+    dr.titleEl.textContent = title;
+    formView.classList.add("hidden");
+    pickerView.classList.remove("hidden");
+    let showHidden = false, cur = null;
+    const back = () => { dr.titleEl.textContent = oldTitle; pickerView.classList.add("hidden"); formView.classList.remove("hidden"); restoreFoot(); };
+    const choose = h("button", { class: "btn brand", type: "button", onclick: () => { if (cur) { pick(cur); back(); } } }, "Choose this folder");
+    dr.foot.replaceChildren(h("button", { class: "btn ghost left", type: "button", onclick: back }, "← Back"), choose);
+    const go = async (dir) => {
+      let r;
+      try {
+        r = await api("GET", "/fs?path=" + enc(dir) + (showHidden ? "&hidden=1" : ""));
+      } catch (e) {
+        if (dir !== S.info.home) return go(S.info.home);
+        pickerView.replaceChildren(h("p", { class: "muted" }, e.message));
+        return;
+      }
+      cur = r.path;
+      choose.textContent = `Choose “${r.path.split(/[\\/]/).filter(Boolean).pop() || r.path}”`;
+      const sep = S.info.sep, parts = r.path.split(/[\\/]/).filter(Boolean), win = /^[A-Za-z]:/.test(r.path);
+      const crumbs = h("div", { class: "crumbpath" });
+      parts.forEach((part, i) => {
+        const full = (win ? "" : sep) + parts.slice(0, i + 1).join(sep) + (win && i === 0 ? sep : "");
+        if (i > 0 || !win) crumbs.append(h("span", { class: "sep" }, sep));
+        const last = i === parts.length - 1;
+        crumbs.append(h("button", { type: "button", class: last ? "here" : "", onclick: last ? null : () => go(full) }, part));
+      });
+      const hid = h("input", { type: "checkbox", checked: showHidden ? true : null });
+      hid.addEventListener("change", () => { showHidden = hid.checked; go(r.path); });
+      const join = (n) => r.path.replace(/[\\/]+$/, "") + sep + n;
+      pickerView.replaceChildren(crumbs,
+        h("div", { class: "dirs" },
+          r.parent ? h("button", { type: "button", class: "dir", onclick: () => go(r.parent) }, "↑", h("span", { class: "muted" }, "Up one level")) : "",
+          r.dirs.length ? r.dirs.map((n) => h("button", { type: "button", class: "dir", onclick: () => go(join(n)) }, icon("folder"), h("span", {}, n), h("span", { class: "chev" }, "›"))) : h("div", { class: "dir muted", style: { cursor: "default" } }, "This folder has no sub-folders.")),
+        h("div", { class: "inline", style: { marginTop: "12px", gap: "14px", flexWrap: "wrap" } },
+          r.is_git ? h("span", { class: "pill green" }, "this folder is a git repo") : "",
+          h("button", { type: "button", class: "btn small", onclick: () => go(r.home) }, "Home folder"),
+          h("label", { class: "check", style: { margin: 0 } }, hid, "show hidden folders")),
+        h("p", { class: "hint" }, "Click a folder to open it, then press “Choose” below."));
+    };
+    go(start);
+  }
+
   // ---------- start ----------
   setupRail();
   (async () => {
@@ -1281,6 +2167,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       if (/token/i.test(e.message)) toast("This page needs the access token: open the link ferry printed.", true);
     }
     await refresh();
+    S.notes = await api("GET", "/events/recent").catch(() => []);
+    paintBadge();
     connectEvents();
     setInterval(refresh, 3000);
   })();

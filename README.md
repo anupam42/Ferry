@@ -95,6 +95,16 @@ The web app does what the terminal dashboard does, with buttons instead of keys:
 - **History & undo**: every sync pass, **Undo the last sync**, and **Go back** to how things were 15 minutes ago, this morning, yesterday or at a time you type. It shows what will change before doing it.
 - **Stats** and a live **Activity** feed. Pause, resume, "sync everything now" and approval of large batches are at the top.
 
+- **Git client** (the branch button on the rail): clone, create or open a repository. You get:
+  - **Changes:** tick files, or single lines, to commit; "✨ Write it for me" for the message; amend, undo, discard, stash.
+  - **History:** every commit's changes as a change story; cherry-pick, revert, tag or branch from any commit.
+  - **Branches:** switch, merge, rename, delete.
+  - **Fetch, pull and push**, with an ahead / behind count and help when the two sides have diverged.
+  - **Merge conflict help:** keep yours, keep theirs or keep both, then continue or abort.
+  - **Pull requests and their checks** (through `gh`, or `glab` for GitLab), plus tags and worktrees.
+
+  Repositories your pairs sync into appear on their own. A Git action that would change files there (switching branches, pulling…) pauses that pair first, and discarded changes go to the Trash.
+
 `ferry ui --config work.yaml`, `ferry ui ./scratch ./repo` (pairs added in the browser then last only for the session), `--port 8080` and `--no-open` work as you'd expect. Keep the terminal window open while you sync; the web page talks to that process. The page and its API only answer on `localhost` unless you set `--host` together with `--serve-token`. The same page is also served by `ferry --serve 127.0.0.1:7878` (without adding or removing pairs).
 
 ## Features
@@ -450,7 +460,7 @@ Every pair runs its own serial task queue: timers, the file watcher, the dashboa
 
 The state, history, hash-cache and status files are compatible with the earlier Go version of ferry, so an existing data folder keeps working.
 
-Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs, set up the project and send a pull request, and [ROADMAP.md](ROADMAP.md) for ideas waiting for someone to build them. For comparison, [docs/gitkraken-plans.md](docs/gitkraken-plans.md) summarises what GitKraken offers on each of its plans.
+Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs, set up the project and send a pull request, and [ROADMAP.md](ROADMAP.md) for ideas waiting for someone to build them. For comparison, [docs/gitkraken-plans.md](docs/gitkraken-plans.md) summarises what GitKraken offers on each of its plans, and [docs/git-client-features.md](docs/git-client-features.md) compares Ferry with GitHub Desktop and GitLab as an everyday Git client.
 
 ## Releasing
 

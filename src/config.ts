@@ -96,9 +96,11 @@ export interface Settings {
   serveToken: string;
   theme: string;
   webhooks: Webhook[];
+  /** Repositories opened in the web app's Git client (not synced from anywhere). */
+  repos: string[];
 }
 
-export const emptySettings = (): Settings => ({ notify: null, serve: "", serveToken: "", theme: "", webhooks: [] });
+export const emptySettings = (): Settings => ({ notify: null, serve: "", serveToken: "", theme: "", webhooks: [], repos: [] });
 
 export const DEFAULT_COMMIT_MESSAGE = "sync: {count} file(s) from {source} at {datetime}";
 
@@ -296,6 +298,7 @@ export function loadFile(
             settings.webhooks.push(hook);
           }
           break;
+        case "repos": settings.repos = dec.list(v, key).map((r) => path.resolve(path.dirname(path.resolve(file)), expandHome(r))); break;
         case "defaults": defaultsNode = v; break;
         case "pairs":
           if (v != null && !isSeq(v)) dec.fail(v as Node, "pairs: expected a list");
@@ -850,6 +853,24 @@ export function appendPairToFile(file: string, obj: Record<string, unknown>): vo
     pairs.flow = false;
     pairs.add(doc.createNode(obj));
   } else throw new Error(`${file}: pairs is not a list`);
+  fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+  fs.writeFileSync(file, doc.toString());
+}
+
+/** Adds or removes a repository in the config file's repos: list (creating the file if needed). */
+export function setRepoInFile(file: string, repo: string, present: boolean): void {
+  let text = "";
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch {}
+  if (text.trim() === "") text = "# ferry configuration (pairs added from the web app are saved here)\n\npairs: []\n";
+  const doc = YAML.parseDocument(text);
+  if (doc.errors.length > 0) throw new Error(`${file}: ${doc.errors[0]!.message}`);
+  const list = doc.get("repos");
+  const items: string[] = isSeq(list) ? list.items.map((it) => String(isScalar(it) ? it.value : it)) : [];
+  const next = present ? [...new Set([...items, repo])] : items.filter((r) => path.resolve(expandHome(r)) !== path.resolve(repo));
+  if (next.length === items.length && next.every((r, i) => r === items[i])) return;
+  doc.set("repos", doc.createNode(next));
   fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
   fs.writeFileSync(file, doc.toString());
 }

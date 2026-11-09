@@ -401,7 +401,7 @@ describe("web app redesign", () => {
     write(s, "a.txt", "one\ntwo\n");
     await runOnce(e);
     write(s, "a.txt", "one\nTWO\nthree\n");
-    write(d, "a.txt", "one\nTWO\nthree\n");
+    write(d, "a.txt", "one\ntwo, edited in the target\n"); // the two sides really differ
     const api = new ApiServer([e], "");
     const get = (p: string) => api.handle(new Request("http://127.0.0.1" + p));
     for (const m of ["happy", "sleepy", "worried", "comparing"]) {
@@ -444,5 +444,21 @@ describe("targets inside a bigger repository", () => {
     expect(d.lines.some((l) => l.op === "+" && l.text === "TWO")).toBe(true);
     const missing = await e.diff("products/app/a.txt", false);
     expect(missing.lines[0]!.text).toContain("isn't in the target");
+  });
+});
+
+describe("notifications", () => {
+  test("the server keeps recent notable events, skipping per-file noise, up to a limit", async () => {
+    const api = new ApiServer([], "");
+    const ev = (kind: string, i: number) => ({ time: Date.now() + i, pair: "p", kind: kind as never, path: "f" + i, msg: "m" + i });
+    api.broadcast(ev("add", 0)); // a single copied file: summed up by "synced", not kept
+    api.broadcast(ev("conflict", 1));
+    api.broadcast(ev("synced", 2));
+    let recent = (await (await api.handle(new Request("http://127.0.0.1/events/recent"))).json()) as { kind: string }[];
+    expect(recent.map((e) => e.kind)).toEqual(["conflict", "synced"]);
+    for (let i = 0; i < 400; i++) api.broadcast(ev("commit", 10 + i));
+    recent = (await (await api.handle(new Request("http://127.0.0.1/events/recent"))).json()) as { kind: string }[];
+    expect(recent.length).toBe(300);
+    expect(recent[0]!.kind).toBe("commit");
   });
 });

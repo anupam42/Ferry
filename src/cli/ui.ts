@@ -9,7 +9,7 @@ import path from "node:path";
 
 import { ApiServer, type PairManager } from "../api.ts";
 import {
-  appendPairToFile, checkOverlaps, dataDir, expandHome, isRemoteSpec, loadFile, normalize, pairsFromObject, removePairFromFile,
+  appendPairToFile, checkOverlaps, dataDir, setRepoInFile, expandHome, isRemoteSpec, loadFile, normalize, pairsFromObject, removePairFromFile,
   type Pair, type Settings, emptySettings,
 } from "../config.ts";
 import { Engine } from "../engine/engine.ts";
@@ -142,7 +142,22 @@ export async function cmdUI(args: string[]): Promise<void> {
     },
   };
 
-  api = new ApiServer(engines, settings.serveToken, { version: VERSION, manager });
+  // repositories opened in the Git client, remembered in the same config file
+  const repoList = [...settings.repos];
+  const repos = {
+    list: () => repoList,
+    add(dir: string) {
+      if (repoList.includes(dir)) return;
+      repoList.push(dir);
+      if (configFile !== "") setRepoInFile(configFile, dir, true);
+    },
+    remove(dir: string) {
+      const i = repoList.indexOf(dir);
+      if (i >= 0) repoList.splice(i, 1);
+      if (configFile !== "") setRepoInFile(configFile, dir, false);
+    },
+  };
+  api = new ApiServer(engines, settings.serveToken, { version: VERSION, manager, repos });
   let port = f.getInt("port");
   for (let tries = 0; ; tries++) {
     try {

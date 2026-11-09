@@ -8,6 +8,7 @@
 //   POST /pairs/{name}/commit        ?message=…&push=1
 //   POST /pairs/{name}/resolve       {"path": "...", "choice": "source|target|newer|both|merge"}
 //   POST /pairs/{name}/undo          undo the last sync batch
+//   GET  /events/recent              the last 300 notable events (for notifications after a reload)
 //   POST /pairs/{name}/restore       {"at": "2h ago"}: undo every batch after that time
 //   POST /pairs/{name}/ignore        {"path": "..."}: add the file to the source's .syncignore
 //   GET  /pairs/{name}/stats?since=7d   history totals (JSON)
@@ -30,6 +31,7 @@ import type { Engine } from "./engine/engine.ts";
 import { statusJSON } from "./engine/engine.ts";
 import { batchesSince } from "./engine/journal.ts";
 import { eventJSON, parseChoice, type Event } from "./engine/types.ts";
+import { GitApi, type RepoManager } from "./gitapi.ts";
 import { errMsg, parseWhen } from "./util.ts";
 import webPage from "./web/index.html" with { type: "text" };
 import logoSVG from "../assets/logo/icon.svg" with { type: "text" };
@@ -77,20 +79,35 @@ export interface PairManager {
 export interface ApiOptions {
   version?: string;
   manager?: PairManager | null;
+  repos?: RepoManager | null;
 }
 
 type Sub = (chunk: string) => void;
+
+/** Event kinds kept for the web app's notifications (per-file copies are summed up by "synced"). */
+const NOTABLE = new Set(["conflict", "resolved", "error", "warn", "skip", "commit", "synced", "paused", "resumed", "info"]);
+const RECENT_MAX = 300;
 
 const enc = new TextEncoder();
 
 export class ApiServer {
   private subs = new Set<Sub>();
+  private recent: Record<string, unknown>[] = [];
   private server: ReturnType<typeof Bun.serve> | null = null;
 
-  constructor(private engines: Engine[], private token: string, private opts: ApiOptions = {}) {}
+  private git: GitApi;
+
+  constructor(private engines: Engine[], private token: string, private opts: ApiOptions = {}) {
+    this.git = new GitApi(engines, opts.repos ?? null);
+  }
 
   /** Forwards an event to every /events subscriber. */
   broadcast(ev: Event): void {
+    // remember the events worth a notification, so the web app can show them after a reload
+    if (NOTABLE.has(ev.kind)) {
+      this.recent.push(eventJSON(ev));
+      if (this.recent.length > RECENT_MAX) this.recent.splice(0, this.recent.length - RECENT_MAX);
+    }
     if (this.subs.size === 0) return;
     const chunk = `event: ${ev.kind}\ndata: ${JSON.stringify(eventJSON(ev))}\n\n`;
     for (const s of this.subs) s(chunk);
@@ -151,12 +168,14 @@ export class ApiServer {
     if (req.method === "GET" && url.pathname === "/info") {
       const m = this.opts.manager;
       return json({
-        version: this.opts.version ?? "", can_add: !!m, config_file: m?.configFile ?? "",
+        version: this.opts.version ?? "", can_add: !!m, can_open_repos: !!this.opts.repos, config_file: m?.configFile ?? "",
         home: os.homedir(), platform: process.platform, sep: path.sep,
       });
     }
     if (req.method === "GET" && url.pathname === "/fs") return this.listDir(url);
+    if (parts[0] === "git" && parts.length >= 2) return this.git.handle(req, url, parts);
     if (req.method === "GET" && url.pathname === "/events") return this.events(req);
+    if (req.method === "GET" && url.pathname === "/events/recent") return json(this.recent);
     if (req.method === "POST" && url.pathname === "/pairs") return this.addPair(req);
     if (parts[0] === "pairs" && parts.length === 3) {
       const e = this.engines.find((x) => x.name === parts[1]);
