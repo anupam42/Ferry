@@ -33,6 +33,7 @@ import type { Engine } from "./engine/engine.ts";
 import { statusJSON } from "./engine/engine.ts";
 import { batchesSince } from "./engine/journal.ts";
 import { eventJSON, parseChoice, type Event } from "./engine/types.ts";
+import { MAX_DIFF_LINES } from "./gitclient.ts";
 import { GitApi, type RepoManager } from "./gitapi.ts";
 import * as conn from "./integrations.ts";
 import { errMsg, parseWhen } from "./util.ts";
@@ -258,7 +259,8 @@ export class ApiServer {
         head: ["Last commit", "Now in the target"],
         new: ["Not in the last commit", "Now in the target"],
       }[kind];
-      return json({ path: rel, title, kind, before: labels[0], after: labels[1], lines });
+      const more = Math.max(0, lines.length - MAX_DIFF_LINES);
+      return json({ path: rel, title, kind, before: labels[0], after: labels[1], lines: more ? lines.slice(0, MAX_DIFF_LINES) : lines, ...(more ? { more } : {}) });
     }
     let out = title + "\n";
     for (const l of lines) out += (l.op === "@" ? l.text : l.op + l.text) + "\n";

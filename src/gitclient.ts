@@ -255,8 +255,19 @@ export function parseUnified(text: string): Line[] {
   return out;
 }
 
+/** Most diff lines sent to the web page; past this the browser would crawl (a 250k-line generated file). */
+export const MAX_DIFF_LINES = 3000;
+
+interface FileDiff { lines: Line[]; before: string; after: string; more?: number }
+
+/** Keeps the first MAX_DIFF_LINES lines and says how many were left out. */
+function capped(d: FileDiff): FileDiff {
+  if (d.lines.length <= MAX_DIFF_LINES) return d;
+  return { ...d, lines: d.lines.slice(0, MAX_DIFF_LINES), more: d.lines.length - MAX_DIFF_LINES };
+}
+
 /** A working-tree file's changes: not yet staged, or already staged. */
-export async function fileDiff(root: string, file: unknown, staged: boolean): Promise<{ lines: Line[]; before: string; after: string }> {
+export async function fileDiff(root: string, file: unknown, staged: boolean): Promise<FileDiff> {
   const p = repoPath(root, file);
   let text = "";
   if (!staged && !(await gitOk(root, ["ls-files", "--error-unmatch", "--", p]))) {
@@ -265,10 +276,10 @@ export async function fileDiff(root: string, file: unknown, staged: boolean): Pr
     try {
       data = fs.readFileSync(path.join(root, p));
     } catch {}
-    return { lines: lineDiff(Buffer.alloc(0), data, 3), before: "Not in git yet", after: "In your folder" };
+    return capped({ lines: lineDiff(Buffer.alloc(0), data, 3), before: "Not in git yet", after: "In your folder" });
   }
   text = await git(root, staged ? ["diff", "--cached", "--no-color", "-U3", "--", p] : ["diff", "--no-color", "-U3", "--", p]);
-  return { lines: parseUnified(text), before: staged ? "Last commit" : "Staged or last commit", after: staged ? "Staged for the next commit" : "In your folder" };
+  return capped({ lines: parseUnified(text), before: staged ? "Last commit" : "Staged or last commit", after: staged ? "Staged for the next commit" : "In your folder" });
 }
 
 /**
@@ -503,14 +514,14 @@ export async function commitDetail(root: string, hash: unknown): Promise<CommitD
 }
 
 /** One file's change in a commit (against its first parent). */
-export async function commitFileDiff(root: string, hash: unknown, file: unknown): Promise<{ lines: Line[]; before: string; after: string }> {
+export async function commitFileDiff(root: string, hash: unknown, file: unknown): Promise<FileDiff> {
   const h = commitId(hash);
   const p = repoPath(root, file);
   const parents = (await git(root, ["show", "-s", "--format=%P", h])).trim().split(" ").filter(Boolean);
   const text = parents.length
     ? await git(root, ["diff", "--no-color", "-M", "-U3", parents[0]!, h, "--", p])
     : await git(root, ["show", "--no-color", "--format=", h, "--", p]);
-  return { lines: parseUnified(text), before: parents.length ? "Before this commit" : "Nothing (first commit)", after: "After this commit" };
+  return capped({ lines: parseUnified(text), before: parents.length ? "Before this commit" : "Nothing (first commit)", after: "After this commit" });
 }
 
 // ---------- branches ----------
@@ -671,14 +682,14 @@ export async function conflicted(root: string): Promise<string[]> {
 }
 
 /** Both sides of a conflicted file, as a diff from "yours" (ours) to "theirs". */
-export async function conflictDiff(root: string, file: unknown): Promise<{ lines: Line[]; before: string; after: string }> {
+export async function conflictDiff(root: string, file: unknown): Promise<FileDiff> {
   const p = repoPath(root, file);
   const side = async (n: number) => {
     const r = await exec(["git", "-C", root, "show", `:${n}:${p}`], { env: env() });
     return r.code === 0 ? Buffer.from(r.stdout) : Buffer.alloc(0);
   };
   const [ours, theirs] = await Promise.all([side(2), side(3)]);
-  return { lines: lineDiff(ours, theirs, 3), before: "Your version (current branch)", after: "Their version (coming in)" };
+  return capped({ lines: lineDiff(ours, theirs, 3), before: "Your version (current branch)", after: "Their version (coming in)" });
 }
 
 /** Settles one conflicted file: keep yours, keep theirs, keep both (union), or mark your own edit as done. */

@@ -222,11 +222,34 @@ details.more > summary { cursor: pointer; font-weight: 650; padding: 6px 0; }
 .narrator { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; }
 .narrator img { width: 86px; height: 63px; flex: none; }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
-.map { position: relative; height: 34px; border-radius: 12px; background: var(--card2); margin-bottom: 6px; overflow: hidden; }
-.map .mk { position: absolute; top: 5px; bottom: 5px; min-width: 6px; border-radius: 4px; border: 0; padding: 0; cursor: pointer; }
-.map .mk.add { background: #2BC48A; } .map .mk.del { background: #FF5C6C; } .map .mk.edit { background: #F5B33D; }
-.map .mk.on { outline: 3px solid var(--text); outline-offset: 1px; }
-.map-scale { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-bottom: 16px; }
+.map { --map-add: #2BC48A; --map-del: #FF5C6C; --map-edit: #F5B33D; margin-bottom: 18px; }
+.map-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.map-legend { display: flex; gap: 14px; font-weight: 500; }
+.map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.map-legend i { width: 10px; height: 10px; border-radius: 3px; }
+.map-track { position: relative; height: 30px; margin-top: 30px; border-radius: 10px; background: var(--card2); }
+.map-track .grid { position: absolute; top: 0; bottom: 0; width: 1px; background: color-mix(in srgb, var(--muted) 18%, transparent); }
+.map .mk { position: absolute; top: 6px; bottom: 6px; min-width: 7px; border-radius: 5px; border: 0; padding: 0; cursor: pointer;
+  box-shadow: 0 0 0 2px var(--card2); transition: top .15s, bottom .15s, box-shadow .15s; }
+.map .mk:hover, .map .mk.on { top: 2px; bottom: 2px; }
+.map .mk.on { box-shadow: 0 0 0 2px var(--card2), 0 0 0 4px var(--text); }
+.map .mk:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--card2), 0 0 0 4px var(--accent); }
+.map .pin { position: absolute; bottom: calc(100% + 8px); transform: translateX(-50%); min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700; line-height: 1; color: var(--text); background: var(--card-solid); border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent); box-shadow: 0 1px 4px rgba(9,35,72,.18); transition: transform .15s; }
+.map .pin::after { content: ""; position: absolute; top: 100%; left: 50%; width: 2px; height: 6px; margin-left: -1px; background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.map .mk.on .pin { background: var(--text); color: var(--card-solid); transform: translateX(-50%) scale(1.1); }
+.map .tip { position: absolute; top: calc(100% + 10px); transform: translateX(-50%); z-index: 5; width: max-content; max-width: 280px; padding: 9px 12px; border-radius: 12px;
+  background: var(--text); color: var(--card-solid); font-size: 12px; line-height: 1.45; text-align: left; box-shadow: 0 8px 24px rgba(9,35,72,.28); pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .12s; }
+.map .tip.left { transform: translateX(-14px); } .map .tip.right { transform: translateX(calc(-100% + 14px)); }
+.map .tip b, .map .tip span, .map .tip code { display: block; }
+.map .tip code { margin-top: 4px; font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .8; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.map .mk:hover .tip, .map .mk:focus-visible .tip { opacity: 1; visibility: visible; }
+.map-ruler { position: relative; height: 22px; margin-top: 4px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.map-ruler .tick { position: absolute; top: 0; transform: translateX(-50%); padding-top: 5px; }
+.map-ruler .tick::before { content: ""; position: absolute; top: 0; left: 50%; width: 1px; height: 4px; background: currentColor; opacity: .5; }
+.map-ruler .start { left: 0; transform: none; } .map-ruler .start::before { left: 0; }
+.map-ruler .end { right: 0; left: auto; transform: none; } .map-ruler .end::before { left: auto; right: 0; }
+@media (prefers-reduced-motion: reduce) { .map .mk, .map .pin, .map .tip { transition: none; } }
 .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; font-size: 12.5px; }
 .side { border-radius: 14px; padding: 8px 12px; background: var(--card2); }
 .side b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
@@ -281,6 +304,18 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 .empty p { color: var(--muted); max-width: 480px; margin: 0 auto 16px; }
 .float { animation: bob 3.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .float { animation: none; } }
+/* Relay while something loads */
+.relay-loading { display: flex; align-items: center; gap: 18px; padding: 22px 24px; }
+.relay-loading img { width: 92px; height: 68px; flex: none; animation: bob 2.4s ease-in-out infinite; }
+.relay-loading img.wide { width: 150px; height: 71px; animation: none; }
+.relay-loading b { display: block; font-size: 15px; }
+.relay-loading small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+.relay-loading .dots i { display: inline-block; width: 5px; height: 5px; margin-left: 3px; border-radius: 50%; background: currentColor; opacity: .25; animation: dot 1.2s ease-in-out infinite; vertical-align: middle; }
+.relay-loading .dots i:nth-child(2) { animation-delay: .2s; }
+.relay-loading .dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes dot { 0%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .relay-loading img, .relay-loading .dots i { animation: none; } }
+.diff-more { margin: 14px 0 4px; padding: 12px 14px; border-radius: 14px; background: var(--soft, rgba(37,134,230,.08)); color: var(--muted); font-size: 13px; }
 .log { padding: 0 14px 12px; max-height: 560px; overflow: auto; }
 .ev { display: grid; grid-template-columns: 64px 28px 1fr; gap: 6px; padding: 7px 4px; border-top: 1px solid var(--line); font-size: 13px; align-items: start; }
 .ev .t { color: var(--faint); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
@@ -421,6 +456,13 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     return s;
   }
   const face = (mood) => "/mascot/" + mood + ".svg";
+  /**
+   * Relay while something loads. "comparing" uses the animated comparing art
+   * (for diffs); other moods bob. card: false for use inside an existing card.
+   */
+  const relayLoading = (say, { mood = "focused", sub = "", card = true } = {}) => h("div", { class: (card ? "card " : "") + "relay-loading", role: "status", "aria-live": "polite" },
+    h("img", { src: face(mood), alt: "", class: mood === "comparing" ? "wide" : "" }),
+    h("div", {}, h("b", {}, say, h("span", { class: "dots", "aria-hidden": "true" }, h("i"), h("i"), h("i"))), sub ? h("small", {}, sub) : null));
 
   async function api(method, url, body) {
     const headers = { "X-Ferry": "web" };
@@ -1019,7 +1061,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 
   // ---------- history ----------
   async function tabHistory(body, p) {
-    body.replaceChildren(h("div", { class: "card empty-row" }, "Loading history…"));
+    body.replaceChildren(relayLoading("Reading the history", { mood: "thinking" }));
     const batches = await act(null, () => api("GET", pairURL(p.name, "history")));
     if (!batches || current()?.name !== p.name || S.tab !== "history") return;
     const remote = !!p.remote;
@@ -1069,7 +1111,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   async function tabStats(body, p) {
     const sel = h("select", { style: { width: "auto" } }, ...[["24h", "last 24 hours"], ["7d", "last 7 days"], ["30d", "last 30 days"], ["all", "all history"]].map(([v, l]) => h("option", { value: v, selected: v === S.statsSince ? true : null }, l)));
     sel.addEventListener("change", () => { S.statsSince = sel.value; S.shown = ""; renderBody(current()); });
-    body.replaceChildren(h("div", { class: "card empty-row" }, "Counting…"));
+    body.replaceChildren(relayLoading("Counting what I've synced", { mood: "thinking" }));
     const s = await act(null, () => api("GET", pairURL(p.name, "stats") + "?since=" + enc(S.statsSince)));
     if (!s || current()?.name !== p.name || S.tab !== "stats") return;
     if (s.batches === 0) {
@@ -1295,7 +1337,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   async function showDiff(p, file, conflict) {
     const folder = file.includes("/") ? file.slice(0, file.lastIndexOf("/") + 1) : "";
     const dr = drawer({ title: file.split("/").pop(), sub: [conflict ? "Changed in both folders" : "What changed", folder].filter(Boolean).join(" · "), wide: true });
-    dr.body.append(h("div", { class: "narrator" }, h("img", { src: face("comparing"), alt: "", style: { width: "150px", height: "71px" } }), h("div", { class: "bubble" }, h("div", { class: "say" }, "Comparing the two versions…"))));
+    dr.body.append(relayLoading("Comparing the two versions", { mood: "comparing", card: false }));
     let d;
     try {
       d = await api("GET", pairURL(p.name, "diff") + "?format=json&path=" + enc(file) + (conflict ? "&conflict=1" : ""));
@@ -1311,6 +1353,65 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   }
 
   /** Renders a diff (from /diff?format=json or the Git client) as Relay's change story into body. */
+  /**
+   * The change map: the whole file as a track, each change a numbered pin at
+   * its place (and as wide as it is), coloured by what happened: edited lines
+   * amber, new green, removed red, split when one change does several.
+   * Hovering or focusing a pin says what it is; clicking jumps to it.
+   */
+  function changeMap(parsed, marks, go) {
+    const total = Math.max(1, parsed.maxNo);
+    const pct = (line) => Math.max(0, Math.min(100, ((line - 1) / total) * 100));
+    const n = parsed.changes.length;
+    const kinds = new Set();
+    // pins sit above their change, nudged apart so neighbours never cover each other
+    const centres = parsed.changes.map((c) => pct(c.at) + Math.max(1.2, ((c.added.length || c.removed.length) / total) * 100) / 2);
+    const gap = Math.min(4.2, 100 / Math.max(1, n));
+    const pins = centres.slice();
+    for (let k = 1; k < n; k++) pins[k] = Math.max(pins[k], pins[k - 1] + gap);
+    for (let k = n - 1; k >= 0; k--) pins[k] = Math.min(pins[k], k === n - 1 ? 99 : pins[k + 1] - gap);
+    const track = h("div", { class: "map-track", role: "group", "aria-label": `${plural(n, "change")} across the file` });
+    parsed.changes.forEach((c, k) => {
+      const edited = Math.min(c.added.length, c.removed.length);
+      const extraAdd = c.added.length - edited, extraDel = c.removed.length - edited;
+      const size = edited + extraAdd + extraDel;
+      const left = pct(c.at);
+      const width = Math.min(100 - left, Math.max(1.2, ((c.added.length || c.removed.length) / total) * 100));
+      // colour stripes in proportion: edited, then new, then removed
+      const parts = [[edited, "var(--map-edit)"], [extraAdd, "var(--map-add)"], [extraDel, "var(--map-del)"]].filter(([v]) => v > 0);
+      if (edited) kinds.add("edit"); if (extraAdd) kinds.add("add"); if (extraDel) kinds.add("del");
+      let acc = 0;
+      const bg = parts.length === 1 ? parts[0][1] : "linear-gradient(90deg," + parts.map(([v, col]) => { const a = acc; acc += (v / size) * 100; return `${col} ${a}% ${acc}%`; }).join(",") + ")";
+      const first = c.added.length ? c.added[0] : null, last = c.added.length ? c.added[c.added.length - 1] : null;
+      const where = first ? (first.newNo === last.newNo ? `Line ${first.newNo}` : `Lines ${first.newNo}–${last.newNo}`) : `After line ${Math.max(1, c.at - 1)}`;
+      const what = [edited ? plural(edited, "line") + " edited" : "", extraAdd ? `${extraAdd} new` : "", extraDel ? `${extraDel} removed` : ""].filter(Boolean).join(", ");
+      const sample = (c.added[0] || c.removed[0] || { text: "" }).text.trim();
+      const pinAt = ((pins[k] - left) / width) * 100;
+      const side = pins[k] > 72 ? "right" : pins[k] < 28 ? "left" : "mid";
+      const mk = h("button", { class: "mk", style: { left: left + "%", width: width + "%", background: bg }, "aria-label": `Change ${k + 1} of ${n}: ${where.toLowerCase()}, ${what}`, onclick: () => go(k) },
+        h("span", { class: "pin", style: { left: pinAt + "%" } }, String(k + 1)),
+        h("span", { class: "tip " + side, style: { left: pinAt + "%" } },
+          h("b", {}, `Change ${k + 1} of ${n}`), h("span", {}, `${where} · ${what}`),
+          sample ? h("code", {}, sample.length > 60 ? sample.slice(0, 60) + "…" : sample) : null));
+      marks.push(mk);
+      track.append(mk);
+    });
+    // a ruler with round line numbers, so "where" reads at a glance
+    const raw = total / 5, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = Math.max(1, Math.round([1, 2, 2.5, 5, 10].map((m) => m * mag).find((v) => v >= raw) || mag * 10));
+    const ruler = h("div", { class: "map-ruler", "aria-hidden": "true" });
+    for (let v = step; v < total - step * 0.4; v += step) {
+      ruler.append(h("span", { class: "tick", style: { left: pct(v + 1) + "%" } }, String(v)));
+      track.prepend(h("span", { class: "grid", style: { left: pct(v + 1) + "%" } }));
+    }
+    ruler.append(h("span", { class: "tick start" }, "line 1"), h("span", { class: "tick end" }, `line ${total}`));
+    const names = { edit: ["edited", "var(--map-edit)"], add: ["new", "var(--map-add)"], del: ["removed", "var(--map-del)"] };
+    const legend = h("div", { class: "map-legend" }, ...["edit", "add", "del"].filter((k) => kinds.has(k)).map((k) => h("span", {}, h("i", { style: { background: names[k][1] } }), names[k][0])));
+    return h("div", { class: "map" },
+      h("div", { class: "map-head" }, h("span", {}, "Where the changes are"), legend),
+      track, ruler);
+  }
+
   function storyInto(body, foot, d, file, extra, keys) {
     const parsed = parseDiff(d.lines);
     const st = story(parsed, file.split("/").pop());
@@ -1381,18 +1482,11 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
         st.added ? h("span", { class: "pill green" }, `+ ${plural(st.added, "new line")}`) : "",
         st.edited ? h("span", { class: "pill amber" }, `✎ ${plural(st.edited, "edited line")}`) : "",
         st.removed ? h("span", { class: "pill red" }, `− ${plural(st.removed, "removed line")}`) : ""));
-      const map = h("div", { class: "map", "aria-label": "Where in the file the changes are" });
-      parsed.changes.forEach((c, k) => {
-        const left = Math.min(98, (Math.max(0, c.at - 1) / Math.max(1, parsed.maxNo)) * 100);
-        const w = Math.max(1.2, ((c.added.length + c.removed.length) / Math.max(1, parsed.maxNo)) * 100);
-        const mk = h("button", { class: "mk " + c.kind, "aria-label": `Change ${k + 1}, near line ${c.at}`, title: `Change ${k + 1}: near line ${c.at}`, style: { left: left + "%", width: Math.min(w, 100 - left) + "%" }, onclick: () => go(k) });
-        marks.push(mk);
-        map.append(mk);
-      });
-      top.push(map, h("div", { class: "map-scale" }, h("span", {}, "start of the file"), h("span", {}, `line ${parsed.maxNo}`)));
+      top.push(changeMap(parsed, marks, go));
     }
     top.push(h("div", { class: "sides" }, h("div", { class: "side" }, h("b", {}, "Before"), d.before), h("div", { class: "side" }, h("b", {}, "After"), d.after)));
     top.push(h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } }, h("span", { class: "muted", style: { fontSize: "12.5px" } }, "Tip: press J and K to jump between changes."), seg));
+    if (d.more) top.push(h("div", { class: "diff-more" }, `This file is very big, so I'm showing the first ${d.lines.length.toLocaleString()} changed lines. ${d.more.toLocaleString()} more aren't shown.`));
     body.replaceChildren(...top, content);
     const nav = [h("span", { class: "left" }, counter), prev, next];
     if (foot) foot.replaceChildren(...nav, ...(extra || []));
@@ -1698,6 +1792,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 
   async function showConflict(file) {
     const dr = drawer({ title: file.split("/").pop(), sub: "Changed on both branches", wide: true });
+    dr.body.append(relayLoading("Comparing your version with theirs", { mood: "comparing", card: false }));
     try {
       const d = await api("GET", gitURL("conflict") + "?path=" + enc(file));
       const pick = (choice, text) => { tryAct("resolve", { path: file, choice }, `${file}: ${text}`); dr.close(); };
@@ -1716,7 +1811,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     const typing = ui.body.contains(document.activeElement) && document.activeElement.tagName === "INPUT" && document.activeElement.type === "text";
     if (S.gshown === key || (typing && S.gshown.startsWith(S.repoSel + "|" + S.gitTab))) return;
     S.gshown = key;
-    if (!st) { ui.body.replaceChildren(h("div", { class: "card empty-row" }, S.repoError || "Loading…")); return; }
+    if (!st) { ui.body.replaceChildren(S.repoError ? h("div", { class: "card empty-row" }, S.repoError) : relayLoading("Opening the repository", { sub: "Looking at branches and changes." })); return; }
     ({ changes: gitChanges, history: gitHistory, branches: gitBranches, stashes: gitStashes, prs: gitPRs, issues: gitIssues, tags: gitTags, worktrees: gitWorktrees })[S.gitTab](ui.body, st);
   }
 
@@ -1807,7 +1902,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       seg.replaceChildren(
         h("button", { class: !staged ? "on" : "", onclick: () => { staged = false; load(); } }, "Not staged yet"),
         h("button", { class: staged ? "on" : "", onclick: () => { staged = true; load(); } }, "Staged"));
-      content.replaceChildren(h("p", { class: "muted" }, "Loading…"));
+      content.replaceChildren(relayLoading("Comparing the two versions", { mood: "comparing", card: false }));
       let d;
       try {
         d = await api("GET", gitURL("diff") + "?path=" + enc(f.path) + (staged ? "&staged=1" : ""));
@@ -1872,7 +1967,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   // ---------- history ----------
   async function gitHistory(body, st) {
     if (!st.head) { body.replaceChildren(section("g-hist", "History", 0, "", h("div", { class: "empty-row" }, "No commits yet. Your first commit will show up here."))); return; }
-    body.replaceChildren(h("div", { class: "card empty-row" }, "Loading history…"));
+    body.replaceChildren(relayLoading("Reading the history", { mood: "thinking" }));
     const commits = await act(null, () => api("GET", gitURL("log") + "?limit=" + (50 + S.logSkip)));
     if (!commits || S.gitTab !== "history") return;
     const rows = commits.map((c) => h("tr", { style: { cursor: "pointer" }, onclick: () => showCommit(c.hash) },
@@ -1886,16 +1981,17 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 
   async function showCommit(hash) {
     const dr = drawer({ title: "Commit", sub: hash.slice(0, 7), wide: true });
+    dr.body.append(relayLoading("Opening this commit", { mood: "thinking", card: false }));
     let c;
     try {
       c = await api("GET", gitURL("commit") + "?hash=" + enc(hash));
-    } catch (e) { dr.body.append(h("p", { class: "muted" }, e.message)); return; }
+    } catch (e) { dr.body.replaceChildren(h("p", { class: "muted" }, e.message)); return; }
     dr.titleEl.textContent = c.subject;
     const pane = h("div");
     const list = h("div", { class: "files-list" });
     const open = async (f, btn) => {
       list.querySelectorAll(".row-file").forEach((b) => b.classList.toggle("on", b === btn));
-      pane.replaceChildren(h("p", { class: "muted" }, "Loading…"));
+      pane.replaceChildren(relayLoading(`Comparing ${f.path.split("/").pop()}`, { mood: "comparing", card: false, sub: f.added > 2000 ? "It's a big one, so this may take a moment." : "" }));
       try {
         const d = await api("GET", gitURL("commit-diff") + "?hash=" + enc(c.hash) + "&path=" + enc(f.path));
         storyInto(pane, null, d, f.path.split("/").pop(), null, dr.panel);
@@ -1909,7 +2005,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       list.append(btn);
       if (i === 0) setTimeout(() => open(f, btn));
     });
-    dr.body.append(
+    dr.body.replaceChildren(
       h("div", { class: "commit-meta" }, h("b", {}, "Author"), h("span", {}, `${c.author} <${c.email}>`), h("b", {}, "When"), h("span", {}, new Date(c.date).toLocaleString()),
         h("b", {}, "Commit"), h("span", { class: "mono" }, c.hash), c.parents.length > 1 ? h("b", {}, "Merge of") : "", c.parents.length > 1 ? h("span", { class: "mono" }, c.parents.map((x) => x.slice(0, 7)).join(" + ")) : ""),
       c.body ? h("div", { class: "commit-body" }, c.body) : "",
@@ -1937,7 +2033,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 
   // ---------- branches ----------
   async function gitBranches(body, st) {
-    body.replaceChildren(h("div", { class: "card empty-row" }, "Loading branches…"));
+    body.replaceChildren(relayLoading("Gathering your branches"));
     const b = await act(null, () => api("GET", gitURL("branches")));
     if (!b || S.gitTab !== "branches") return;
     const local = b.local.map((x) => h("tr", {},
@@ -1994,7 +2090,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 
   // ---------- pull requests ----------
   async function gitPRs(body) {
-    body.replaceChildren(h("div", { class: "card empty-row" }, "Asking for your pull requests…"));
+    body.replaceChildren(relayLoading("Asking for your pull requests", { mood: "excited", sub: "And how their checks are doing." }));
     let res;
     try {
       res = await api("GET", gitURL("prs"));
@@ -2090,7 +2186,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   }
 
   async function gitIssues(body, st) {
-    body.replaceChildren(h("div", { class: "card empty-row" }, "Asking Jira for your issues…"));
+    body.replaceChildren(relayLoading("Asking Jira for your issues", { mood: "excited" }));
     let res;
     try {
       res = await api("GET", gitURL("issues"));

@@ -305,3 +305,20 @@ describe("git client over HTTP", () => {
     expect(noPost.status).toBe(403); // the X-Ferry header is still required
   });
 });
+
+describe("very large diffs", () => {
+  test("are cut to the first lines, saying how many more there are", async () => {
+    const d = await repo();
+    const n = g.MAX_DIFF_LINES + 500;
+    put(d, "big.json", Array.from({ length: n }, (_, i) => `line ${i}`).join("\n") + "\n");
+    const untracked = await g.fileDiff(d, "big.json", false);
+    expect(untracked.lines.length).toBe(g.MAX_DIFF_LINES);
+    expect(untracked.more).toBeGreaterThan(0);
+    await g.stage(d, ["big.json"]);
+    const hash = await g.commit(d, "add big");
+    const c = await g.commitFileDiff(d, hash, "big.json");
+    expect(c.lines.length).toBe(g.MAX_DIFF_LINES);
+    expect(c.lines.length + c.more!).toBe(n + 1); // plus the hunk header
+    expect((await g.fileDiff(d, "a.txt", false)).more).toBeUndefined();
+  });
+});
