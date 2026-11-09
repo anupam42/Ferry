@@ -464,20 +464,33 @@ export interface Commit {
   date: string;
   subject: string;
   refs: string[];
+  /** the first line of the message body (a merged pull request's title, say) */
+  note?: string;
+  /** true for the commit HEAD points at */
+  head?: boolean;
 }
 
-export async function log(root: string, o: { skip?: number; limit?: number; ref?: string } = {}): Promise<Commit[]> {
+/**
+ * Commits, newest first, in date order: a commit never comes before its
+ * children, which is what drawing the branch graph needs. all: every local
+ * and remote branch and tag, not just the current branch.
+ */
+export async function log(root: string, o: { skip?: number; limit?: number; ref?: string; all?: boolean } = {}): Promise<Commit[]> {
   if (!(await gitOk(root, ["rev-parse", "--verify", "-q", "HEAD"]))) return [];
-  const limit = Math.min(Math.max(o.limit ?? 50, 1), 200);
-  const args = ["log", `--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1e`, `-n${limit}`, `--skip=${Math.max(0, o.skip ?? 0)}`];
-  if (o.ref) args.push(plain(o.ref, "branch"));
+  const limit = Math.min(Math.max(o.limit ?? 50, 1), 1000);
+  const args = ["log", "--date-order", `--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b%x1e`, `-n${limit}`, `--skip=${Math.max(0, o.skip ?? 0)}`];
+  if (o.all) args.push("--branches", "--remotes", "--tags", "HEAD");
+  else if (o.ref) args.push(plain(o.ref, "branch"));
   args.push("--");
   const out = await git(root, args);
-  return out.split("\x1e").map((r) => r.trim()).filter(Boolean).map((r) => {
-    const [hash, short, parents, author, email, date, subject, refs] = r.split("\x1f");
+  return out.split("\x1e").map((r) => r.replace(/^\n+/, "")).filter((r) => r.trim()).map((r) => {
+    const [hash, short, parents, author, email, date, subject, refs, body] = r.split("\x1f");
+    const decor = refs ? refs.split(", ") : [];
+    const note = (body ?? "").split("\n").map((l) => l.trim()).find((l) => l && !/^(co-authored-by|signed-off-by):/i.test(l)) ?? "";
     return {
       hash: hash!, short: short!, parents: parents ? parents.split(" ").filter(Boolean) : [], author: author!, email: email!, date: date!,
-      subject: subject ?? "", refs: refs ? refs.split(", ").map((x) => x.replace(/^HEAD -> /, "")).filter((x) => x && x !== "HEAD") : [],
+      subject: subject ?? "", refs: decor.map((x) => x.replace(/^HEAD -> /, "")).filter((x) => x && x !== "HEAD"),
+      ...(note ? { note: note.slice(0, 200) } : {}), ...(decor.some((x) => x === "HEAD" || x.startsWith("HEAD -> ")) ? { head: true } : {}),
     };
   });
 }

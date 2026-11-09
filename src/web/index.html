@@ -192,7 +192,7 @@ a.btn { text-decoration: none; }
 .field > .label, .field .label { display: block; font-weight: 650; margin-bottom: 6px; }
 .field small, .hint { display: block; color: var(--muted); font-size: 12.5px; margin-top: 5px; }
 .field-error { color: var(--red) !important; font-weight: 600; }
-input[type=text], input[type=password], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--card-solid); border-radius: 14px; padding: 10px 14px; }
+input[type=text], input[type=password], input[type=search], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--card-solid); border-radius: 14px; padding: 10px 14px; }
 textarea { min-height: 70px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
 input.invalid { border-color: var(--red); }
 .inline { display: flex; gap: 8px; align-items: center; }
@@ -467,6 +467,33 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 .insight-tiles .tile .v { font-size: 22px; white-space: nowrap; }
 @media (max-width: 900px) { .insight-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .heat-tip { transition: none; } }
+/* ---------- history graph ---------- */
+.h-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 2px 16px 10px; }
+.h-search { max-width: 340px; }
+.h-scroll { overflow-x: auto; }
+.h-rows { --graph-w: 34px; }
+.h-row { display: grid; grid-template-columns: var(--graph-w) minmax(130px, 200px) 84px minmax(0, 1fr) minmax(112px, 152px); align-items: center; column-gap: 14px; height: 44px; padding: 0 16px 0 6px; cursor: pointer; border-radius: 12px; }
+.h-row:not(.h-head):hover, .h-row:focus-visible { background: var(--accent-soft); outline: none; }
+.h-row.is-head .h-subject { font-weight: 700; }
+.h-head { height: 34px; cursor: default; font-size: 12.5px; font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--line); border-radius: 0; margin-bottom: 2px; }
+.h-graph { height: 44px; display: block; overflow: hidden; }
+.h-graph .graph { display: block; }
+.graph .edge { fill: none; stroke-width: 2; stroke-linecap: round; }
+.graph .node { fill: var(--lane); stroke: var(--card-solid); stroke-width: 2; }
+.graph .node.merge { fill: var(--card-solid); stroke: var(--lane); stroke-width: 2.5; }
+.graph .node.head { stroke: var(--text); stroke-width: 2.5; }
+.h-rows.searching .h-graph svg { visibility: hidden; }
+.h-author { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.h-avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+.h-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
+.h-commit { color: var(--accent); font-size: 12.5px; } .h-head .h-commit { color: inherit; font-size: inherit; }
+.h-msg .refpill svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: 3px; }
+.h-msg { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 13.5px; }
+.h-msg .refpill { flex: none; } .h-msg .refpill.current { box-shadow: inset 0 0 0 1.5px currentColor; font-weight: 700; }
+.h-subject { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 40px; }
+.h-note { color: var(--muted); overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; min-width: 0; }
+.h-date { color: var(--muted); font-size: 12.5px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) { .h-row { grid-template-columns: var(--graph-w) 28px minmax(0, 1fr) 96px; } .h-name, .h-commit { display: none; } .h-head .h-commit { display: none; } }
 /* ---------- shape my history ---------- */
 .shape-tip { display: flex; align-items: center; gap: 10px; margin: 0 2px 12px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--card2); color: var(--muted); font-size: 12.5px; }
 .shape-tip svg { width: 16px; height: 16px; flex: none; color: var(--accent); } .shape-tip span { flex: 1; }
@@ -2582,18 +2609,132 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   }
 
   // ---------- history ----------
+  // ---------- history: commits with their branch graph ----------
+
+  const LANE_COLOURS = ["#22A06B", "#2A78D6", "#E0592A", "#8B5CF6", "#D6457A", "#1FA3B8", "#C99A1B", "#5B6B8A"];
+  const GRAPH = { row: 44, lane: 14, pad: 10, max: 12 };
+
+  /**
+   * Lays commits (newest first, children before parents) out in lanes.
+   * Each row gets its node's lane and colour, and the line pieces that cross
+   * it: lanes passing straight through, lanes curving into this commit (where
+   * branches meet), and lines out to its parents (where a merge forks).
+   */
+  function graphLayout(commits, pin) {
+    const lanes = [], colour = [];
+    let next = 0, width = 1;
+    // the branch you're on always runs down the first lane
+    if (pin && commits.some((c) => c.hash === pin)) { lanes[0] = pin; colour[0] = 0; next = 1; }
+    const rows = commits.map((c) => {
+      const before = lanes.slice(), beforeColour = colour.slice();
+      let col = lanes.indexOf(c.hash);
+      if (col < 0) { // a branch tip: no child seen yet
+        col = lanes.indexOf(null);
+        if (col < 0) col = lanes.length;
+        colour[col] = next++ % LANE_COLOURS.length;
+        beforeColour[col] = colour[col];
+      }
+      const lines = [];
+      before.forEach((hash, j) => {
+        if (!hash) return;
+        if (hash === c.hash) { lines.push({ from: j, to: col, half: "top", c: beforeColour[j] }); if (j !== col) lanes[j] = null; }
+        else lines.push({ from: j, to: j, half: "all", c: beforeColour[j] });
+      });
+      const [first, ...others] = c.parents;
+      lanes[col] = first || null;
+      if (first) lines.push({ from: col, to: col, half: "bottom", c: colour[col] });
+      for (const p of others) {
+        let k = lanes.indexOf(p);
+        if (k < 0) { k = lanes.indexOf(null); if (k < 0) k = lanes.length; lanes[k] = p; colour[k] = next++ % LANE_COLOURS.length; }
+        lines.push({ from: col, to: k, half: "bottom", c: colour[k] });
+      }
+      while (lanes.length && lanes[lanes.length - 1] === null) lanes.pop();
+      width = Math.max(width, before.length, lanes.length, col + 1);
+      return { col, c: colour[col], lines };
+    });
+    return { rows, width: Math.min(width, GRAPH.max) };
+  }
+
+  function graphCell(row, width, c) {
+    const { row: H, lane: L, pad } = GRAPH;
+    const x = (j) => pad + j * L, mid = H / 2;
+    const w = pad * 2 + (width - 1) * L;
+    const g = sv("svg", { class: "graph", width: w, height: H, viewBox: `0 0 ${w} ${H}`, "aria-hidden": "true" });
+    const curve = (x1, y1, x2, y2) => x1 === x2 ? `M${x1} ${y1}V${y2}` : `M${x1} ${y1}C${x1} ${(y1 + y2) / 2} ${x2} ${(y1 + y2) / 2} ${x2} ${y2}`;
+    for (const l of row.lines) {
+      if (l.from >= GRAPH.max || l.to >= GRAPH.max) continue;
+      const d = l.half === "all" ? curve(x(l.from), 0, x(l.to), H) : l.half === "top" ? curve(x(l.from), 0, x(l.to), mid) : curve(x(l.from), mid, x(l.to), H);
+      g.append(sv("path", { d, stroke: LANE_COLOURS[l.c], class: "edge" }));
+    }
+    if (row.col < GRAPH.max) {
+      const merge = c.parents.length > 1;
+      g.append(sv("circle", { cx: x(row.col), cy: mid, r: merge ? 4 : 5, class: "node" + (merge ? " merge" : "") + (c.head ? " head" : ""), style: `--lane:${LANE_COLOURS[row.c]}` }));
+    }
+    return g;
+  }
+
+  const AVATAR = ["#2F55D4", "#3D5A99", "#7C3AED", "#2E7D5B", "#C2410C", "#0E7490", "#BE185D", "#4B5563"];
+  const avatarFor = (c) => {
+    let n = 0;
+    for (const ch of (c.email || c.author)) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
+    const ini = c.author.trim().split(/\s+/).slice(0, 2).map((w) => w[0] ? w[0].toUpperCase() : "").join("") || "?";
+    return h("span", { class: "h-avatar", style: { background: AVATAR[n % AVATAR.length] }, "aria-hidden": "true" }, ini);
+  };
+  const shortDate = (iso) => {
+    const t = Date.parse(iso);
+    return localStorage.getItem("ferry-time") !== "exact" && Date.now() - t < 7 * 86400e3 ? ago(iso) : new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  };
+  const refPill = (ref, st) => {
+    // remote branches are "<remote>/<name>"; a local "feature/x" isn't one
+    const tag = ref.startsWith("tag: "), remote = !tag && ((st && st.remotes) || []).some((r) => ref.startsWith(r + "/")), current = !tag && st && ref === st.branch;
+    return h("span", { class: "pill refpill " + (tag ? "amber" : remote ? "violet" : "blue") + (current ? " current" : ""), title: tag ? "tag" : remote ? "branch on the remote" : current ? "the branch you're on" : "branch" },
+      tag ? [icon("tag"), ref.slice(5)] : ref);
+  };
+
   async function gitHistory(body, st) {
     if (!st.head) { body.replaceChildren(section("g-hist", "History", 0, "", h("div", { class: "empty-row" }, "No commits yet. Your first commit will show up here."))); return; }
     body.replaceChildren(relayLoading("Reading the history", { mood: "thinking" }));
-    const commits = await act(null, () => api("GET", gitURL("log") + "?limit=" + (50 + S.logSkip)));
+    const all = S.histAll === true;
+    const commits = await act(null, () => api("GET", gitURL("log") + "?limit=" + (100 + S.logSkip) + (all ? "&all=1" : "")));
     if (!commits || S.gitTab !== "history") return;
-    const rows = commits.map((c) => h("tr", { style: { cursor: "pointer" }, onclick: () => showCommit(c.hash) },
-      h("td", { class: "file" }, ...linkIssues(c.subject), ...c.refs.map((ref) => h("span", { class: "pill refpill " + (ref.startsWith("tag: ") ? "amber" : ref.includes("/") ? "violet" : "blue") }, ref.replace("tag: ", "🏷 ")))),
-      h("td", { class: "opt muted" }, c.author),
-      h("td", { class: "opt muted" }, ago(c.date)),
-      h("td", { class: "end mono muted" }, c.short)));
-    const more = commits.length >= 50 + S.logSkip ? h("button", { class: "btn small", onclick: () => { S.logSkip += 50; S.gshown = ""; renderGitBody(S.repo); } }, "Show older commits") : null;
-    body.replaceChildren(section("g-hist", "History", commits.length, "", h("table", { class: "table" }, h("tbody", {}, rows)), more));
+    const scope = h("div", { class: "seg", role: "radiogroup", "aria-label": "Which commits" },
+      ...[[false, `On ${st.branch || "this branch"}`], [true, "All branches"]].map(([v, label]) => h("button", { class: all === v ? "on" : "", role: "radio", "aria-checked": all === v ? "true" : "false",
+        onclick: () => { S.histAll = v; S.logSkip = 0; S.gshown = ""; renderGitBody(S.repo); } }, label)));
+    const search = h("input", { type: "search", class: "h-search", placeholder: "Find a commit: message, author or id", "aria-label": "Find a commit" });
+    const { rows: layout, width } = graphLayout(commits, (commits.find((c) => c.head) || {}).hash);
+    const list = h("div", { class: "h-rows", role: "table", "aria-label": "Commits, newest first" });
+    const head = h("div", { class: "h-row h-head", role: "row" }, h("span", { role: "columnheader", class: "h-graph-h" }, ""), h("span", { role: "columnheader" }, "Author"),
+      h("span", { role: "columnheader", class: "h-commit" }, "Commit"), h("span", { role: "columnheader" }, "Message"), h("span", { role: "columnheader", class: "h-date" }, "Date"));
+    const gw = GRAPH.pad * 2 + (width - 1) * GRAPH.lane;
+    list.style.setProperty("--graph-w", gw + "px");
+    const rowEls = commits.map((c, i) => {
+      const merge = c.parents.length > 1;
+      const el = h("div", { class: "h-row" + (c.head ? " is-head" : ""), role: "row", tabindex: "0", onclick: () => showCommit(c.hash), onkeydown: (e) => { if (e.key === "Enter") showCommit(c.hash); },
+        "aria-label": `${c.subject}, by ${c.author}, ${shortDate(c.date)}` },
+        h("span", { class: "h-graph", role: "cell" }, graphCell(layout[i], width, c)),
+        h("span", { class: "h-author", role: "cell" }, avatarFor(c), h("span", { class: "h-name" }, c.author)),
+        h("span", { class: "h-commit mono", role: "cell" }, c.short),
+        h("span", { class: "h-msg", role: "cell", title: c.subject + (c.note ? "\n" + c.note : "") },
+          merge ? h("span", { class: "pill green refpill h-merged" }, "Merged") : null,
+          ...c.refs.map((r) => refPill(r, st)),
+          h("span", { class: "h-subject" }, ...linkIssues(c.subject)), c.note && merge ? h("span", { class: "h-note" }, c.note) : null),
+        h("span", { class: "h-date", role: "cell", title: new Date(c.date).toLocaleString() }, shortDate(c.date)));
+      el.dataset.find = (c.subject + " " + (c.note || "") + " " + c.author + " " + c.email + " " + c.hash).toLowerCase();
+      return el;
+    });
+    list.append(head, ...rowEls);
+    // searching hides the graph: lines between rows that aren't next to each other would mislead
+    const none = h("div", { class: "empty-row hidden" }, "No commit here matches. Try “Show older commits”, or All branches.");
+    search.oninput = () => {
+      const q = search.value.trim().toLowerCase();
+      list.classList.toggle("searching", !!q);
+      let shown = 0;
+      for (const el of rowEls) { const hit = !q || el.dataset.find.includes(q); el.classList.toggle("hidden", !hit); if (hit) shown++; }
+      none.classList.toggle("hidden", shown > 0);
+    };
+    const more = commits.length >= 100 + S.logSkip ? h("div", { style: { padding: "10px 16px 14px" } }, h("button", { class: "btn small", onclick: () => { S.logSkip += 100; S.gshown = ""; renderGitBody(S.repo); } }, "Show older commits")) : null;
+    body.replaceChildren(section("g-hist", "History", commits.length, "", h("div", {},
+      h("div", { class: "h-tools" }, scope, search), h("div", { class: "h-scroll" }, list), none, more)));
   }
 
   async function showCommit(hash) {

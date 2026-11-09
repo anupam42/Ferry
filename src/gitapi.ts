@@ -113,7 +113,7 @@ export class GitApi {
     const root = r.path;
     switch (action) {
       case "state": return json({ ...(await g.state(root)), name: r.name, pairs: r.pairs, standalone: r.standalone });
-      case "log": return json(await g.log(root, { skip: Number(q.get("skip") ?? 0), limit: Number(q.get("limit") ?? 50), ref: q.get("ref") || undefined }));
+      case "log": return json(await g.log(root, { skip: Number(q.get("skip") ?? 0), limit: Number(q.get("limit") ?? 50), ref: q.get("ref") || undefined, all: q.get("all") === "1" }));
       case "commit": return json(await g.commitDetail(root, q.get("hash")));
       case "commit-diff": return json(await g.commitFileDiff(root, q.get("hash"), q.get("path")));
       case "diff": return json(await g.fileDiff(root, q.get("path"), q.get("staged") === "1"));
