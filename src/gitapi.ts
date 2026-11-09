@@ -5,7 +5,8 @@
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
 //   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
-//                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout}
+//                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|
+//                   shape-diff|shape-message|shape-commit}   (GET /git/{id}/shape: the timeline to shape, see shape.ts)
 //
 // When a repository is also the target of a folder pair, actions that change
 // its files (switching branches, pulling, merging…) pause that pair first,
@@ -19,6 +20,7 @@ import { batchTime, history } from "./engine/journal.ts";
 import type { Engine } from "./engine/engine.ts";
 import * as g from "./gitclient.ts";
 import * as conn from "./integrations.ts";
+import * as shaper from "./shape.ts";
 import { errMsg } from "./util.ts";
 
 export interface RepoManager {
@@ -128,6 +130,7 @@ export class GitApi {
         return json(await g.pullRequests(root));
       }
       case "issues": return json(await conn.jiraMyIssues());
+      case "shape": return json(await shaper.timeline(root, this.engines));
       case "insights": return json({ ...(await g.insights(root, { author: q.get("author") === "me" ? "me" : "" })), sync: this.syncDays(root) });
       case "ai-message": {
         const st = await g.state(root);
@@ -183,6 +186,24 @@ export class GitApi {
         else return done({ branch: await g.checkoutRemoteBranch(root, b.branch) });
         return done();
       }
+      case "shape-diff": return json(await shaper.groupDiff(root, this.engines, b));
+      case "shape-message": {
+        // a message for one group of syncs, from what it changed
+        const t = await shaper.timeline(root, this.engines);
+        const ids = new Set(Array.isArray(b.batches) ? (b.batches as unknown[]).map(String) : []);
+        const files = [...new Map(t.batches.filter((x) => ids.has(x.id)).flatMap((x) => x.files).map((f) => [f.path, f])).values()];
+        if (!files.length) throw new g.GitClientError("that step isn't in the timeline any more", "stale");
+        let diff = "";
+        for (const f of files.slice(0, 20)) {
+          const d = await shaper.groupDiff(root, this.engines, { batches: [...ids], path: f.path });
+          diff += `--- ${f.path}\n` + d.lines.slice(0, 120).map((l) => (l.op === "@" ? "@@ " : l.op) + l.text).join("\n") + "\n";
+          if (diff.length > 40_000) break;
+        }
+        const { msg, error } = await ai.tryCommitMessage(files.map((f) => `${f.op === "add" ? "A" : f.op === "delete" ? "D" : "M"}  ${f.path}`), diff);
+        if (msg === null) throw new g.GitClientError(error, "ai");
+        return done({ message: msg });
+      }
+      case "shape-commit": return done(await shaper.shape(root, this.engines, b));
       case "issue-start": {
         // a branch named after the issue, and (if asked) the issue moved to "in progress"
         const key = String(b.key ?? "");

@@ -103,6 +103,7 @@ The web app does what the terminal dashboard does, with buttons instead of keys:
   Git settings change `git config --global`. Everything else is saved in your browser.
 - **Git client** (the branch button on the rail): clone, create or open a repository. You get:
   - **Changes:** tick files, or single lines, to commit; "✨ Write it for me" for the message; amend, undo, discard, stash.
+  - **Shape my history** (repositories a pair syncs into): Ferry records every sync, so instead of one big commit it can replay the work since your last commit and split it where you paused. Join or split the steps, preview what each changed, name them (or let Claude), and get one commit per step with the time you did the work. Your files don't change; files Ferry didn't write stay uncommitted.
   - **History:** every commit's changes as a change story; cherry-pick, revert, tag or branch from any commit.
   - **Insights:** heatmaps of the last year: commits per day (click a day for its commits), what weekday and hour the work happens, and the busiest files month by month, plus streaks, commits per week, hotspots (files that are big *and* change often), files that change together, and, for repositories Ferry syncs into, the work synced between commits. Switch between everyone's commits and just yours.
   - **Branches:** switch, merge, rename, delete.

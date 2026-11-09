@@ -92,9 +92,11 @@ body { zoom: var(--zoom); }
 .count.blue { background: var(--accent); }
 .count.red { background: #E5484D; }
 .pair-list { padding: 0 10px 12px; display: flex; flex-direction: column; gap: 6px; }
-.pair { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 10px; border-radius: 18px; border: 0; background: none; text-align: left; cursor: pointer; width: 100%; }
+.pair { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 8px; border-radius: 18px; border: 2px solid transparent; background: none; text-align: left; cursor: pointer; width: 100%; }
 .pair:hover { background: var(--accent-soft); }
-.pair.sel { background: var(--card-solid); box-shadow: 0 4px 14px rgba(9,35,72,.08); }
+/* the selected one: a border in Relay's gradient (the accent pair, so it follows Settings → Accent) */
+.pair.sel { background: linear-gradient(var(--card-solid), var(--card-solid)) padding-box, linear-gradient(135deg, var(--accent), var(--accent-2)) border-box;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 18%, transparent); }
 .pair img { width: 44px; height: 32px; }
 .pair > div { min-width: 0; }
 a.btn { text-decoration: none; }
@@ -465,6 +467,31 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 .insight-tiles .tile .v { font-size: 22px; white-space: nowrap; }
 @media (max-width: 900px) { .insight-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .heat-tip { transition: none; } }
+/* ---------- shape my history ---------- */
+.shape-tip { display: flex; align-items: center; gap: 10px; margin: 0 2px 12px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--card2); color: var(--muted); font-size: 12.5px; }
+.shape-tip svg { width: 16px; height: 16px; flex: none; color: var(--accent); } .shape-tip span { flex: 1; }
+.shape-callout { display: flex; align-items: center; gap: 16px; padding: 14px 18px; margin-bottom: 14px; background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent-2) 12%, transparent)); }
+.shape-callout img { width: 76px; height: 56px; flex: none; }
+.shape-callout b { display: block; font-size: 14.5px; } .shape-callout small { display: block; color: var(--muted); margin-top: 2px; }
+.shape-gap { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 14px; font-size: 13px; }
+.shape-list { display: flex; flex-direction: column; gap: 12px; }
+.shape-group { padding: 14px 16px; }
+.shape-head { display: flex; align-items: center; gap: 12px; }
+.shape-head .grow { flex: 1; min-width: 0; }
+.shape-head b { display: block; font-size: 14px; } .shape-head small { display: block; color: var(--muted); font-size: 12px; }
+.shape-n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-weight: 800; font-size: 13px; }
+.shape-msg { display: flex; gap: 8px; align-items: center; margin: 12px 0 10px; }
+.shape-msg input { flex: 1; }
+.shape-files { display: flex; flex-wrap: wrap; gap: 6px; }
+.shape-file { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 99px; background: var(--card-solid); color: var(--text); font-size: 12.5px; cursor: pointer; }
+.shape-file i { font-style: normal; font-weight: 800; } .shape-file.add i { color: var(--green); } .shape-file.delete i { color: var(--red); } .shape-file.update i { color: var(--amber); }
+.shape-file:hover, .shape-file.on { border-color: var(--accent); } .shape-file.on { background: var(--accent-soft); }
+.shape-details { margin-top: 10px; font-size: 12.5px; } .shape-details summary { cursor: pointer; color: var(--muted); }
+.shape-steps { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-left: 4px; border-left: 2px solid var(--line); }
+.shape-step { display: flex; gap: 10px; padding: 3px 10px; color: var(--text); } .shape-step .mono { color: var(--muted); min-width: 64px; }
+.shape-cut { align-self: flex-start; margin-left: 8px; padding: 1px 8px; border: 1px dashed var(--line); border-radius: 99px; background: none; color: var(--muted); font-size: 11.5px; cursor: pointer; }
+.shape-cut:hover { color: var(--accent); border-color: var(--accent); }
+.shape-preview:not(:empty) { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 /* ---------- insight charts ---------- */
 .chart { display: block; width: 100%; height: auto; overflow: visible; --ink: var(--accent); }
 [data-theme="light"] .chart, :root .chart { --bar: #2a78d6; } [data-theme="dark"] .chart { --bar: #5598e7; }
@@ -2327,9 +2354,152 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       h("label", { class: "field" }, coAuth),
       last ? h("label", { class: "check" }, amend, h("span", {}, `Add to the last commit instead (“${last.subject}”)`, last.pushed ? h("small", { class: "hint" }, "It's already pushed: you'd need to force-push afterwards.") : null)) : null,
       h("div", { class: "inline", style: { justifyContent: "space-between" } }, commitBtn, undoBtn));
-    body.replaceChildren(
+    // a repository a pair syncs into: Ferry recorded the work, so it can be shaped into commits
+    const shapeSlot = h("div");
+    if (st.pairs && st.pairs.length && files.length) shapeCallout(shapeSlot, st);
+    else if (files.length && localStorage.getItem("ferry-tip-shape") !== "off") {
+      // opened directly: nothing recorded the work, so say where shaping is available
+      shapeSlot.append(h("div", { class: "shape-tip" }, icon("info"),
+        h("span", {}, "Shape my history, which turns your work into a few clean commits, works on repositories a folder pair syncs into: Ferry records each sync there."),
+        h("button", { class: "btn small ghost", "aria-label": "Hide this tip", onclick: () => { localStorage.setItem("ferry-tip-shape", "off"); shapeSlot.replaceChildren(); } }, "Got it")));
+    }
+    body.replaceChildren(shapeSlot,
       section("g-changes", "Changes", files.length, "blue", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "No changes. Edit some files and they show up here."), headBtns),
       section("g-commit", "Commit", null, "", form));
+  }
+
+  // ---------- shape my history ----------
+
+  const span = (a, b) => { const m = Math.round((Date.parse(b) - Date.parse(a)) / 60000); return m < 1 ? "a moment" : m < 60 ? plural(m, "minute") : `${Math.floor(m / 60)} h ${m % 60 ? (m % 60) + " min" : ""}`.trim(); };
+  const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const dayAndClock = (iso) => { const d = new Date(iso), today = new Date(); return (d.toDateString() === today.toDateString() ? "" : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + ", ") + hhmm(iso); };
+
+  async function shapeCallout(slot, st) {
+    const t = await api("GET", gitURL("shape")).catch(() => null);
+    if (!t || !t.batches.length || S.gitTab !== "changes") return;
+    const first = t.batches[0].time, last = t.batches[t.batches.length - 1].time;
+    slot.replaceChildren(h("div", { class: "card shape-callout" },
+      h("img", { class: "float", src: face("excited"), alt: "" }),
+      h("div", { class: "grow" }, h("b", {}, `I recorded ${plural(t.batches.length, "sync")} since your last commit, over ${span(first, last)}.`),
+        h("small", {}, "Instead of one big commit, I can split the work where you paused and make a commit for each part.")),
+      h("button", { class: "btn brand", onclick: () => openShape(st) }, icon("commit"), "Shape my history")));
+  }
+
+  /** A short message for a group, from what it changed (you'll usually want to edit it). */
+  function suggestMessage(files, st) {
+    const name = (p) => p.split("/").pop();
+    const verbs = { add: "Add", update: "Update", delete: "Remove" };
+    const byOp = {};
+    for (const f of files) (byOp[f.op] ||= []).push(name(f.path));
+    const list = (xs) => xs.length <= 2 ? xs.join(" and ") : `${xs.slice(0, 2).join(", ")} and ${xs.length - 2} more`;
+    // "Add about.html, update index.html": each kind of change in turn, the first one capitalised
+    const parts = ["add", "update", "delete"].filter((op) => byOp[op]).map((op) => `${verbs[op].toLowerCase()} ${list(byOp[op])}`);
+    let msg = parts.length ? parts.join(", ") : "Update files";
+    msg = msg[0].toUpperCase() + msg.slice(1);
+    const key = st && (st.branch.match(/^([A-Z][A-Z0-9_]+-\d+)/) || [])[1];
+    if (key && localStorage.getItem("ferry-jira-prefix") !== "off") msg = `${key}: ${msg}`;
+    return msg;
+  }
+
+  async function openShape(st) {
+    const dr = drawer({ title: "Shape my history", sub: `${st.name} · on ${st.branch}`, wide: true });
+    dr.body.append(relayLoading("Replaying your work", { mood: "thinking", card: false, sub: "Putting the syncs since your last commit in order." }));
+    let t;
+    try { t = await api("GET", gitURL("shape")); } catch (e) { dr.body.replaceChildren(h("p", { class: "muted" }, e.message)); return; }
+    if (!t.batches.length) { dr.body.replaceChildren(h("div", { class: "empty" }, h("img", { class: "float", src: face("happy"), alt: "" }), h("h2", {}, "Nothing to shape."), h("p", {}, "I haven't synced anything into this repository since its last commit."))); return; }
+
+    const B = t.batches;
+    const GAPS = [[5, "5 min"], [15, "15 min"], [30, "30 min"], [60, "1 hour"], [0, "Never (one commit)"]];
+    let gap = Number(localStorage.getItem("ferry-shape-gap") || 15);
+    let cuts = new Set(); // batch index where a new commit starts
+    const messages = new Map(); // first batch id → message you typed
+    const fromGap = () => { cuts = new Set(); if (gap) for (let i = 1; i < B.length; i++) if (Date.parse(B[i].time) - Date.parse(B[i - 1].time) >= gap * 60000) cuts.add(i); };
+    fromGap();
+    const groups = () => { const out = [[]]; B.forEach((b, i) => { if (cuts.has(i)) out.push([]); out[out.length - 1].push(i); }); return out; };
+    // what a group did to each file overall: added then edited is still "added"; added then deleted is nothing
+    const filesOf = (idx) => {
+      const seen = new Map();
+      for (const f of idx.flatMap((i) => B[i].files)) { const x = seen.get(f.path); seen.set(f.path, x ? { first: x.first, last: f.op } : { first: f.op, last: f.op }); }
+      return [...seen].flatMap(([path, { first, last }]) => first === "add" && last === "delete" ? [] : [{ path, op: first === "add" ? "add" : last === "delete" ? "delete" : "update" }]);
+    };
+
+    const list = h("div", { class: "shape-list" });
+    const total = new Set(B.flatMap((b) => b.files.map((f) => f.path))).size;
+    const say = h("div", { class: "say" });
+    const hint = h("div", { class: "hint" });
+    const gapSeg = h("div", { class: "seg", role: "radiogroup", "aria-label": "Start a new commit after a pause of" });
+    const paintGap = () => gapSeg.replaceChildren(...GAPS.map(([v, label]) => h("button", { class: gap === v ? "on" : "", role: "radio", "aria-checked": gap === v ? "true" : "false",
+      onclick: () => { gap = v; localStorage.setItem("ferry-shape-gap", String(v)); fromGap(); paintGap(); paint(); } }, label)));
+    paintGap();
+    const go = h("button", { class: "btn brand" }, icon("commit"), "Create commits");
+
+    const paint = () => {
+      const gs = groups();
+      say.textContent = `${plural(B.length, "sync")} between ${dayAndClock(B[0].time)} and ${hhmm(B[B.length - 1].time)}, touching ${plural(total, "file")}.`;
+      hint.textContent = gs.length === 1 ? "That's one commit for now. Pick a shorter pause, or split it yourself with ✂." : `I split them into ${plural(gs.length, "commit")} where you paused for ${gap >= 60 ? "an hour" : gap + " minutes"} or more. Name each one, join or split them, then create them.`;
+      go.replaceChildren(icon("commit"), `Create ${plural(gs.length, "commit")} on ${t.branch}`);
+      list.replaceChildren(...gs.map((idx, gi) => {
+        const files = filesOf(idx);
+        const key = B[idx[0]].id;
+        const input = h("input", { type: "text", value: messages.get(key) ?? suggestMessage(files, st), "aria-label": `Message for commit ${gi + 1}` });
+        input.oninput = () => messages.set(key, input.value);
+        const aiBtn = S.settings && S.settings.ai && S.settings.ai.configured ? h("button", { class: "btn small", title: "Claude reads what this step changed and writes a message", onclick: async () => {
+          aiBtn.disabled = true; aiBtn.textContent = "Writing…";
+          try { const r = await api("POST", gitURL("shape-message"), { batches: idx.map((i) => B[i].id) }); input.value = r.message; messages.set(key, r.message); } catch (e) { toast(e.message, true); }
+          aiBtn.disabled = false; aiBtn.textContent = "✨ Write it";
+        } }, "✨ Write it") : null;
+        const preview = h("div", { class: "shape-preview" });
+        let open = "";
+        const chip = (f) => h("button", { class: "shape-file " + f.op, title: f.path, onclick: async (ev) => {
+          list.querySelectorAll(".shape-file.on").forEach((x) => x.classList.remove("on"));
+          if (open === f.path) { open = ""; preview.replaceChildren(); return; }
+          open = f.path; ev.currentTarget.classList.add("on");
+          preview.replaceChildren(relayLoading(`Comparing ${f.path.split("/").pop()}`, { mood: "comparing", card: false }));
+          try { const d = await api("POST", gitURL("shape-diff"), { batches: idx.map((i) => B[i].id), path: f.path }); storyInto(preview, null, d, f.path.split("/").pop(), null, dr.panel); }
+          catch (e) { preview.replaceChildren(h("p", { class: "muted" }, e.message)); }
+        } }, h("i", { "aria-hidden": "true" }, f.op === "add" ? "+" : f.op === "delete" ? "−" : "✎"), f.path.split("/").pop());
+        // the syncs inside, with a ✂ between them to start a new commit there
+        const steps = h("div", { class: "shape-steps" }, ...idx.flatMap((i, k) => [
+          k > 0 ? h("button", { class: "shape-cut", title: "Start a new commit here", onclick: () => { cuts.add(i); paint(); } }, "✂ split here") : null,
+          h("div", { class: "shape-step" }, h("span", { class: "mono" }, hhmm(B[i].time)), h("span", {}, B[i].files.map((f) => (f.op === "add" ? "+" : f.op === "delete" ? "−" : "✎") + " " + f.path.split("/").pop()).join(", "))),
+        ]));
+        return h("div", { class: "card shape-group" },
+          h("div", { class: "shape-head" }, h("span", { class: "shape-n" }, gi + 1),
+            h("div", { class: "grow" }, h("b", {}, idx.length === 1 ? hhmm(B[idx[0]].time) : `${hhmm(B[idx[0]].time)} – ${hhmm(B[idx[idx.length - 1]].time)}`),
+              h("small", {}, `${plural(idx.length, "sync")} · ${plural(files.length, "file")}${idx.length > 1 ? " · " + span(B[idx[0]].time, B[idx[idx.length - 1]].time) : ""}`)),
+            gi < gs.length - 1 ? h("button", { class: "btn small ghost", title: "Make this and the next one a single commit", onclick: () => { cuts.delete(gs[gi + 1][0]); paint(); } }, "Join with next ↓") : null),
+          h("div", { class: "shape-msg" }, input, aiBtn),
+          h("div", { class: "shape-files" }, ...files.map(chip)),
+          idx.length > 1 ? h("details", { class: "shape-details" }, h("summary", {}, `The ${idx.length} syncs in this commit`), steps) : null,
+          preview);
+      }));
+    };
+
+    dr.body.replaceChildren(
+      h("div", { class: "narrator" }, h("img", { src: face("excited"), alt: "" }), h("div", { class: "bubble" }, say, hint)),
+      h("div", { class: "shape-gap" }, h("span", { class: "muted" }, "Start a new commit after a pause of"), gapSeg),
+      list,
+      t.unrecorded.length ? h("div", { class: "callout amber", style: { margin: "14px 0 0" } }, `${plural(t.unrecorded.length, "other changed file")} ${t.unrecorded.length === 1 ? "wasn't" : "weren't"} synced by Ferry (${t.unrecorded.slice(0, 3).join(", ")}${t.unrecorded.length > 3 ? "…" : ""}). They stay uncommitted for you to commit as usual.`) : "");
+    paint();
+    go.onclick = async () => {
+      const gs = groups();
+      const plan = gs.map((idx) => { const key = B[idx[0]].id; return { batches: idx.map((i) => B[i].id), message: (messages.get(key) ?? suggestMessage(filesOf(idx), st)).trim() }; });
+      const empty = plan.findIndex((p) => !p.message);
+      if (empty >= 0) return toast(`Commit ${empty + 1} needs a message`, true);
+      go.disabled = true;
+      try {
+        const r = await api("POST", gitURL("shape-commit"), { head: t.head, groups: plan });
+        dr.close();
+        toast(`Made ${plural(r.commits.length, "commit")} on ${t.branch}` + (r.skipped ? ` (${r.skipped} step${r.skipped === 1 ? "" : "s"} added up to no change)` : ""), false, "party");
+        refreshGit();
+      } catch (e) {
+        go.disabled = false;
+        toast(e.message, true);
+        if (e.code === "stale") { dr.close(); openShape(S.repo || st); }
+      }
+    };
+    dr.foot.replaceChildren(h("span", { class: "muted left", style: { fontSize: "12.5px" } }, "Your files don't change. Commits get the time you did the work. Commit hooks don't run."),
+      h("button", { class: "btn ghost", onclick: () => dr.close() }, "Cancel"), go);
   }
 
   async function discardFiles(files, label) {
