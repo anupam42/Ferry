@@ -229,7 +229,7 @@ export class ApiServer {
       .map((d) => d.name)
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
     const parent = path.dirname(dir);
-    return json({ path: dir, parent: parent === dir ? "" : parent, home: os.homedir(), dirs, is_git: isDir(path.join(dir, ".git")) });
+    return json({ path: dir, parent: parent === dir ? "" : parent, home: os.homedir(), dirs, is_git: isDir(path.join(dir, ".git")), drives: drives() });
   }
 
   private async addPair(req: Request): Promise<Response> {
@@ -353,6 +353,17 @@ function isDir(p: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Drive roots on Windows (C:\, D:\, …) so the folder picker can leave C:. Empty elsewhere. */
+function drives(): string[] {
+  if (process.platform !== "win32") return [];
+  const out: string[] = [];
+  for (let c = 65; c <= 90; c++) {
+    const root = String.fromCharCode(c) + ":\\";
+    if (isDir(root)) out.push(root);
+  }
+  return out;
 }
 
 function json(v: unknown): Response {

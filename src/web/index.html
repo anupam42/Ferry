@@ -929,6 +929,7 @@ input.invalid { border-color: var(--red); }
         h("div", { class: "tools" },
           r.is_git && h("span", { class: "badge ok" }, "this folder is a git repo"),
           h("button", { type: "button", class: "btn small", onclick: () => go(r.home) }, "⌂ Home folder"),
+          ...(r.drives || []).map((d) => h("button", { type: "button", class: "btn small", title: "Open drive " + d, onclick: () => go(d) }, "💽 " + d.replace(/\\$/, ""))),
           h("label", { class: "check", style: "margin:0" }, hiddenBox, "show hidden folders"),
         ),
         h("p", { class: "hint" }, "Click a folder to open it, then press “Choose” at the bottom."),
