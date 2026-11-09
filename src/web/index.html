@@ -618,6 +618,39 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 .op-card { border: 2px solid var(--red); }
 .seg.big button { padding: 8px 18px; }
 .rp-sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ---------- repository files (tree + README) ---------- */
+.ft-tree { padding: 4px 10px 12px; }
+.ft-dir > summary { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 12px; cursor: pointer; list-style: none; font-weight: 600; }
+.ft-dir > summary::-webkit-details-marker { display: none; }
+.ft-dir > summary:hover { background: var(--accent-soft); }
+.ft-dir > summary > svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.ft-caret { display: inline-flex; transform: rotate(-90deg); transition: transform .15s; }
+.ft-caret svg { width: 14px !important; height: 14px !important; }
+.ft-dir[open] > summary .ft-caret { transform: none; }
+.ft-kids { margin-left: 15px; padding-left: 9px; border-left: 1px solid var(--line); }
+.ft-file { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 7px 10px; border-radius: 12px; cursor: pointer; text-align: left; }
+.ft-file:hover, .ft-file:focus-visible { background: var(--accent-soft); }
+.ft-file svg { width: 16px; height: 16px; color: var(--faint); flex: none; }
+.ft-file span { overflow-wrap: anywhere; }
+.ft-view { margin: 0; background: var(--card2); border-radius: 14px; padding: 12px 16px; overflow-x: auto; white-space: pre; font-size: 12.5px; }
+.md { padding: 6px 22px 20px; line-height: 1.65; overflow-wrap: anywhere; }
+.md > :first-child { margin-top: 6px; }
+.md > :last-child { margin-bottom: 0; }
+.md h1, .md h2 { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.md h1 { font-size: 25px; margin: 18px 0 10px; } .md h2 { font-size: 20px; margin: 18px 0 8px; } .md h3 { font-size: 16.5px; margin: 16px 0 6px; }
+.md p { margin: 10px 0; }
+.md a { color: var(--accent); }
+.md img.md-img { max-width: 100%; border-radius: 10px; }
+.md hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+.md ul, .md ol { margin: 8px 0; padding-left: 26px; }
+.md li { margin: 3px 0; }
+.md li.md-task { list-style: none; margin-left: -20px; }
+.md li.md-task input { accent-color: var(--accent); margin-right: 7px; }
+.md code { background: var(--card2); border-radius: 6px; padding: 2px 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.md .md-pre { background: var(--card2); border-radius: 14px; padding: 12px 16px; overflow-x: auto; white-space: pre; margin: 10px 0; }
+.md blockquote { margin: 10px 0; padding: 2px 14px; border-left: 3px solid var(--line); color: var(--muted); }
+.md blockquote .md { padding: 0; }
+@media (prefers-reduced-motion: reduce) { .ft-caret { transition: none; } }
 /* phones (kept last so it wins over the layout above): the rail becomes a bar along the top that stays in reach */
 @media (max-width: 700px) {
   .app, .app.settings-mode { grid-template-columns: minmax(0, 1fr); padding: 10px; gap: 12px; }
@@ -2225,7 +2258,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     renderOperation(st);
 
     const n = st ? st.files.filter((f) => !f.conflicted).length : 0;
-    const tabs = [["changes", "Changes", "files", n], ["history", "History", "clock", 0], ["insights", "Insights", "chart", 0], ["branches", "Branches", "branch", 0], ["stashes", "Stashes", "box", st ? st.stashes : 0],
+    const tabs = [["files", "Files", "folder", 0], ["changes", "Changes", "files", n], ["history", "History", "clock", 0], ["insights", "Insights", "chart", 0], ["branches", "Branches", "branch", 0], ["stashes", "Stashes", "box", st ? st.stashes : 0],
       ["prs", "Pull requests", "pr", 0], ["issues", "Jira", "ticket", 0], ["tags", "Tags", "tag", 0], ["worktrees", "Worktrees", "tree", 0]]
       .filter(([id]) => id !== "issues" || (S.conns && S.conns.jira.connected));
     if (!tabs.some(([id]) => id === S.gitTab)) S.gitTab = "changes";
@@ -2313,7 +2346,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     if (S.gshown === key || (typing && S.gshown.startsWith(S.repoSel + "|" + S.gitTab))) return;
     S.gshown = key;
     if (!st) { ui.body.replaceChildren(S.repoError ? h("div", { class: "card empty-row" }, S.repoError) : relayLoading("Opening the repository", { sub: "Looking at branches and changes." })); return; }
-    ({ changes: gitChanges, history: gitHistory, insights: gitInsights, branches: gitBranches, stashes: gitStashes, prs: gitPRs, issues: gitIssues, tags: gitTags, worktrees: gitWorktrees })[S.gitTab](ui.body, st);
+    ({ files: gitFiles, changes: gitChanges, history: gitHistory, insights: gitInsights, branches: gitBranches, stashes: gitStashes, prs: gitPRs, issues: gitIssues, tags: gitTags, worktrees: gitWorktrees })[S.gitTab](ui.body, st);
   }
 
   const STATUS = (f) => f.conflicted ? ["Conflict", "red"] : f.untracked ? ["New", "solid-green"] : (f.x === "A" ? ["New", "solid-green"] : f.x === "R" ? ["Renamed", "solid-violet"] : (f.x === "D" || f.y === "D") ? ["Deleted", "solid-red"] : ["Modified", "solid-blue"]);
@@ -2902,6 +2935,186 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     } }, icon("plus"), "New tag");
     const pushAll = list.length ? h("button", { class: "btn small", onclick: () => tryAct("tag-push", {}, "Pushed all tags", "party") }, "Push all tags") : null;
     body.replaceChildren(section("g-tags", "Tags", list.length, "", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "No tags yet. Tags mark releases, like v1.0."), h("span", { class: "inline" }, pushAll, add)));
+  }
+
+  // ---------- files: the repository tree, with the README below ----------
+  async function gitFiles(body, st) {
+    body.replaceChildren(relayLoading("Listing the repository's files", { sub: "Every file git tracks." }));
+    const paths = await act(null, () => api("GET", gitURL("files")));
+    if (!paths || S.gitTab !== "files") return;
+
+    // folders and files from the flat list of paths
+    const root = { dirs: new Map(), files: [] };
+    for (const p of paths) {
+      const parts = p.split("/");
+      let node = root;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!node.dirs.has(parts[i])) node.dirs.set(parts[i], { dirs: new Map(), files: [] });
+        node = node.dirs.get(parts[i]);
+      }
+      node.files.push(parts[parts.length - 1]);
+    }
+    const nodes = (node, prefix, depth) => [
+      ...[...node.dirs.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, sub]) =>
+        h("details", { class: "ft-dir", open: depth === 0 ? true : null },
+          h("summary", {}, h("span", { class: "ft-caret" }, icon("caret")), icon("folder"), name),
+          h("div", { class: "ft-kids" }, nodes(sub, prefix + name + "/", depth + 1)))),
+      ...[...node.files].sort((a, b) => a.localeCompare(b)).map((f) =>
+        h("button", { class: "ft-file", onclick: () => showRepoFile(prefix + f) }, icon("files"), h("span", {}, f))),
+    ];
+    body.replaceChildren(section("g-files", "Files", paths.length, "",
+      paths.length ? h("div", { class: "ft-tree" }, nodes(root, "", 0))
+        : h("div", { class: "empty-row" }, "Nothing here yet. Commit some files and they show up in this tree.")));
+
+    // like GitHub and GitLab: the repository's README rendered under the file list
+    const readme = paths.find((p) => /^readme\.(md|markdown|mdown|mkd|txt)$/i.test(p)) || paths.find((p) => /^readme$/i.test(p));
+    if (!readme) return;
+    const mdBox = h("div", {});
+    mdBox.append(relayLoading("Reading " + readme, { card: false }));
+    body.append(section("g-readme", readme, null, "", mdBox));
+    const f = await act(null, () => api("GET", gitURL("file") + "?path=" + enc(readme)));
+    if (!f || S.gitTab !== "files") return;
+    mdBox.replaceChildren(/\.(md|markdown|mdown|mkd)$/i.test(readme) ? mdRender(f.text) : h("div", { class: "md" }, h("pre", { class: "mono md-pre" }, f.text)));
+  }
+
+  /** A file from the tree, in the drawer. */
+  async function showRepoFile(p) {
+    const dr = drawer({ title: p.split("/").pop(), sub: p, wide: true });
+    dr.body.append(relayLoading("Reading " + p.split("/").pop(), { card: false }));
+    try {
+      const f = await api("GET", gitURL("file") + "?path=" + enc(p));
+      if (f.binary) dr.body.replaceChildren(h("div", { class: "empty-row" }, "That's a binary file, so I can't show it as text."));
+      else if (f.tooBig) dr.body.replaceChildren(h("div", { class: "empty-row" }, "That file is too large to show here (over 1 MB)."));
+      else dr.body.replaceChildren(h("pre", { class: "mono ft-view" }, f.text));
+    } catch (e) {
+      dr.body.replaceChildren(h("p", { class: "muted" }, e.message));
+    }
+  }
+
+  /**
+   * A tiny markdown renderer for the README: headings, fenced and inline code,
+   * bold/italic, links, images, lists (with task boxes), quotes and rules.
+   * Everything starts as plain text and nodes are built by hand, so nothing in
+   * the file is ever parsed as HTML.
+   */
+  function mdRender(text) {
+    const box = h("div", { class: "md" });
+    mdBlocks(box, text);
+    return box;
+  }
+
+  function mdBlocks(box, text) {
+    const lines = text.replace(/\r\n?/g, "\n").split("\n");
+    let para = [];
+    const flush = () => {
+      if (para.length) box.append(h("p", {}, mdInline(para.join(" "))));
+      para = [];
+    };
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      let m;
+      if (/^```/.test(line)) {
+        flush();
+        const buf = [];
+        for (i++; i < lines.length && !/^```\s*$/.test(lines[i]); i++) buf.push(lines[i]);
+        box.append(h("pre", { class: "mono md-pre" }, buf.join("\n")));
+      } else if ((m = /^(#{1,6})\s+(.*)$/.exec(line))) {
+        flush();
+        box.append(h("h" + m[1].length, {}, mdInline(m[2].trim())));
+      } else if (/^\s{0,3}(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+        flush();
+        box.append(h("hr"));
+      } else if (/^\s{0,3}>/.test(line)) {
+        flush();
+        const buf = [];
+        while (i < lines.length && /^\s{0,3}>/.test(lines[i])) buf.push(lines[i++].replace(/^\s{0,3}> ?/, ""));
+        i--;
+        box.append(h("blockquote", {}, mdRender(buf.join("\n"))));
+      } else if (/^\s{0,3}(?:[-*+]|\d+[.)])\s+/.test(line)) {
+        flush();
+        const ordered = /^\s{0,3}\d/.test(line);
+        const items = [];
+        while (i < lines.length && /^\s{0,3}(?:[-*+]|\d+[.)])\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s{0,3}(?:[-*+]|\d+[.)])\s+/, ""));
+        i--;
+        box.append(h(ordered ? "ol" : "ul", {}, items.map((it) => {
+          const task = /^\[( |x|X)\]\s+/.exec(it);
+          return task
+            ? h("li", { class: "md-task" }, h("input", { type: "checkbox", disabled: true, checked: task[1] !== " " ? true : null }), mdInline(it.slice(task[0].length)))
+            : h("li", {}, mdInline(it));
+        })));
+      } else if (line.includes("<") && /^\s*(?:<[^>]+>\s*)*$/.test(line)) {
+        // raw HTML blocks (badges, pictures) aren't rendered, but their images are —
+        // a whole <picture> keeps its <source> variants, so dark mode picks the right one
+        flush();
+        const buf = [line];
+        while (i + 1 < lines.length && lines[i + 1].includes("<") && /^\s*(?:<[^>]+>\s*)*$/.test(lines[i + 1])) buf.push(lines[++i]);
+        const html = buf.join("\n");
+        const imgEl = (tag) => {
+          const src = mdImage(/src="([^"]+)"/i.exec(tag)?.[1] ?? "");
+          if (!src) return null;
+          return h("img", { class: "md-img", src, alt: /alt="([^"]*)"/i.exec(tag)?.[1] ?? "", width: /\swidth="(\d{1,4})"/i.exec(tag)?.[1] ?? null });
+        };
+        for (const pm of html.matchAll(/<picture>([\s\S]*?)<\/picture>/gi)) {
+          const sources = [...pm[1].matchAll(/<source\b[^>]*>/gi)].map((sm) => {
+            const src = mdImage(/srcset="([^"]+)"/i.exec(sm)?.[1] ?? "");
+            return src ? h("source", { srcset: src, media: /media="([^"]*)"/i.exec(sm)?.[1] ?? null }) : null;
+          }).filter((s) => s !== null);
+          const im = imgEl(/<img\b[^>]*>/i.exec(pm[1])?.[0] ?? "");
+          if (im) box.append(h("picture", {}, sources, im));
+        }
+        for (const im of html.replace(/<picture>[\s\S]*?<\/picture>/gi, "").matchAll(/<img\b[^>]*>/gi)) {
+          const el = imgEl(im[0]);
+          if (el) box.append(el);
+        }
+      } else if (/^\s{0,3}<[a-zA-Z!/]/.test(line) && />\s*$/.test(line)) {
+        // HTML with text in it (<b>…</b>, <em>…</em>, <br>): keep the text, as markdown where trivial
+        const txt = line
+          .replace(/<\/?(b|strong)\s*>/gi, "**")
+          .replace(/<\/?(em|i)\s*>/gi, "*")
+          .replace(/<br\s*\/?>/gi, " ")
+          .replace(/<[^>]+>/g, "");
+        if (txt.trim()) para.push(txt.trim());
+      } else if (!line.trim()) flush();
+      else para.push(line.trim());
+    }
+    flush();
+  }
+
+  /** Inline markdown: code, bold, italic, links and images (asterisks only, so snake_case stays alone). */
+  function mdInline(s) {
+    const out = [];
+    const re = /`([^`]+)`|\*\*([^*\s](?:[^*\n]*[^*\s])?)\*\*|\*([^*\s](?:[^*\n]*[^*\s])?)\*|!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)|\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g;
+    let last = 0, m;
+    while ((m = re.exec(s))) {
+      if (m.index > last) out.push(s.slice(last, m.index));
+      if (m[1] != null) out.push(h("code", {}, m[1]));
+      else if (m[2] != null) out.push(h("strong", {}, m[2]));
+      else if (m[3] != null) out.push(h("em", {}, m[3]));
+      else if (m[4] != null) {
+        const src = mdImage(m[5]);
+        out.push(src ? h("img", { class: "md-img", src, alt: m[4] }) : m[4]);
+      } else out.push(mdLink(m[7], mdInline(m[6])));
+      last = re.lastIndex;
+    }
+    if (last < s.length) out.push(s.slice(last));
+    return out;
+  }
+
+  /** Where a README image loads from: the web, or this repository (relative paths). */
+  function mdImage(url) {
+    if (/^https?:\/\//i.test(url)) return url;
+    if (!url || url.startsWith("#") || /^[a-z][a-z0-9+.-]*:/i.test(url)) return null;
+    const p = url.replace(/^\.\/+/, "").replace(/^\/+/, "");
+    return gitURL("file") + "?path=" + enc(p) + "&raw=1" + (token ? "&token=" + enc(token) : "");
+  }
+
+  /** A README link: web links open in a new tab; files in this repository open in the drawer. */
+  function mdLink(url, kids) {
+    if (/^(https?:\/\/|mailto:)/i.test(url)) return h("a", { href: url, target: "_blank", rel: "noopener noreferrer" }, kids);
+    if (url.startsWith("#")) return h("a", { href: url }, kids);
+    if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return h("span", {}, kids);
+    const p = url.replace(/^\.\/+/, "").replace(/^\/+/, "");
+    return h("a", { href: "#", onclick: (e) => { e.preventDefault(); showRepoFile(p); } }, kids);
   }
 
   // ---------- worktrees ----------

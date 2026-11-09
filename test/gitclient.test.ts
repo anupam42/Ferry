@@ -366,4 +366,27 @@ describe("insights", () => {
     expect(mine.total).toBe(6);
     expect(Object.values(mine.dayCommits).flat().every((c) => c.author !== "X" || c.subject !== "work on c.txt")).toBe(true);
   });
+
+  test("browsing the work tree: tracked files and file contents", async () => {
+    const d = await repo();
+    put(d, "src/deep/x.ts", "x\n");
+    fs.writeFileSync(path.join(d, "pic.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x0d]));
+    await g.stage(d, []);
+    await g.commit(d, "more");
+
+    expect(await g.trackedFiles(d)).toEqual(["a.txt", "pic.png", "src/deep/x.ts"]);
+
+    const f = await g.readFile(d, "a.txt");
+    expect(f).toMatchObject({ path: "a.txt", text: "one\ntwo\nthree\n", binary: false, tooBig: false });
+    expect((await g.readFile(d, "pic.png")).binary).toBe(true);
+    await expect(g.readFile(d, "../outside.txt")).rejects.toThrow(/outside the repository/);
+    await expect(g.readFile(d, "nope.txt")).rejects.toThrow(/isn't in the repository/);
+    await expect(g.readFile(d, "src")).rejects.toThrow(/isn't in the repository/);
+
+    const img = await g.rawImage(d, "pic.png");
+    expect(img.type).toBe("image/png");
+    expect(img.data.length).toBe(6);
+    await expect(g.rawImage(d, "a.txt")).rejects.toThrow(/only images/);
+    await expect(g.rawImage(d, "../secret.png")).rejects.toThrow(/outside the repository/);
+  });
 });

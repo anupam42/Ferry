@@ -906,6 +906,64 @@ export async function checkoutPullRequest(root: string, number: unknown): Promis
   if (r.code !== 0) throw new GitClientError(cleanMessage(r.stderr || r.error || "checkout failed"));
 }
 
+// ---------- browsing the work tree (the Files tab) ----------
+
+/** Every file git tracks, repo-relative with slashes, sorted. */
+export async function trackedFiles(root: string): Promise<string[]> {
+  const out = await git(root, ["ls-files", "-z"]);
+  return out.split("\0").filter(Boolean);
+}
+
+export interface FileContent {
+  path: string;
+  size: number;
+  text: string;
+  binary: boolean;
+  tooBig: boolean;
+}
+
+/** The most file text sent to the browser (1 MB); past that the Files tab says so instead. */
+const MAX_READ_BYTES = 1024 * 1024;
+
+/** A file's text from the work tree. Binary and huge files come back flagged, not read out. */
+export async function readFile(root: string, file: unknown): Promise<FileContent> {
+  const p = repoPath(root, file);
+  const abs = path.resolve(root, p);
+  let st: fs.Stats;
+  try {
+    st = fs.statSync(abs);
+  } catch {
+    throw new GitClientError("that file isn't in the repository");
+  }
+  if (!st.isFile()) throw new GitClientError("that file isn't in the repository");
+  if (st.size > MAX_READ_BYTES) return { path: p, size: st.size, text: "", binary: false, tooBig: true };
+  const data = fs.readFileSync(abs);
+  if (data.subarray(0, 8000).includes(0)) return { path: p, size: st.size, text: "", binary: true, tooBig: false };
+  return { path: p, size: st.size, text: data.toString("utf8"), binary: false, tooBig: false };
+}
+
+/** Image kinds a README may show inline. */
+const IMAGE_TYPES: Record<string, string> = {
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+  ".webp": "image/webp", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".avif": "image/avif",
+};
+
+/** An image's bytes and content type, for pictures a README references (drawn with <img>, so svg scripts never run). */
+export async function rawImage(root: string, file: unknown): Promise<{ type: string; data: Buffer }> {
+  const p = repoPath(root, file);
+  const type = IMAGE_TYPES[path.extname(p).toLowerCase()];
+  if (!type) throw new GitClientError("only images can be shown inline");
+  const abs = path.resolve(root, p);
+  let st: fs.Stats;
+  try {
+    st = fs.statSync(abs);
+  } catch {
+    throw new GitClientError("that file isn't in the repository");
+  }
+  if (st.size > 10 * 1024 * 1024) throw new GitClientError("that image is too large to show here");
+  return { type, data: fs.readFileSync(abs) };
+}
+
 // ---------- insights: heatmaps of commits and files ----------
 
 export interface Insights {

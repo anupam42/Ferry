@@ -3,7 +3,7 @@
 //   GET  /git/repos                         repositories: opened directly, and pair targets
 //   POST /git/repos                         {"action": "clone"|"create"|"add", "url", "path"}
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
-//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message}
+//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|file}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
 //                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|
 //                   shape-diff|shape-message|shape-commit}   (GET /git/{id}/shape: the timeline to shape, see shape.ts)
@@ -118,6 +118,15 @@ export class GitApi {
       case "commit-diff": return json(await g.commitFileDiff(root, q.get("hash"), q.get("path")));
       case "diff": return json(await g.fileDiff(root, q.get("path"), q.get("staged") === "1"));
       case "conflict": return json(await g.conflictDiff(root, q.get("path")));
+      case "files": return json(await g.trackedFiles(root));
+      case "file": {
+        // raw=1: an image's bytes, for pictures a README references (only image types are served)
+        if (q.get("raw") === "1") {
+          const img = await g.rawImage(root, q.get("path"));
+          return new Response(img.data, { headers: { "Content-Type": img.type, "Cache-Control": "no-store" } });
+        }
+        return json(await g.readFile(root, q.get("path")));
+      }
       case "branches": return json(await g.branches(root));
       case "stashes": return json(await g.stashes(root));
       case "tags": return json(await g.tags(root));
