@@ -153,6 +153,7 @@ export class Engine {
   private remoteFull = false;
   private journalN = 0;
   private lastStatus = 0;
+  private compareProgress: { done: number; total: number } | null = null;
 
   // published snapshot
   private status: Status;
@@ -173,7 +174,7 @@ export class Engine {
       : null;
     this.status = {
       name: cfg.name, source: cfg.source, target: cfg.target, remote: cfg.remote || cfg.cloud, mode: cfg.mode, watcher: "",
-      userPaused: false, guardReason: "", conflicts: [], pendingBatch: 0, pending: false,
+      userPaused: false, guardReason: "", conflicts: [], pendingBatch: 0, pending: false, comparing: null,
       lastSync: 0, added: 0, updated: 0, deleted: 0, renamed: 0, skipped: 0, failed: 0,
       isGit: false, branch: "", gitStatus: [], changed: [],
     };
@@ -292,6 +293,7 @@ export class Engine {
       this.hashes.clear();
       if (this.cfg.remote !== "" || this.cfg.cloud !== "") this.remoteFull = true;
       this.emit({ kind: "info", msg: "full resync" });
+      await this.prepareCompare();
       await this.cycle(true, true);
     });
   }
@@ -374,6 +376,7 @@ export class Engine {
         this.doPruneBackups();
         await this.checkGuard();
         if (this.mirrorList.length > 0) await this.applyMirror();
+        await this.prepareCompare();
         await this.cycle(true, true);
         await this.refreshGit(false);
       });
@@ -1328,6 +1331,74 @@ export class Engine {
     }
   }
 
+  // ---------- comparing by content ----------
+
+  /** Loads the saved hash cache (for one-off commands such as plan, which don't call run). */
+  loadHashCache(): void {
+    this.hashes.load(this.hashPath());
+  }
+
+  /**
+   * Reads every file a full comparison will need, in short slices that give
+   * the event loop back in between, so the dashboard and web app keep
+   * drawing (and can show progress) instead of freezing. The planning that
+   * follows then finds every hash in the cache. Progress is published only
+   * when the work takes longer than a moment.
+   */
+  async prepareCompare(onProgress?: (done: number, total: number) => void): Promise<void> {
+    const m = this.buildMatcher();
+    let S: Snapshot, T: Snapshot | null = null;
+    try {
+      S = this.scan(this.cfg.source, m);
+      if (this.twoWay) T = this.scan(this.cfg.target, m);
+    } catch {
+      return; // cycle() reports scan errors
+    }
+    // only files present on both sides with equal sizes are compared by content
+    const work: [string, string][] = [];
+    for (const [rel, s] of S) {
+      const tp = this.abs(DST, rel);
+      let size: number;
+      if (T) {
+        const t = T.get(rel);
+        if (!t) continue;
+        size = t.size;
+      } else {
+        const st = stat(tp);
+        if (!st) continue;
+        size = Number(st.size);
+      }
+      if (size === s.size) work.push([this.abs(SRC, rel), tp]);
+    }
+    const started = performance.now();
+    let lastYield = started, shown = false;
+    const report = (done: number) => {
+      this.compareProgress = { done, total: work.length };
+      this.publish();
+      onProgress?.(done, work.length);
+    };
+    try {
+      for (let i = 0; i < work.length; i++) {
+        for (const p of work[i]!) {
+          try {
+            this.hash(p);
+          } catch {}
+        }
+        const now = performance.now();
+        if (now - lastYield >= 25) {
+          lastYield = now;
+          if (!shown && now - started > 200) shown = true;
+          if (shown) report(i + 1);
+          await new Promise<void>((r) => setImmediate(r));
+        }
+      }
+      if (shown) report(work.length);
+    } finally {
+      this.compareProgress = null;
+      this.publish();
+    }
+  }
+
   // ---------- mirror ----------
 
   /** Target files that don't exist in the source (respecting ignores). */
@@ -1677,10 +1748,13 @@ export class Engine {
       }
     };
     const tpath = this.abs(DST, rel), spath = this.abs(SRC, rel);
+    const missing = (p: string) => !lstat(p);
     if (conflict || !(await gitx.isRepo(this.gitTarget))) {
+      if (missing(tpath) && missing(spath)) return { title: "not found: " + rel, lines: [{ op: "@", text: `${rel} isn't in either folder any more (it may have been moved or deleted)` }] };
       return { title: "target ↔ source: " + rel, lines: diff(read(tpath), read(spath), 3) };
     }
     const head = await gitx.showHead(this.gitTarget, rel);
+    if (!head && missing(tpath)) return { title: "not found: " + rel, lines: [{ op: "@", text: `${rel} isn't in the target or in the last commit (it may have been moved or deleted)` }] };
     const title = head ? "HEAD ↔ working copy: " + rel : "new file (not in HEAD): " + rel;
     return { title, lines: diff(head ?? Buffer.alloc(0), read(tpath), 3) };
   }
@@ -1850,6 +1924,7 @@ export class Engine {
     st.isGit = this.isGit;
     st.pending = this.needsApply;
     st.pendingBatch = this.pendingBatch;
+    st.comparing = this.compareProgress ? { ...this.compareProgress } : null;
     this.maybeWriteStatus();
   }
 
@@ -2144,7 +2219,7 @@ export function statusJSON(s: Status): Record<string, unknown> {
   Object.assign(o, { mode: s.mode, watcher: s.watcher, user_paused: s.userPaused });
   if (s.guardReason) o.guard_reason = s.guardReason;
   Object.assign(o, {
-    conflicts: s.conflicts, pending_batch: s.pendingBatch, pending: s.pending, last_sync: isoTime(s.lastSync),
+    conflicts: s.conflicts, pending_batch: s.pendingBatch, pending: s.pending, comparing: s.comparing, last_sync: isoTime(s.lastSync),
     added: s.added, updated: s.updated, deleted: s.deleted, renamed: s.renamed, skipped: s.skipped, failed: s.failed,
     is_git: s.isGit,
   });

@@ -33,7 +33,36 @@ import { eventJSON, parseChoice, type Event } from "./engine/types.ts";
 import { errMsg, parseWhen } from "./util.ts";
 import webPage from "./web/index.html" with { type: "text" };
 import logoSVG from "../assets/logo/icon.svg" with { type: "text" };
-import mascotSVG from "../assets/mascot/relay.svg" with { type: "text" };
+import mascot_relay from "../assets/mascot/relay.svg" with { type: "text" };
+import mascot_happy from "../assets/mascot/relay-happy.svg" with { type: "text" };
+import mascot_focused from "../assets/mascot/relay-focused.svg" with { type: "text" };
+import mascot_sleepy from "../assets/mascot/relay-sleepy.svg" with { type: "text" };
+import mascot_worried from "../assets/mascot/relay-worried.svg" with { type: "text" };
+import mascot_sad from "../assets/mascot/relay-sad.svg" with { type: "text" };
+import mascot_thinking from "../assets/mascot/relay-thinking.svg" with { type: "text" };
+import mascot_party from "../assets/mascot/relay-party.svg" with { type: "text" };
+import mascot_excited from "../assets/mascot/relay-excited.svg" with { type: "text" };
+import mascot_surprised from "../assets/mascot/relay-surprised.svg" with { type: "text" };
+import mascot_love from "../assets/mascot/relay-love.svg" with { type: "text" };
+import mascot_wink from "../assets/mascot/relay-wink.svg" with { type: "text" };
+import mascot_comparing from "../assets/mascot/relay-comparing.svg" with { type: "text" };
+
+/** Relay's expressions, served at /mascot/{name}.svg (bundled into the binary). */
+const MASCOT: Record<string, string> = {
+  relay: mascot_relay as unknown as string,
+  happy: mascot_happy as unknown as string,
+  focused: mascot_focused as unknown as string,
+  sleepy: mascot_sleepy as unknown as string,
+  worried: mascot_worried as unknown as string,
+  sad: mascot_sad as unknown as string,
+  thinking: mascot_thinking as unknown as string,
+  party: mascot_party as unknown as string,
+  excited: mascot_excited as unknown as string,
+  surprised: mascot_surprised as unknown as string,
+  love: mascot_love as unknown as string,
+  wink: mascot_wink as unknown as string,
+  comparing: mascot_comparing as unknown as string,
+};
 
 const PAGE = webPage as unknown as string;
 
@@ -109,8 +138,10 @@ export class ApiServer {
         headers: { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=86400", "X-Content-Type-Options": "nosniff" },
       });
     }
-    if (req.method === "GET" && url.pathname === "/relay.svg") {
-      return new Response(mascotSVG as unknown as string, {
+    const mascotName = /^\/mascot\/([a-z]+)\.svg$/.exec(url.pathname)?.[1]
+      ?? (url.pathname === "/relay.svg" ? "relay" : url.pathname === "/relay-comparing.svg" ? "comparing" : "");
+    if (req.method === "GET" && mascotName && MASCOT[mascotName]) {
+      return new Response(MASCOT[mascotName], {
         headers: { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=86400", "X-Content-Type-Options": "nosniff" },
       });
     }
@@ -194,7 +225,18 @@ export class ApiServer {
   private async diff(e: Engine, url: URL): Promise<Response> {
     const rel = url.searchParams.get("path") ?? "";
     if (rel === "") return text("path is required", 400);
-    const { title, lines } = await e.diff(rel, url.searchParams.get("conflict") === "1");
+    const conflict = url.searchParams.get("conflict") === "1";
+    const { title, lines } = await e.diff(rel, conflict);
+    if (url.searchParams.get("format") === "json") {
+      // what the two sides are, in plain words, for the web app's change viewer
+      const kind = conflict || title.startsWith("target ↔ source") ? "sides" : title.startsWith("new file") ? "new" : "head";
+      const labels = {
+        sides: ["In the target", "In your working folder"],
+        head: ["Last commit", "Now in the target"],
+        new: ["Not in the last commit", "Now in the target"],
+      }[kind];
+      return json({ path: rel, title, kind, before: labels[0], after: labels[1], lines });
+    }
     let out = title + "\n";
     for (const l of lines) out += (l.op === "@" ? l.text : l.op + l.text) + "\n";
     return new Response(out, { headers: { "Content-Type": "text/plain; charset=utf-8" } });

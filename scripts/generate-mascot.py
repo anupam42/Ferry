@@ -826,3 +826,39 @@ diwali_sparkler()
 diwali_diyas()
 diwali_sweets()
 print("wrote 5 Diwali variants")
+
+
+# ---------- comparing: Relay looks from one file to the other ----------
+# Used by the web app while files are compared by content.
+def comparing_anim():
+    W, H = 360, 170
+    def doc(x, cls):
+        lines = "".join(f'<path d="M{x + 12} {y}h{w}" stroke="#B9C6DD" stroke-width="4" stroke-linecap="round"/>' for y, w in [(80, 28), (92, 24), (104, 28), (116, 18)])
+        return (f'<g><rect x="{x - 6}" y="52" width="64" height="86" rx="12" fill="{SPARK}" opacity=".0" class="{cls}"/>'
+                f'<rect x="{x}" y="58" width="52" height="74" rx="8" fill="#FFFFFF" stroke="{NAVY}" stroke-width="4"/>{lines}'
+                f'<rect x="{x + 6}" y="66" width="40" height="5" rx="2.5" fill="{SPARK}" class="scan"/></g>')
+    face = f'<g class="look">{eyes("open")}</g>' + mouth("small") + cheek()
+    relay = (f'<g class="float"><g transform="translate(95 22) scale(.38)"><defs><clipPath id="cmpclip"><path d="{SIL}"/></clipPath></defs>'
+             f'{figure("cmp", face)}</g></g>')
+    css = """
+    .float { animation: float 3s ease-in-out infinite; }
+    .look { animation: look 3s ease-in-out infinite; }
+    .scan { animation: scan 1.5s ease-in-out infinite alternate; }
+    .seeL { animation: seeL 3s ease-in-out infinite; }
+    .seeR { animation: seeR 3s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    @keyframes look { 0%, 38% { transform: translateX(-16px); } 50%, 88% { transform: translateX(16px); } 100% { transform: translateX(-16px); } }
+    @keyframes scan { from { transform: translateY(0); } to { transform: translateY(56px); } }
+    @keyframes seeL { 0%, 38% { opacity: .35; } 50%, 88% { opacity: 0; } 100% { opacity: .35; } }
+    @keyframes seeR { 0%, 38% { opacity: 0; } 50%, 88% { opacity: .35; } 100% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }"""
+    content = f'''<style>{css}
+  </style>
+  {doc(18, "seeL")}
+  {doc(290, "seeR")}
+  {relay}'''
+    open(os.path.join(out, "relay-comparing.svg"), "w").write(svg(content, (0, 0, W, H), label="Relay comparing two files", title="Comparing"))
+
+
+comparing_anim()
+print("wrote relay-comparing.svg")

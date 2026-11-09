@@ -450,7 +450,7 @@ Every pair runs its own serial task queue: timers, the file watcher, the dashboa
 
 The state, history, hash-cache and status files are compatible with the earlier Go version of ferry, so an existing data folder keeps working.
 
-Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs, set up the project and send a pull request, and [ROADMAP.md](ROADMAP.md) for ideas waiting for someone to build them.
+Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs, set up the project and send a pull request, and [ROADMAP.md](ROADMAP.md) for ideas waiting for someone to build them. For comparison, [docs/gitkraken-plans.md](docs/gitkraken-plans.md) summarises what GitKraken offers on each of its plans.
 
 ## Releasing
 

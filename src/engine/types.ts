@@ -55,6 +55,8 @@ export interface Status {
   conflicts: string[];
   pendingBatch: number; // >0 while a large batch waits for approval
   pending: boolean;
+  /** Set while files are being compared by content (a full resync, or the first pass). */
+  comparing: { done: number; total: number } | null;
 
   lastSync: number; // ms, 0 = never
   added: number;
@@ -77,6 +79,7 @@ export function isPaused(s: Status): boolean {
 /** A one-line description such as "watching" or "2 conflicts". */
 export function stateOf(s: Status): string {
   if (s.conflicts.length > 0) return plural(s.conflicts.length, "conflict");
+  if (s.comparing) return `comparing ${s.comparing.done}/${s.comparing.total} files`;
   if (s.pendingBatch > 0) return plural(s.pendingBatch, "change") + " awaiting approval";
   if (s.userPaused) return "paused";
   if (s.guardReason !== "") return "paused: " + s.guardReason;

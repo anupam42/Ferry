@@ -8,6 +8,7 @@ import { counts, type Batch } from "../engine/journal.ts";
 import { isPaused, parseChoice, stateOf, type ChangedFile, type Event, type Kind, type Status } from "../engine/types.ts";
 import * as gitx from "../gitx.ts";
 import { execInteractive, isMac, isWindows, startDetached, which } from "../proc.ts";
+import { comparingArt, type ArtStyle } from "../relayart.ts";
 import { errMsg, fmtClock, fmtDateTime } from "../util.ts";
 import { renderDiff } from "./diffview.ts";
 import { box, joinHorizontal, parseKeys, queryDarkBackground, Screen, Style, truncate, width } from "./term.ts";
@@ -192,6 +193,12 @@ export class Dashboard {
       this.refresh();
       this.requestRender();
     }, 500);
+    // while a pair compares files, redraw often enough for Relay's animation
+    const fast = setInterval(() => {
+      if (!this.statuses.some((s) => s.comparing)) return;
+      this.refresh();
+      this.requestRender();
+    }, 160);
     const restore = () => this.screen.leave();
     process.on("exit", restore);
     this.render();
@@ -203,6 +210,7 @@ export class Dashboard {
       });
     } finally {
       clearInterval(tick);
+      clearInterval(fast);
       stdin.off("data", onData);
       process.stdout.off("resize", onResize);
       process.off("exit", restore);
@@ -587,6 +595,18 @@ export class Dashboard {
     let head = t.bold.render("Changed this session") + t.muted.render(`  (${this.rows.filter((r) => r.path !== "").length})`);
     if (this.filter !== "") head += t.flash.render("  /" + this.filter) + t.muted.render(" esc clears");
     lines.push(head);
+    if (st.comparing) {
+      const art: ArtStyle = {
+        body: (x) => t.bold.render(x),
+        scarf: (x) => new Style({ fg: t.cyan }).render(x),
+        active: (x) => new Style({ fg: t.yellow, bold: true }).render(x),
+        muted: (x) => t.muted.render(x),
+        bar: (x) => new Style({ fg: t.cyan }).render(x),
+      };
+      for (const l of comparingArt(Math.floor(Date.now() / 160), st.comparing.done, st.comparing.total, "Relay is comparing files…", art)) {
+        lines.push(truncate(l, w - 4));
+      }
+    }
 
     const gitLines = st.isGit ? Math.min(st.gitStatus.length, 6) + 2 : 0;
     const listH = Math.max(3, inner - 1 - gitLines);

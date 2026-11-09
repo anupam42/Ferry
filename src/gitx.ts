@@ -84,7 +84,34 @@ export async function configGet(dir: string, key: string): Promise<string> {
 /** `git status --porcelain` lines limited to dir. */
 export async function status(dir: string): Promise<string[]> {
   const out = await run(dir, "status", "--porcelain=v1", "--untracked-files=all", "--", ".");
-  return out.replace(/\n+$/, "").split("\n").filter((l) => l !== "");
+  const pre = await prefix(dir);
+  return out.replace(/\n+$/, "").split("\n").filter((l) => l !== "").map((l) => relativeLine(l, pre));
+}
+
+const prefixes = new Map<string, string>();
+
+/**
+ * Where dir sits inside its repository ("products/app/"), or "" at the root.
+ * git status prints paths from the repository root; ferry works with paths
+ * relative to the target, so status lines have this prefix removed.
+ */
+async function prefix(dir: string): Promise<string> {
+  let p = prefixes.get(dir);
+  if (p === undefined) {
+    p = (await tryRun(dir, "rev-parse", "--show-prefix"))?.trim() ?? "";
+    prefixes.set(dir, p);
+  }
+  return p;
+}
+
+/** A porcelain status line with pre removed from its path(s), including quoted paths and renames. */
+export function relativeLine(line: string, pre: string): string {
+  if (pre === "" || line.length < 4) return line;
+  const strip = (p: string) => {
+    if (p.startsWith('"') && p.slice(1).startsWith(pre)) return '"' + p.slice(1 + pre.length);
+    return p.startsWith(pre) ? p.slice(pre.length) : p;
+  };
+  return line.slice(0, 3) + line.slice(3).split(" -> ").map(strip).join(" -> ");
 }
 
 /** Counts status lines with something in the index. */

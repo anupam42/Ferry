@@ -50,6 +50,7 @@ import * as gitx from "../gitx.ts";
 import { Printer } from "../printer.ts";
 import { which } from "../proc.ts";
 import * as ai from "../ai.ts";
+import { ComparingSpinner } from "../relayart.ts";
 import * as cloud from "../cloud.ts";
 import * as remote from "../remote.ts";
 import * as service from "../service.ts";
@@ -74,6 +75,7 @@ import {
   paint,
   printDiff,
   println,
+  relayStyle,
   relTo,
   stdinIsTTY,
   VERSION,
@@ -168,7 +170,7 @@ function ago(t: number): string {
 
 // ---------- plan ----------
 
-export function cmdPlan(args: string[]): void {
+export async function cmdPlan(args: string[]): Promise<void> {
   const f = newRunFlags("plan")
     .string("format", "text", "text | markdown | json")
     .bool("diff", false, "include a diff for every changed file");
@@ -194,6 +196,11 @@ export function cmdPlan(args: string[]): void {
   let total = 0;
   for (const p of pairs) {
     const e = new Engine(p, null);
+    e.loadHashCache();
+    // big folders take a while to compare: Relay keeps you company on stderr
+    const spinner = new ComparingSpinner(process.stderr, relayStyle());
+    await e.prepareCompare((done, total) => spinner.update(done, total, `Relay is comparing ${p.name}…`));
+    spinner.stop();
     let changes: Change[];
     try {
       changes = e.plan();

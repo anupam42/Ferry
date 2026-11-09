@@ -350,3 +350,99 @@ describe("web app config repairs", () => {
     expect(after.dropped).toEqual([]);
   });
 });
+
+describe("comparing animation", () => {
+  test("prepareCompare reports progress for slow comparisons and clears it afterwards", async () => {
+    const { e, s, d } = setup();
+    // enough equal-sized pairs that hashing takes longer than the 200 ms threshold
+    const big = Buffer.alloc(256 * 1024, 7);
+    for (let i = 0; i < 160; i++) {
+      write(s, `f${i}.bin`, big);
+      write(d, `f${i}.bin`, big);
+    }
+    write(s, "only-in-source.txt", "x");
+    const seen: [number, number][] = [];
+    const statuses: unknown[] = [];
+    await e.prepareCompare((done, total) => {
+      seen.push([done, total]);
+      statuses.push(e.getStatus().comparing);
+    });
+    if (seen.length > 0) {
+      expect(seen.every(([, total]) => total === 160)).toBe(true);
+      expect(seen[seen.length - 1]![0]).toBe(160);
+      expect(statuses[0]).toMatchObject({ total: 160 });
+    }
+    expect(e.getStatus().comparing).toBeNull();
+  }, 30_000);
+
+  test("every frame of Relay's terminal art has the same width", async () => {
+    const { comparingArt } = await import("../src/relayart.ts");
+    const widths = new Set<number>();
+    for (let f = 0; f < 16; f++) {
+      const lines = comparingArt(f, f, 16);
+      expect(lines).toHaveLength(3);
+      widths.add([...lines[1]!].length);
+      expect(lines[0]).toBe("  ╭─────╮");
+    }
+    expect(widths.size).toBe(1);
+  });
+
+  test("the web app serves the comparing animation", async () => {
+    const api = new ApiServer([], "");
+    const r = await api.handle(new Request("http://127.0.0.1/relay-comparing.svg"));
+    expect(r.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await r.text()).toContain("Relay comparing two files");
+  });
+});
+
+describe("web app redesign", () => {
+  test("serves Relay's expressions and a structured diff", async () => {
+    const { e, s, d } = setup();
+    write(s, "a.txt", "one\ntwo\n");
+    await runOnce(e);
+    write(s, "a.txt", "one\nTWO\nthree\n");
+    write(d, "a.txt", "one\nTWO\nthree\n");
+    const api = new ApiServer([e], "");
+    const get = (p: string) => api.handle(new Request("http://127.0.0.1" + p));
+    for (const m of ["happy", "sleepy", "worried", "comparing"]) {
+      const r = await get(`/mascot/${m}.svg`);
+      expect(r.status).toBe(200);
+      expect(r.headers.get("Content-Type")).toBe("image/svg+xml");
+    }
+    expect((await get("/mascot/../../etc/passwd.svg")).status).toBe(404);
+    const j = (await (await get(`/pairs/${encodeURIComponent(e.name)}/diff?format=json&path=a.txt&conflict=1`)).json()) as {
+      kind: string; before: string; after: string; lines: { op: string }[];
+    };
+    expect(j.kind).toBe("sides");
+    expect(j.before).toBe("In the target");
+    expect(j.lines.length).toBeGreaterThan(0);
+  });
+});
+
+describe("targets inside a bigger repository", () => {
+  test("status paths are relative to the target, so diffs find the file", async () => {
+    const { relativeLine, status } = await import("../src/gitx.ts");
+    expect(relativeLine(" M products/app/a.txt", "products/app/")).toBe(" M a.txt");
+    expect(relativeLine('?? "products/app/my file.txt"', "products/app/")).toBe('?? "my file.txt"');
+    expect(relativeLine("R  products/app/a.txt -> products/app/b.txt", "products/app/")).toBe("R  a.txt -> b.txt");
+    expect(relativeLine(" M other/x.txt", "")).toBe(" M other/x.txt");
+
+    const repo = tempDir();
+    const git = (...a: string[]) => Bun.spawnSync(["git", "-C", repo, ...a]);
+    git("init", "-q");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "T");
+    const { e, s } = setup((p) => (p.target = path.join(repo, "products", "app")));
+    write(s, "a.txt", "one\ntwo\n");
+    await runOnce(e);
+    git("add", "-A");
+    git("commit", "-qm", "first");
+    write(s, "a.txt", "one\nTWO\n");
+    await e.cycle(false, true);
+    expect(await status(e.cfg.target)).toEqual([" M a.txt"]);
+    const d = await e.diff("a.txt", false);
+    expect(d.lines.some((l) => l.op === "+" && l.text === "TWO")).toBe(true);
+    const missing = await e.diff("products/app/a.txt", false);
+    expect(missing.lines[0]!.text).toContain("isn't in the target");
+  });
+});

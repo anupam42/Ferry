@@ -23,6 +23,17 @@ export function paint(code: string, s: string): string {
   return out.color ? `\x1b[${code}m${s}\x1b[0m` : s;
 }
 
+/** Relay's terminal art in the CLI's colours (see relayart.ts). */
+export function relayStyle() {
+  return {
+    body: (s: string) => paint("1", s),
+    scarf: (s: string) => paint("36", s),
+    active: (s: string) => paint("1;33", s),
+    muted: (s: string) => paint("90", s),
+    bar: (s: string) => paint("36", s),
+  };
+}
+
 export function println(s = ""): void {
   process.stdout.write(s + "\n");
 }

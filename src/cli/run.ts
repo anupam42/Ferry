@@ -8,7 +8,8 @@ import { notifySettings } from "../notify.ts";
 import { Printer, type Sink } from "../printer.ts";
 import { ExitError } from "../util.ts";
 import { Dispatcher } from "../webhook.ts";
-import { confirm, isTTY, out, paint, printDiff, println, stdinIsTTY, stdinLines, VERSION } from "./common.ts";
+import { ComparingSpinner } from "../relayart.ts";
+import { confirm, isTTY, out, paint, printDiff, println, relayStyle, stdinIsTTY, stdinLines, VERSION } from "./common.ts";
 import { FlagError, HelpRequested } from "./flags.ts";
 import { loadPairs, newRunFlags } from "./runflags.ts";
 
@@ -83,6 +84,16 @@ export async function cmdRun(args: string[]): Promise<void> {
     emit = printer.handle;
   }
 
+  // plain terminal: Relay shows up while files are compared by content
+  const spinner = uiMode === "plain" && tty && !f.getBool("quiet") ? new ComparingSpinner(process.stdout, relayStyle()) : null;
+  if (spinner) {
+    const base = emit;
+    emit = (ev) => {
+      spinner.clear(); // printed lines go above Relay, which redraws on its next frame
+      base(ev);
+    };
+  }
+
   // webhooks and the HTTP API see every event too
   const hooks = Dispatcher.create(settings.webhooks);
   let apiSrv: ApiServer | null = null;
@@ -116,6 +127,22 @@ export async function cmdRun(args: string[]): Promise<void> {
     return e;
   });
   if (tui && !once) dashboard = new tui.Dashboard(engines, VERSION, settings.theme);
+  if (spinner) {
+    const poll = setInterval(() => {
+      let done = 0, total = 0, any = false;
+      for (const e of engines) {
+        const c = e.getStatus().comparing;
+        if (!c) continue;
+        any = true;
+        done += c.done;
+        total += c.total;
+      }
+      if (any) spinner.update(done, total);
+      else if (spinner.active) spinner.stop();
+    }, 120);
+    poll.unref();
+    process.on("exit", () => spinner.stop());
+  }
 
   // mirror needs a confirmation before anything runs
   for (let i = 0; i < pairs.length; i++) {

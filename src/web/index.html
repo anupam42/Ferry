@@ -5,265 +5,309 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ferry</title>
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
+<script>
+  // pick the theme before anything is drawn, so the page never flashes the wrong one
+  (() => {
+    const saved = localStorage.getItem("ferry-theme");
+    const dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  })();
+</script>
 <style>
-:root {
-  --bg: #f6f7f9; --panel: #ffffff; --panel2: #f1f3f6; --line: #e3e6eb; --text: #1b1f24; --muted: #667080;
-  --accent: #2563eb; --accent-text: #ffffff; --accent-soft: #e8efff;
-  --green: #16803c; --green-soft: #e6f6ec; --yellow: #a15c00; --yellow-soft: #fff4e0;
-  --red: #c8292e; --red-soft: #fdeceb; --purple: #7c3aed; --cyan: #0e7490;
-  --radius: 10px; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+/* ---------- themes (brand: navy #092348, blue #2586E6, mint #66E4C0) ---------- */
+:root, [data-theme="light"] {
+  --bg: linear-gradient(135deg, #DDF6EE 0%, #E4EEFF 48%, #ECE6FF 100%);
+  --rail: rgba(255,255,255,.62); --card: rgba(255,255,255,.78); --card-solid: #FFFFFF; --card2: rgba(240,245,252,.9);
+  --line: rgba(9,35,72,.09); --text: #0B2147; --muted: #5E6C86; --faint: #94A0B6;
+  --accent: #2586E6; --accent-2: #3CCBB0; --accent-text: #FFFFFF; --accent-soft: rgba(37,134,230,.12);
+  --pill: #FFFFFF; --pill-text: #0B2147;
+  --green: #12805A; --green-soft: #DDF7EC; --red: #C8343F; --red-soft: #FDE7E9; --amber: #A3620A; --amber-soft: #FFF1D6;
+  --violet: #6D4BD8; --violet-soft: #ECE6FF;
+  --ins: #CFF5E3; --ins-text: #0B5D3E; --del: #FFD9DD; --del-text: #8E1D29;
+  --shadow: 0 10px 30px rgba(9,35,72,.08), 0 2px 6px rgba(9,35,72,.05);
+  --overlay: rgba(9,35,72,.28);
+  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1216; --panel: #171b21; --panel2: #1e232b; --line: #2a3039; --text: #e6e9ee; --muted: #8b95a5;
-    --accent: #4c8dff; --accent-text: #0b0e12; --accent-soft: #1a2740;
-    --green: #4ade80; --green-soft: #13261b; --yellow: #f5b642; --yellow-soft: #2b2212;
-    --red: #f87171; --red-soft: #2c1517; --purple: #a78bfa; --cyan: #22d3ee;
-    --shadow: none;
-  }
+[data-theme="dark"] {
+  --bg: linear-gradient(135deg, #071430 0%, #0D1E40 50%, #1A1844 100%);
+  --rail: rgba(14,25,50,.7); --card: rgba(17,29,56,.82); --card-solid: #13213F; --card2: rgba(26,40,72,.9);
+  --line: rgba(226,236,255,.09); --text: #E8EEF9; --muted: #A2AECA; --faint: #6E7A96;
+  --accent: #4C9DF5; --accent-2: #4FD8BD; --accent-text: #061127; --accent-soft: rgba(76,157,245,.16);
+  --pill: #1B2B4F; --pill-text: #E8EEF9;
+  --green: #4ADE9B; --green-soft: rgba(74,222,155,.13); --red: #FF7B86; --red-soft: rgba(255,123,134,.13); --amber: #F7BE55; --amber-soft: rgba(247,190,85,.13);
+  --violet: #B79CFF; --violet-soft: rgba(183,156,255,.14);
+  --ins: rgba(74,222,155,.2); --ins-text: #8FF0C3; --del: rgba(255,123,134,.2); --del-text: #FFB3BA;
+  --shadow: 0 12px 34px rgba(0,0,0,.35);
+  --overlay: rgba(2,8,22,.55);
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
-body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+html, body { margin: 0; min-height: 100%; }
+body { font: 14.5px/1.5 ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); background-attachment: fixed; }
 button, input, select, textarea { font: inherit; color: inherit; }
-a { color: var(--accent); }
-.mono { font-family: var(--mono); font-size: 12.5px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
 .muted { color: var(--muted); }
 .hidden { display: none !important; }
+:focus-visible { outline: 2.5px solid var(--accent); outline-offset: 2px; }
 
-header { display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
-.logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
-.logo img { width: 28px; height: 28px; border-radius: 7px; display: block; }
-.conn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-left: 4px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
-.dot.ok { background: var(--green); } .dot.bad { background: var(--red); } .dot.warn { background: var(--yellow); }
-header .grow { flex: 1; }
+/* ---------- layout ---------- */
+.app { display: grid; grid-template-columns: 92px 320px minmax(0, 1fr); gap: 18px; padding: 18px; min-height: 100vh; }
+@media (max-width: 1100px) { .app { grid-template-columns: 92px minmax(0, 1fr); } .pairs-col { grid-column: 2; } .main { grid-column: 2; } }
+@media (max-width: 700px) { .app { grid-template-columns: 1fr; padding: 10px; } .rail { flex-direction: row; position: static; height: auto; } .rail .grow { display: none; } .pairs-col, .main { grid-column: 1; } }
 
-.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
-.btn:hover { background: var(--panel2); }
-.btn:disabled { opacity: .5; cursor: default; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
-.btn.primary:hover { filter: brightness(1.07); }
+.rail { background: var(--rail); backdrop-filter: blur(16px); border-radius: 30px; padding: 16px 0; display: flex; flex-direction: column; align-items: center; gap: 14px; position: sticky; top: 18px; height: calc(100vh - 36px); box-shadow: var(--shadow); }
+.rail .grow { flex: 1; }
+.rail-btn { width: 54px; height: 54px; border-radius: 50%; border: 0; background: var(--pill); color: var(--text); display: grid; place-items: center; cursor: pointer; position: relative; box-shadow: 0 2px 8px rgba(9,35,72,.06); transition: transform .15s; }
+.rail-btn:hover { transform: translateY(-2px); }
+.rail-btn.on { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+.rail-btn svg { width: 22px; height: 22px; }
+.avatar { width: 62px; height: 62px; border-radius: 50%; background: var(--card-solid); display: grid; place-items: center; position: relative; box-shadow: 0 4px 14px rgba(9,35,72,.12); }
+.avatar img { width: 50px; height: 38px; }
+.avatar .dot { position: absolute; right: 2px; top: 4px; width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--card-solid); background: var(--faint); }
+.dot.ok { background: #2BC48A !important; } .dot.bad { background: #FF5C6C !important; }
+
+.card { background: var(--card); backdrop-filter: blur(18px); border-radius: 26px; box-shadow: var(--shadow); }
+
+/* ---------- pairs column ---------- */
+.pairs-col { display: flex; flex-direction: column; gap: 14px; }
+.pairs-head { padding: 18px 18px 12px; display: flex; align-items: center; gap: 10px; }
+.pairs-head h2 { font-size: 17px; margin: 0; flex: 1; }
+.count { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: #FF7A59; color: #fff; font-size: 12px; font-weight: 700; }
+.count.blue { background: var(--accent); }
+.count.red { background: #E5484D; }
+.pair-list { padding: 0 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.pair { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 10px; border-radius: 18px; border: 0; background: none; text-align: left; cursor: pointer; width: 100%; }
+.pair:hover { background: var(--accent-soft); }
+.pair.sel { background: var(--card-solid); box-shadow: 0 4px 14px rgba(9,35,72,.08); }
+.pair img { width: 44px; height: 32px; }
+.pair .name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pair .sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pair-empty { padding: 4px 18px 18px; color: var(--muted); font-size: 13px; }
+
+/* ---------- buttons, pills ---------- */
+.btn { border: 0; border-radius: 99px; padding: 9px 18px; background: var(--pill); color: var(--pill-text); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-weight: 550; box-shadow: 0 2px 8px rgba(9,35,72,.06); white-space: nowrap; transition: transform .12s, filter .12s; }
+.btn:hover { transform: translateY(-1px); }
+.btn:disabled { opacity: .5; cursor: default; transform: none; }
+.btn svg { width: 17px; height: 17px; }
+.btn.primary { background: var(--text); color: var(--card-solid); }
+[data-theme="dark"] .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #061127; }
+.btn.brand { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+.btn.ghost { background: transparent; box-shadow: none; }
+.btn.ghost:hover { background: var(--accent-soft); }
 .btn.danger { color: var(--red); }
-.btn.small { padding: 3px 9px; font-size: 12.5px; }
-.btn.ghost { border-color: transparent; background: transparent; }
-.btn.ghost:hover { background: var(--panel2); }
+.btn.small { padding: 5px 12px; font-size: 13px; }
+.btn.icon { padding: 8px; border-radius: 50%; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 99px; font-size: 12.5px; font-weight: 600; background: var(--card2); color: var(--muted); white-space: nowrap; }
+.pill.green { background: var(--green-soft); color: var(--green); } .pill.red { background: var(--red-soft); color: var(--red); }
+.pill.amber { background: var(--amber-soft); color: var(--amber); } .pill.blue { background: var(--accent-soft); color: var(--accent); }
+.pill.violet { background: var(--violet-soft); color: var(--violet); }
+.pill.solid-blue { background: var(--accent); color: #fff; } .pill.solid-green { background: #19A974; color: #fff; } .pill.solid-red { background: #E5484D; color: #fff; } .pill.solid-violet { background: #8B6CF0; color: #fff; }
 
-main { display: grid; grid-template-columns: 290px 1fr; gap: 16px; padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
-@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+/* ---------- main ---------- */
+.main { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.crumbs { font-size: 14px; color: var(--muted); display: flex; gap: 8px; align-items: center; padding: 6px 4px 0; }
+.crumbs b { color: var(--text); font-weight: 600; }
+.title-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 0 4px; }
+.title-row h1 { font-size: 30px; margin: 0; letter-spacing: -.01em; }
+.title-row .grow { flex: 1; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.paths { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 4px; font-size: 12.5px; color: var(--muted); }
+.paths code { background: var(--card); padding: 3px 10px; border-radius: 99px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--text); max-width: 100%; overflow-wrap: anywhere; }
 
-.pairs { display: flex; flex-direction: column; gap: 8px; }
-.pair-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; cursor: pointer; box-shadow: var(--shadow); text-align: left; width: 100%; }
-.pair-card:hover { border-color: var(--accent); }
-.pair-card.sel { border-color: var(--accent); outline: 2px solid var(--accent-soft); }
-.pair-card .name { font-weight: 600; display: flex; align-items: center; gap: 7px; }
-.pair-card .paths { font-size: 12px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pair-card .state { font-size: 12px; margin-top: 4px; }
+.hero { display: flex; align-items: center; gap: 18px; padding: 14px 22px; }
+.hero img { width: 112px; height: 82px; flex: none; }
+.hero img.anim { width: 150px; height: 71px; }
+.bubble { position: relative; background: var(--card-solid); border-radius: 20px; padding: 12px 16px; flex: 1; min-width: 0; box-shadow: 0 2px 10px rgba(9,35,72,.06); }
+.bubble::before { content: ""; position: absolute; left: -9px; top: 50%; margin-top: -9px; border: 9px solid transparent; border-right-color: var(--card-solid); border-left: 0; }
+.bubble .say { font-weight: 650; font-size: 15.5px; }
+.bubble .hint { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.track { height: 9px; border-radius: 99px; background: var(--card2); overflow: hidden; margin-top: 8px; }
+.track .fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); width: 0; transition: width .35s ease; }
 
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-.detail-head { padding: 16px 18px; border-bottom: 1px solid var(--line); }
-.detail-head h1 { font-size: 18px; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.route { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
-.route .path { background: var(--panel2); border-radius: 6px; padding: 2px 8px; font-family: var(--mono); font-size: 12px; max-width: 100%; overflow-wrap: anywhere; }
-.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 99px; background: var(--panel2); color: var(--muted); }
-.badge.ok { background: var(--green-soft); color: var(--green); }
-.badge.warn { background: var(--yellow-soft); color: var(--yellow); }
-.badge.bad { background: var(--red-soft); color: var(--red); }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 0 4px; }
+.toolbar .grow { flex: 1; }
+.tab { border: 0; border-radius: 99px; padding: 10px 20px; background: var(--pill); color: var(--pill-text); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; box-shadow: 0 2px 8px rgba(9,35,72,.06); }
+.tab svg { width: 18px; height: 18px; }
+.tab.on { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+.tab .count { margin-left: 2px; }
+.search { display: flex; align-items: center; gap: 8px; background: var(--pill); border-radius: 99px; padding: 8px 16px; min-width: 240px; box-shadow: 0 2px 8px rgba(9,35,72,.06); }
+.search input[type=text] { border: 0; outline: 0; background: none; flex: 1; min-width: 0; padding: 2px 0; border-radius: 0; }
+.search svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
 
-.tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--line); overflow-x: auto; }
-.tab { border: 0; background: none; padding: 10px 12px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
-.tab.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
-.tab .count { font-size: 11px; background: var(--red); color: white; border-radius: 99px; padding: 0 6px; margin-left: 4px; }
-.tabbody { padding: 16px 18px; min-height: 320px; }
+/* ---------- sections (collapsible groups) ---------- */
+.body { display: flex; flex-direction: column; gap: 14px; }
+.section { padding: 8px 8px 12px; }
+.section-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.section-head .toggle { border: 0; background: none; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; padding: 0; }
+.section-head .caret { width: 18px; height: 18px; transition: transform .2s; color: var(--muted); display: inline-flex; }
+.section.closed .caret { transform: rotate(-90deg); }
+.section.closed .section-body { display: none; }
+.section-title { display: inline-flex; align-items: center; gap: 10px; background: var(--card-solid); border-radius: 99px; padding: 6px 16px; font-weight: 700; font-size: 16px; box-shadow: 0 2px 8px rgba(9,35,72,.05); }
+.section-head .grow { flex: 1; }
+.table { width: 100%; border-collapse: collapse; }
+.table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 13px; padding: 8px 14px; }
+.table td { padding: 11px 14px; border-top: 1px solid var(--line); vertical-align: middle; }
+.table tr:hover td { background: var(--accent-soft); }
+.table .file { font-weight: 600; overflow-wrap: anywhere; }
+.table .file small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
+.table .end { text-align: right; white-space: nowrap; }
+.empty-row { padding: 18px 16px; color: var(--muted); }
+@media (max-width: 800px) { .table .opt { display: none; } }
 
-.notice { border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.notice.warn { background: var(--yellow-soft); color: var(--yellow); }
-.notice.bad { background: var(--red-soft); color: var(--red); }
-.notice.info { background: var(--accent-soft); color: var(--accent); }
-.notice.ok { background: var(--green-soft); color: var(--green); font-weight: 500; }
-.notice .grow { flex: 1; min-width: 200px; }
+.callout { margin: 0 12px 10px; padding: 12px 16px; border-radius: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.callout.amber { background: var(--amber-soft); color: var(--amber); }
+.callout .grow { flex: 1; min-width: 220px; }
 
-.list { display: flex; flex-direction: column; }
-.row { display: flex; align-items: center; gap: 10px; padding: 7px 4px; border-bottom: 1px solid var(--line); min-height: 38px; }
-.row:last-child { border-bottom: 0; }
-.row .file { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--mono); font-size: 12.5px; }
-.row .when { font-size: 12px; color: var(--muted); white-space: nowrap; }
-.row .btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.sym { width: 18px; text-align: center; font-weight: 700; font-family: var(--mono); flex: none; }
-.k-add { color: var(--green); } .k-update { color: var(--yellow); } .k-delete { color: var(--red); } .k-rename { color: var(--purple); }
-.k-conflict, .k-error { color: var(--red); } .k-kept { color: var(--cyan); } .k-commit, .k-resolved { color: var(--green); }
-.k-warn, .k-paused, .k-skip { color: var(--yellow); }
-.conflict { background: var(--red-soft); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
-.conflict .file { font-family: var(--mono); font-weight: 600; overflow-wrap: anywhere; }
-.conflict .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding: 4px 12px 14px; }
+.tile { background: var(--card-solid); border-radius: 20px; padding: 14px 16px; }
+.tile .v { font-size: 26px; font-weight: 800; }
+.tile .l { color: var(--muted); font-size: 13px; }
+.bars { padding: 4px 16px 14px; display: flex; flex-direction: column; gap: 6px; }
+.bar { display: grid; grid-template-columns: 56px 1fr 44px; gap: 10px; align-items: center; font-size: 12.5px; }
+.bar .t { height: 12px; border-radius: 99px; background: var(--card2); overflow: hidden; }
+.bar .f { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
 
-.empty { text-align: center; color: var(--muted); padding: 40px 10px; }
-.empty h2 { color: var(--text); font-size: 18px; margin: 0 0 6px; }
-.hero { text-align: center; padding: 60px 20px; }
-.hero h2 { font-size: 22px; margin: 0 0 8px; }
-.hero p { color: var(--muted); max-width: 520px; margin: 0 auto 18px; }
-.hero .mascot { display: block; margin: 0 auto 12px; animation: float 3.2s ease-in-out infinite; }
-.hero .tagline { font-style: italic; margin-top: -8px; }
-@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-@media (prefers-reduced-motion: reduce) { .hero .mascot { animation: none; } }
-
-.log { font-family: var(--mono); font-size: 12px; max-height: 520px; overflow: auto; }
-.log .ev { display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
-.log .ev .t { color: var(--muted); flex: none; }
-.log .ev .m { overflow-wrap: anywhere; }
-
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
-.tile { background: var(--panel2); border-radius: 8px; padding: 10px 12px; }
-.tile .v { font-size: 22px; font-weight: 700; }
-.tile .l { font-size: 12px; color: var(--muted); }
-.bars { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 16px; }
-.bar { display: grid; grid-template-columns: 60px 1fr 50px; gap: 8px; align-items: center; font-size: 12px; }
-.bar .track { background: var(--panel2); border-radius: 4px; height: 12px; overflow: hidden; }
-.bar .fill { background: var(--accent); height: 100%; border-radius: 4px; }
-h3 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-
-.batch { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
-.batch summary { padding: 8px 12px; cursor: pointer; display: flex; gap: 10px; align-items: center; list-style: none; }
-.batch summary::-webkit-details-marker { display: none; }
-.batch .entries { padding: 0 12px 8px 36px; font-family: var(--mono); font-size: 12px; }
-.batch.undone { opacity: .55; }
-
-label.field { display: block; margin-bottom: 12px; }
-label.field > span { display: block; font-weight: 600; margin-bottom: 4px; }
-.field small, .hint { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; font-weight: normal; }
-input[type=text], input[type=password], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 10px; }
-textarea { min-height: 60px; font-family: var(--mono); font-size: 12.5px; }
-input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.field { display: block; margin: 0 0 16px; }
+.field > .label, .field .label { display: block; font-weight: 650; margin-bottom: 6px; }
+.field small, .hint { display: block; color: var(--muted); font-size: 12.5px; margin-top: 5px; }
+.field-error { color: var(--red) !important; font-weight: 600; }
+input[type=text], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--card-solid); border-radius: 14px; padding: 10px 14px; }
+textarea { min-height: 70px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+input.invalid { border-color: var(--red); }
 .inline { display: flex; gap: 8px; align-items: center; }
 .inline > input[type=text] { flex: 1; }
-.check { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; cursor: pointer; }
-.check input { margin-top: 3px; }
-.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.check { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; cursor: pointer; }
+.check input { margin-top: 4px; accent-color: var(--accent); }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 600px) { .choices { grid-template-columns: 1fr; } }
-.choice { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; display: block; }
+.choice { border: 2px solid var(--line); border-radius: 18px; padding: 12px 14px; cursor: pointer; background: var(--card-solid); }
 .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
-.choice input { margin-right: 6px; }
-.choice small { display: block; color: var(--muted); margin-top: 3px; }
-details.more { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; }
-details.more > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.choice input { margin-right: 6px; accent-color: var(--accent); }
+.choice small { display: block; color: var(--muted); margin-top: 4px; }
+details.more { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 6px; }
+details.more > summary { cursor: pointer; font-weight: 650; padding: 6px 0; }
 
-.modal-bg { position: fixed; inset: 0; background: rgba(10,14,20,.45); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 20; overflow: auto; }
-.modal { background: var(--panel); border-radius: 12px; width: 100%; max-width: 640px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
-.modal.wide { max-width: 980px; }
-.modal-head { display: flex; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); gap: 10px; }
-.modal-head h2 { font-size: 16px; margin: 0; flex: 1; overflow-wrap: anywhere; }
-.modal-body { padding: 16px 18px; }
-.modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+/* ---------- drawer ---------- */
+.scrim { position: fixed; inset: 0; background: var(--overlay); opacity: 0; transition: opacity .25s; z-index: 30; }
+.scrim.open { opacity: 1; }
+.drawer { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(560px, calc(100vw - 24px)); background: var(--card-solid); border-radius: 28px; box-shadow: -20px 0 60px rgba(9,35,72,.25); z-index: 31; display: flex; flex-direction: column; transform: translateX(calc(100% + 24px)); transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+.drawer.wide { width: min(900px, calc(100vw - 24px)); }
+.drawer.open { transform: none; }
+.drawer-head { display: flex; align-items: center; gap: 12px; padding: 20px 22px 14px; border-bottom: 1px solid var(--line); }
+.drawer-head h2 { margin: 0; font-size: 19px; overflow-wrap: anywhere; }
+.drawer-head .sub { color: var(--muted); font-size: 13px; }
+.drawer-body { padding: 18px 22px; overflow: auto; flex: 1; }
+.drawer-foot { padding: 14px 22px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.drawer-foot .left { margin-right: auto; }
+@media (prefers-reduced-motion: reduce) { .drawer, .scrim { transition: none; } }
 
-.field > label { display: block; font-weight: 600; margin-bottom: 4px; }
-.field-error { color: var(--red) !important; font-weight: 500; }
-input.invalid { border-color: var(--red); }
-.picker .crumbs { display: flex; gap: 2px; align-items: center; flex-wrap: wrap; font-size: 13px; margin-bottom: 10px; }
-.picker .crumb { border: 0; background: none; padding: 2px 6px; border-radius: 6px; cursor: pointer; color: var(--accent); }
-.picker .crumb:hover { background: var(--accent-soft); }
-.picker .crumb.here { color: var(--text); font-weight: 600; cursor: default; background: none; }
-.picker .crumbs .slash { color: var(--muted); }
-.picker .dirs { border: 1px solid var(--line); border-radius: 8px; max-height: 340px; min-height: 120px; overflow: auto; }
-.picker .dir { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; background: none; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--line); }
-.picker .dir:last-child { border-bottom: 0; }
-.picker .dir:hover, .picker .dir:focus-visible { background: var(--accent-soft); }
-.picker .dir .chev { margin-left: auto; color: var(--muted); }
-.picker .tools { display: flex; gap: 12px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
-.modal-foot .left { margin-right: auto; }
+/* folder picker (inside the add drawer) */
+.crumbpath { display: flex; gap: 2px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.crumbpath button { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 3px 7px; border-radius: 8px; }
+.crumbpath button:hover { background: var(--accent-soft); }
+.crumbpath .here { color: var(--text); font-weight: 700; cursor: default; }
+.crumbpath .here:hover { background: none; }
+.crumbpath .sep { color: var(--faint); }
+.dirs { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.dir { display: flex; gap: 10px; align-items: center; width: 100%; border: 0; background: none; text-align: left; padding: 11px 16px; cursor: pointer; border-top: 1px solid var(--line); }
+.dir:first-child { border-top: 0; }
+.dir:hover { background: var(--accent-soft); }
+.dir svg { width: 18px; height: 18px; color: var(--accent); }
+.dir .chev { margin-left: auto; color: var(--faint); }
 
-.diff { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel2); border-radius: 8px; padding: 10px 0; max-height: 65vh; overflow: auto; }
-.diff div { padding: 0 12px; }
-.diff .a { background: var(--green-soft); color: var(--green); }
-.diff .d { background: var(--red-soft); color: var(--red); }
-.diff .h { color: var(--cyan); }
+/* ---------- change story (diff) ---------- */
+.narrator { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; }
+.narrator img { width: 86px; height: 63px; flex: none; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.map { position: relative; height: 34px; border-radius: 12px; background: var(--card2); margin-bottom: 6px; overflow: hidden; }
+.map .mk { position: absolute; top: 5px; bottom: 5px; min-width: 6px; border-radius: 4px; border: 0; padding: 0; cursor: pointer; }
+.map .mk.add { background: #2BC48A; } .map .mk.del { background: #FF5C6C; } .map .mk.edit { background: #F5B33D; }
+.map .mk.on { outline: 3px solid var(--text); outline-offset: 1px; }
+.map-scale { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-bottom: 16px; }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; font-size: 12.5px; }
+.side { border-radius: 14px; padding: 8px 12px; background: var(--card2); }
+.side b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.change { border-radius: 20px; border: 2px solid var(--line); margin-bottom: 14px; overflow: hidden; scroll-margin-top: 10px; }
+.change.on { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.change-head { display: flex; gap: 10px; align-items: center; padding: 10px 14px; background: var(--card2); font-size: 13.5px; }
+.change-head .grow { flex: 1; }
+.change-head .ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; flex: none; }
+.ic.add { background: #19A974; } .ic.del { background: #E5484D; } .ic.edit { background: #E8A120; }
+.lines { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+.ln { display: grid; grid-template-columns: 54px 22px 1fr; align-items: start; }
+.ln .no { color: var(--faint); text-align: right; padding: 3px 8px 3px 0; user-select: none; }
+.ln .op { text-align: center; padding: 3px 0; user-select: none; font-weight: 700; }
+.ln .tx { padding: 3px 12px 3px 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ln.ctx { color: var(--muted); }
+.ln.add { background: var(--ins); } .ln.add .op, .ln.add .tx { color: var(--ins-text); }
+.ln.del { background: var(--del); } .ln.del .op, .ln.del .tx { color: var(--del-text); }
+.ln.del .tx { text-decoration: line-through; text-decoration-thickness: 1px; }
+.edit-pair { padding: 8px 12px 10px; }
+.edit-pair .lab { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 6px 0 2px; font-family: ui-rounded, system-ui, sans-serif; }
+.edit-pair .txt { white-space: pre-wrap; overflow-wrap: anywhere; padding: 6px 10px; border-radius: 10px; background: var(--card2); }
+ins.w { background: var(--ins); color: var(--ins-text); text-decoration: none; border-radius: 4px; padding: 0 2px; font-weight: 700; }
+del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padding: 0 2px; }
+.classic { border-radius: 16px; background: var(--card2); padding: 8px 0; }
+.classic .hdr { color: var(--accent); padding: 4px 14px; }
+.seg { display: inline-flex; background: var(--card2); border-radius: 99px; padding: 3px; }
+.seg button { border: 0; background: none; border-radius: 99px; padding: 5px 14px; cursor: pointer; font-weight: 600; color: var(--muted); }
+.seg button.on { background: var(--card-solid); color: var(--text); box-shadow: 0 1px 4px rgba(9,35,72,.1); }
 
-.toasts { position: fixed; bottom: 16px; right: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 40; max-width: min(420px, calc(100vw - 32px)); }
-.toast { background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
-.toast.bad { background: var(--red); color: white; }
+/* ---------- Relay asks (confirmations) ---------- */
+.ask-wrap { position: fixed; inset: 0; z-index: 40; display: grid; place-items: end center; padding: 24px; background: var(--overlay); opacity: 0; transition: opacity .2s; }
+.ask-wrap.open { opacity: 1; }
+.ask { width: min(520px, 100%); background: var(--card-solid); border-radius: 30px; padding: 22px; box-shadow: 0 30px 80px rgba(9,35,72,.35); transform: translateY(40px); transition: transform .3s cubic-bezier(.2,.8,.2,1); text-align: center; margin-top: 80px; }
+.ask-wrap.open .ask { transform: none; }
+.ask .face { width: 150px; height: 110px; margin: -80px auto 4px; display: block; filter: drop-shadow(0 10px 20px rgba(9,35,72,.25)); }
+.ask .face.bob { animation: bob 2.4s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.ask h3 { margin: 0 0 6px; font-size: 19px; }
+.ask p { margin: 0 0 18px; color: var(--muted); }
+.ask .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.hold { position: relative; overflow: hidden; }
+.hold .prog { position: absolute; inset: 0; background: var(--red-soft); transform-origin: left; transform: scaleX(var(--p, 0)); }
+.hold span { position: relative; }
+.ask .note { font-size: 12px; color: var(--faint); margin-top: 10px; }
+@media (prefers-reduced-motion: reduce) { .ask, .ask-wrap { transition: none; } .ask .face.bob { animation: none; } }
+
+/* ---------- misc ---------- */
+.empty { text-align: center; padding: 50px 20px; }
+.empty img { width: 190px; height: 140px; }
+.empty h2 { margin: 10px 0 6px; font-size: 22px; }
+.empty p { color: var(--muted); max-width: 480px; margin: 0 auto 16px; }
+.float { animation: bob 3.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .float { animation: none; } }
+.log { padding: 0 14px 12px; max-height: 560px; overflow: auto; }
+.ev { display: grid; grid-template-columns: 64px 28px 1fr; gap: 6px; padding: 7px 4px; border-top: 1px solid var(--line); font-size: 13px; align-items: start; }
+.ev .t { color: var(--faint); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.ev .k { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; background: var(--faint); }
+.toasts { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 50; align-items: center; pointer-events: none; }
+.toast { display: flex; align-items: center; gap: 10px; background: var(--text); color: var(--card-solid); padding: 6px 18px 6px 6px; border-radius: 99px; box-shadow: 0 10px 30px rgba(9,35,72,.3); max-width: min(560px, calc(100vw - 32px)); }
+.toast img { width: 44px; height: 32px; flex: none; background: var(--card-solid); border-radius: 99px; padding: 2px 4px; }
+.toast.bad { background: #C8343F; color: #fff; }
+.batch.undone { opacity: .55; }
 </style>
 </head>
 <body>
-<header>
-  <div class="logo">
-    <img src="/logo.svg" alt="" width="28" height="28">
-    Ferry
-  </div>
-  <div class="conn" title="Connection to the ferry process"><span class="dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
-  <div class="grow"></div>
-  <span class="muted" id="version"></span>
-  <button class="btn primary" id="add-btn">+ Add folder pair</button>
-</header>
-
-<main id="main">
-  <aside class="pairs" id="pairs" aria-label="Folder pairs"></aside>
-  <section id="detail"></section>
-</main>
-
+<div class="app">
+  <nav class="rail" aria-label="Ferry">
+    <div class="avatar" title="Relay"><img id="rail-face" src="/mascot/happy.svg" alt="Relay"><span class="dot" id="conn-dot"></span></div>
+    <button class="rail-btn on" id="nav-pairs" title="Folder pairs" aria-label="Folder pairs"></button>
+    <button class="rail-btn" id="nav-activity" title="Activity" aria-label="Activity"></button>
+    <div class="grow"></div>
+    <button class="rail-btn" id="nav-theme" aria-label="Switch light or dark mode"></button>
+  </nav>
+  <aside class="pairs-col">
+    <div class="card">
+      <div class="pairs-head"><h2>Folder pairs</h2><span class="count blue" id="pair-count">0</span></div>
+      <div style="padding:0 18px 12px"><button class="btn brand" id="add-btn" style="width:100%;justify-content:center"></button></div>
+      <div class="pair-list" id="pairs"></div>
+    </div>
+    <div class="muted" style="font-size:12px;padding:0 10px" id="conn-text">connecting…</div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
-
-<template id="add-tpl">
-  <div class="modal-bg">
-    <form class="modal" autocomplete="off">
-      <div class="modal-head"><h2 data-title>Add a folder pair</h2><button type="button" class="btn ghost" data-close aria-label="Close">✕</button></div>
-      <div class="modal-body picker hidden" data-picker-view></div>
-      <div class="modal-body" data-form-view>
-        <div class="field">
-          <label for="f-source"><span>Your working folder (source)</span></label>
-          <div class="inline"><input type="text" id="f-source" name="source" placeholder="Choose the folder you edit in"><button type="button" class="btn" data-browse="source">Choose…</button></div>
-          <small>Where you edit files. Ferry watches this folder.</small>
-          <small class="field-error hidden" data-error="source"></small>
-        </div>
-        <div class="field">
-          <label for="f-target"><span>Where the files should go (target)</span></label>
-          <div class="inline"><input type="text" id="f-target" name="target" placeholder="Choose the destination folder, usually a git repo"><button type="button" class="btn" data-browse="target">Choose…</button></div>
-          <small>Usually a git repository. You can also type <span class="mono">user@server:/path</span> (ssh) or <span class="mono">s3://bucket/folder</span> (cloud storage).</small>
-          <small class="field-error hidden" data-error="target"></small>
-        </div>
-
-        <div class="field"><span style="font-weight:600;display:block;margin-bottom:6px">How should they stay in sync?</span>
-          <div class="choices">
-            <label class="choice"><input type="radio" name="mode" value="one-way" checked>One way →<small>Changes in the working folder are copied to the target. Edits in the target are left alone.</small></label>
-            <label class="choice"><input type="radio" name="mode" value="two-way">Both ways ⇄<small>Changes on either side are copied to the other. If both change the same file, you choose.</small></label>
-          </div>
-        </div>
-
-        <details class="more">
-          <summary>More options</summary>
-          <label class="field" style="margin-top:10px"><span>Name</span><input type="text" name="name" placeholder="e.g. website"><small>Optional. Shown in the list and in notifications.</small></label>
-          <label class="field"><span>When a file is deleted on one side</span>
-            <select name="on_delete">
-              <option value="keep">Keep the other copy (safest)</option>
-              <option value="propagate">Delete it on the other side too</option>
-              <option value="restore">Put it back from the other side (both ways only)</option>
-            </select>
-          </label>
-          <label class="check"><input type="checkbox" name="merge"><span>Try to merge edits automatically when both sides changed a text file <small class="hint">Both ways only. Falls back to asking you if the edits overlap.</small></span></label>
-          <label class="field"><span>Files to skip</span><textarea name="ignore" placeholder="dist&#10;*.log&#10;tmp/"></textarea><small>One pattern per line, like .gitignore. node_modules and .git are always skipped.</small></label>
-          <label class="field"><span>Things that look like passwords or keys</span>
-            <select name="secrets">
-              <option value="warn">Copy them, but warn me</option>
-              <option value="block">Don't copy those files</option>
-              <option value="redact">Copy with the secrets blanked out (one way only)</option>
-              <option value="off">Don't check</option>
-            </select>
-          </label>
-          <label class="field"><span>Also copy to these targets</span><textarea name="targets" placeholder="/Users/you/code/other-repo&#10;s3://my-bucket/backup"></textarea><small>One per line. Each becomes its own one-way pair from the same working folder.</small></label>
-          <label class="check"><input type="checkbox" name="ac_enabled"><span>Commit to git automatically</span></label>
-          <div data-ac class="hidden" style="padding-left:24px">
-            <div class="inline" style="margin-bottom:8px"><span>every</span><select name="ac_interval" style="width:auto"><option value="5m">5 minutes</option><option value="10m" selected>10 minutes</option><option value="30m">30 minutes</option><option value="1h">hour</option></select></div>
-            <label class="check"><input type="checkbox" name="ac_ai"><span>Let Claude write the commit messages <small class="hint">Needs an Anthropic API key (ANTHROPIC_API_KEY) where ferry runs. Otherwise a summary like “update 3 files in src” is used.</small></span></label>
-            <label class="check"><input type="checkbox" name="ac_push"><span>Push after committing</span></label>
-          </div>
-        </details>
-        <p class="hint" data-save-note></p>
-      </div>
-      <div class="modal-foot" data-form-foot><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn primary">Start syncing</button></div>
-      <div class="modal-foot hidden" data-picker-foot></div>
-    </form>
-  </div>
-</template>
 
 <script>
 "use strict";
@@ -278,18 +322,49 @@ input.invalid { border-color: var(--red); }
   const $ = (sel, root = document) => root.querySelector(sel);
   const enc = encodeURIComponent;
 
-  /** Builds an element: h("div", {class: "x", onclick: f}, "text", child, …). Text is never parsed as HTML. */
+  /** h("div", {class, onclick}, ...children): text children are never parsed as HTML. */
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
       if (v == null || v === false) continue;
       if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
       else if (k === "class") el.className = v;
+      else if (k === "style" && typeof v === "object") Object.assign(el.style, v);
       else el.setAttribute(k, v === true ? "" : v);
     }
     for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid instanceof Node ? kid : String(kid));
     return el;
   }
+
+  // line icons (static markup only, never user text)
+  const ICONS = {
+    home: '<path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>',
+    bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    files: '<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/>',
+    commit: '<circle cx="12" cy="12" r="3.5"/><path d="M3 12h5.5M15.5 12H21"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    chart: '<path d="M4 19h16"/><path d="M7 16v-5M12 16V7M17 16v-8"/>',
+    list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/>',
+    pause: '<path d="M9 5v14M15 5v14"/>',
+    play: '<path d="M8 5l11 7-11 7z"/>',
+    sync: '<path d="M20 11a8 8 0 0 0-14.5-4.5M4 13a8 8 0 0 0 14.5 4.5"/><path d="M5 3v4h4M19 21v-4h-4"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    caret: '<path d="m6 9 6 6 6-6"/>',
+    close: '<path d="M6 6l12 12M18 6 6 18"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  };
+  function icon(name) {
+    const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    for (const [k, v] of Object.entries({ viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true" })) s.setAttribute(k, v);
+    s.innerHTML = ICONS[name];
+    return s;
+  }
+  const face = (mood) => "/mascot/" + mood + ".svg";
 
   async function api(method, url, body) {
     const headers = { "X-Ferry": "web" };
@@ -298,20 +373,19 @@ input.invalid { border-color: var(--red); }
     const res = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const text = await res.text();
     if (!res.ok) throw new Error(text.trim() || res.statusText);
-    const type = res.headers.get("Content-Type") || "";
-    return type.includes("json") ? JSON.parse(text) : text;
+    return (res.headers.get("Content-Type") || "").includes("json") ? JSON.parse(text) : text;
   }
   const pairURL = (name, action) => `/pairs/${enc(name)}/${action}`;
 
-  function toast(msg, bad = false) {
-    const t = h("div", { class: "toast" + (bad ? " bad" : "") }, msg);
+  function toast(msg, bad = false, mood) {
+    const t = h("div", { class: "toast" + (bad ? " bad" : "") }, h("img", { src: face(mood || (bad ? "sad" : "happy")), alt: "" }), h("span", {}, msg));
     $("#toasts").append(t);
-    setTimeout(() => t.remove(), bad ? 7000 : 3500);
+    setTimeout(() => t.remove(), bad ? 7000 : 3800);
   }
-  async function act(label, f) {
+  async function act(label, f, mood) {
     try {
       const r = await f();
-      if (label) toast(label);
+      if (label) toast(label, false, mood);
       return r;
     } catch (e) {
       toast(e.message, true);
@@ -321,36 +395,40 @@ input.invalid { border-color: var(--red); }
 
   function ago(iso) {
     const t = Date.parse(iso);
-    if (!t || iso.startsWith("0001")) return "never";
+    if (!t || String(iso).startsWith("0001")) return "never";
     const d = (Date.now() - t) / 1000;
     if (d < 45) return "just now";
     if (d < 3600) return Math.round(d / 60) + " min ago";
     if (d < 86400) return Math.round(d / 3600) + " h ago";
     return new Date(t).toLocaleString();
   }
-  const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  const SYM = { add: "+", update: "~", delete: "−", rename: "↻", conflict: "!", resolved: "✓", error: "✗", warn: "⚠", paused: "‖", resumed: "▶", skip: "·", kept: "◇", commit: "●", synced: "⇄", git: "⎇", info: "i" };
-  const KIND_WORD = { add: "added", update: "updated", delete: "deleted", rename: "renamed", kept: "kept", conflict: "conflict" };
-
-  function stateOf(p) {
-    if (p.conflicts.length) return ["bad", p.conflicts.length + (p.conflicts.length === 1 ? " conflict" : " conflicts")];
-    if (p.pending_batch > 0) return ["warn", p.pending_batch + " changes waiting for approval"];
-    if (p.user_paused) return ["warn", "paused"];
-    if (p.guard_reason) return ["warn", "paused: " + p.guard_reason];
-    if (p.pending) return ["", "settling…"];
-    if (!p.watcher) return ["", "starting…"];
-    return ["ok", "watching"];
-  }
-  const arrowOf = (p) => (p.mode === "two-way" ? "⇄" : "→");
+  const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
   // ---------- state ----------
   const S = {
-    info: null, pairs: [], sel: localStorage.getItem("ferry-sel") || "", tab: "files",
-    log: new Map(), // pair -> events (newest last)
-    cleared: new Map(), // pair -> time the user cleared the "copied" list
-    connected: false,
+    info: null, pairs: [], sel: localStorage.getItem("ferry-sel") || "", tab: "files", q: "",
+    log: new Map(), lastError: new Map(), cleared: new Map(), closed: new Set(JSON.parse(localStorage.getItem("ferry-closed") || "[]")),
+    statsSince: "7d", ui: null, shown: "",
   };
-  const MAX_LOG = 400;
+
+  /** Relay's face and words for a pair's state. */
+  function mood(p) {
+    const err = S.lastError.get(p.name);
+    if (p.comparing) {
+      const { done, total } = p.comparing;
+      return { face: "comparing", anim: true, say: "I'm comparing your files…", hint: `${done} of ${total} checked by content`, progress: total ? done / total : 0, tone: "blue", label: `comparing ${done}/${total}` };
+    }
+    if (p.conflicts.length) return { face: "worried", say: `${plural(p.conflicts.length, "file")} changed in both folders.`, hint: "Pick which version to keep below. Nothing is overwritten until you decide.", tone: "red", label: plural(p.conflicts.length, "conflict") };
+    if (err && Date.now() - err.at < 120000) return { face: "sad", say: "Something went wrong.", hint: err.msg, tone: "red", label: "error" };
+    if (p.pending_batch > 0) return { face: "surprised", say: `That's a lot: ${p.pending_batch} changes at once.`, hint: "Approve them when you're ready (button above).", tone: "amber", label: "waiting for you" };
+    if (p.user_paused) return { face: "sleepy", say: "Paused. Taking a nap.", hint: "I'll catch up on everything you change when you resume.", tone: "amber", label: "paused" };
+    if (p.guard_reason) return { face: "thinking", say: "Paused for a moment.", hint: p.guard_reason, tone: "amber", label: "paused" };
+    if (p.pending || !p.watcher) return { face: "focused", say: "Syncing…", hint: "Copying what changed.", tone: "blue", label: "syncing" };
+    const fresh = p.last_sync && Date.now() - Date.parse(p.last_sync) < 8000;
+    const last = p.last_sync && !p.last_sync.startsWith("0001") ? " · last copy " + ago(p.last_sync) : "";
+    return { face: fresh ? "party" : "happy", say: fresh ? "Done! Everything's copied." : "All synced.", hint: `The target matches your working folder${last}.`, tone: "green", label: "watching" };
+  }
 
   async function refresh() {
     try {
@@ -362,6 +440,10 @@ input.invalid { border-color: var(--red); }
     }
     if (!S.pairs.some((p) => p.name === S.sel)) S.sel = S.pairs[0] ? S.pairs[0].name : "";
     render();
+    if (S.pairs.some((p) => p.comparing)) {
+      clearTimeout(S.fast);
+      S.fast = setTimeout(refresh, 400);
+    }
   }
   let refreshTimer = null;
   const refreshSoon = () => {
@@ -369,13 +451,12 @@ input.invalid { border-color: var(--red); }
     refreshTimer = setTimeout(refresh, 250);
   };
 
+  // "running" means ferry answers; the live-updates stream reconnecting by itself is not an outage
   function setConn(ok) {
-    S.connected = ok;
     $("#conn-dot").className = "dot " + (ok ? "ok" : "bad");
-    $("#conn-text").textContent = ok ? "connected" : "ferry isn't running";
+    $("#conn-text").textContent = ok ? "Ferry is running · updates are live" : "Can't reach Ferry. Is “ferry ui” still running in your terminal?";
   }
 
-  // live events
   function connectEvents() {
     const es = new EventSource("/events" + (token ? "?token=" + enc(token) : ""));
     const onEv = (m) => {
@@ -387,454 +468,787 @@ input.invalid { border-color: var(--red); }
       }
       const list = S.log.get(ev.pair) || [];
       list.push(ev);
-      if (list.length > MAX_LOG) list.splice(0, list.length - MAX_LOG);
+      if (list.length > 400) list.splice(0, list.length - 400);
       S.log.set(ev.pair, list);
+      if (ev.kind === "error") {
+        S.lastError.set(ev.pair, { at: Date.now(), msg: (ev.message || "error") + (ev.path ? " (" + ev.path + ")" : "") });
+        toast(`${ev.pair}: ${ev.message || "error"}`, true);
+      }
+      if (ev.kind === "commit") toast(`${ev.pair}: ${ev.message}`, false, "party");
       if (ev.kind === "conflict" && ev.held && document.hidden) document.title = "(!) Ferry";
-      if (ev.kind === "error") toast(`${ev.pair}: ${ev.message || "error"}${ev.path ? " (" + ev.path + ")" : ""}`, true);
-      if (ev.kind === "commit") toast(`${ev.pair}: ${ev.message}`);
-      if (ev.pair === S.sel && S.tab === "activity") renderTab();
       refreshSoon();
     };
-    for (const k of Object.keys(SYM)) es.addEventListener(k, onEv);
-    es.onopen = () => setConn(true);
-    es.onerror = () => setConn(false);
+    for (const k of ["info", "add", "update", "delete", "rename", "conflict", "resolved", "skip", "warn", "error", "synced", "paused", "resumed", "git", "commit", "kept"]) es.addEventListener(k, onEv);
+    es.onerror = () => refreshSoon(); // the browser reconnects by itself; just check that ferry still answers
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = "Ferry"; });
+
+  // ---------- rail ----------
+  function setupRail() {
+    $("#nav-pairs").append(icon("home"));
+    $("#nav-activity").append(icon("bell"));
+    $("#nav-pairs").onclick = () => { S.tab = "files"; S.shown = ""; render(); };
+    $("#nav-activity").onclick = () => { S.tab = "activity"; S.shown = ""; render(); };
+    const themeBtn = $("#nav-theme");
+    const paintTheme = () => {
+      const dark = document.documentElement.dataset.theme === "dark";
+      themeBtn.replaceChildren(icon(dark ? "sun" : "moon"));
+      themeBtn.title = dark ? "Switch to light mode" : "Switch to dark mode";
+    };
+    themeBtn.onclick = () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      localStorage.setItem("ferry-theme", next);
+      paintTheme();
+    };
+    paintTheme();
+    $("#add-btn").append(icon("plus"), "New pair");
+    $("#add-btn").onclick = openAdd;
+  }
 
   // ---------- rendering ----------
   function render() {
     renderPairs();
-    renderDetail();
+    renderMain();
+    const p = current();
+    const m = p ? mood(p) : null;
+    const want = face(m ? (m.anim ? "focused" : m.face) : "happy");
+    if ($("#rail-face").getAttribute("src") !== want) $("#rail-face").src = want;
+    $("#nav-pairs").classList.toggle("on", S.tab !== "activity");
+    $("#nav-activity").classList.toggle("on", S.tab === "activity");
   }
 
   function renderPairs() {
     const box = $("#pairs");
+    $("#pair-count").textContent = S.pairs.length;
+    if (S.info && !S.info.can_add) $("#add-btn").classList.add("hidden");
     box.replaceChildren();
     for (const p of S.pairs) {
-      const [cls, label] = stateOf(p);
-      box.append(
-        h("button", { class: "pair-card" + (p.name === S.sel ? " sel" : ""), onclick: () => select(p.name) },
-          h("div", { class: "name" }, h("span", { class: "dot " + cls }), p.name),
-          h("div", { class: "paths", title: `${p.source} ${arrowOf(p)} ${p.remote || p.target}` }, `${short(p.source)} ${arrowOf(p)} ${short(p.remote || p.target)}`),
-          h("div", { class: "state muted" }, label, " · last sync ", ago(p.last_sync)),
-        ),
-      );
+      const m = mood(p);
+      box.append(h("button", { class: "pair" + (p.name === S.sel ? " sel" : ""), onclick: () => select(p.name), title: `${p.source} ${arrowOf(p)} ${p.remote || p.target}` },
+        h("img", { src: face(m.anim ? "focused" : m.face), alt: "" }),
+        h("div", {}, h("div", { class: "name" }, p.name), h("div", { class: "sub" }, m.label + " · " + ago(p.last_sync))),
+      ));
     }
-    if (S.pairs.length === 0) box.append(h("div", { class: "muted", style: "padding:8px 4px" }, "No folder pairs yet."));
+    if (!S.pairs.length) box.append(h("div", { class: "pair-empty" }, "No folder pairs yet. Add your first one above."));
   }
-  function short(p) {
-    const home = S.info && S.info.home;
-    if (home && p.startsWith(home)) p = "~" + p.slice(home.length);
-    return p.length > 38 ? "…" + p.slice(-37) : p;
-  }
-
+  const arrowOf = (p) => (p.mode === "two-way" ? "⇄" : "→");
   function select(name) {
     S.sel = name;
+    S.shown = "";
     localStorage.setItem("ferry-sel", name);
     render();
   }
   const current = () => S.pairs.find((p) => p.name === S.sel);
+  function short(path) {
+    const home = S.info && S.info.home;
+    return home && path.startsWith(home) ? "~" + path.slice(home.length) : path;
+  }
 
-  function renderDetail() {
-    const box = $("#detail");
+  /** The main area is built once per pair and then updated in place, so typing, focus and Relay's animation survive refreshes. */
+  function renderMain() {
+    const main = $("#main");
     const p = current();
     if (!p) {
-      box.replaceChildren(
-        h("div", { class: "panel hero" },
-          h("img", { src: "/relay.svg", alt: "Relay, the Ferry mascot", width: "220", height: "161", class: "mascot" }),
-          h("h2", {}, "Keep a folder and a repository in sync"),
-          h("p", { class: "tagline" }, "Relay, the Sync Spirit: a friendly, floating companion that keeps your files and projects in flow."),
-          h("p", {}, "Pick the folder you work in and the folder (usually a git repository) it should be copied to. Ferry watches for changes and copies them for you, with backups, undo and conflict help."),
-          S.info && !S.info.can_add
-            ? h("p", { class: "muted" }, "Start ferry with “ferry ui” to add pairs from here.")
-            : h("button", { class: "btn primary", onclick: openAdd }, "+ Add your first folder pair"),
-        ),
-      );
+      S.ui = null;
+      const canAdd = !S.info || S.info.can_add;
+      main.replaceChildren(h("div", { class: "card empty" },
+        h("img", { src: face("excited"), alt: "Relay", class: "float" }),
+        h("h2", {}, "Hi, I'm Relay. Let's sync your first folder."),
+        h("p", {}, "Pick the folder you work in and the folder (usually a git repository) it should be copied to. I'll watch for changes and copy them for you, with backups, undo and help with conflicts."),
+        h("p", {}, canAdd ? "Click “New pair” on the left to start." : "Start ferry with “ferry ui” to add pairs from here."),
+      ));
       return;
     }
-    const [cls, label] = stateOf(p);
-    const paused = p.user_paused;
-    const head = h("div", { class: "detail-head" },
-      h("h1", {}, p.name, h("span", { class: "badge " + cls }, label)),
-      h("div", { class: "route" },
-        h("span", { class: "path", title: "source" }, p.source), h("span", { "aria-label": p.mode }, arrowOf(p)), h("span", { class: "path", title: "target" }, p.remote || p.target),
-      ),
-      h("div", { class: "muted", style: "font-size:12px;margin-top:6px" },
-        p.mode === "two-way" ? "Both ways" : "One way", " · ", p.watcher || "starting", " · last sync ", ago(p.last_sync),
-        ` · this session: +${p.added} ~${p.updated} −${p.deleted} ↻${p.renamed}`, p.failed ? ` · ${p.failed} failed` : "",
-        p.is_git ? ` · git ${p.branch || ""}` : "",
-      ),
-      h("div", { class: "actions" },
-        h("button", { class: "btn", onclick: () => act(paused ? "resumed" : "paused", () => api("POST", pairURL(p.name, paused ? "resume" : "pause"))).then(refreshSoon) }, paused ? "▶ Resume" : "‖ Pause"),
-        h("button", { class: "btn", title: "Compare every file by content and copy what differs", onclick: (ev) => syncNow(p, ev.currentTarget) }, "⟳ Sync everything now"),
-        p.pending_batch > 0 && h("button", { class: "btn primary", onclick: () => act("approved", () => api("POST", pairURL(p.name, "approve"))).then(refreshSoon) }, `Approve ${p.pending_batch} changes`),
-        S.info && S.info.can_add && h("button", { class: "btn danger", onclick: () => removePair(p) }, "Stop syncing"),
-      ),
-    );
-    const tabs = [
-      ["files", "Files", p.conflicts.length],
-      ["git", "Commit", 0],
-      ["history", "History & undo", 0],
-      ["stats", "Stats", 0],
-      ["activity", "Activity", 0],
-    ].filter(([id]) => id !== "git" || p.is_git);
-    if (!tabs.some(([id]) => id === S.tab)) S.tab = "files";
-    const tabBar = h("div", { class: "tabs", role: "tablist" },
-      tabs.map(([id, name, n]) => h("button", { class: "tab" + (S.tab === id ? " on" : ""), role: "tab", "aria-selected": S.tab === id ? "true" : "false", onclick: () => { S.tab = id; renderDetail(); } }, name, n ? h("span", { class: "count" }, n) : null)),
-    );
-    // keep the tab's content (and anything typed in it) unless what it shows changed
-    const key = tabKey(p);
-    const old = $("#tabbody");
-    const reuse = old && S.shown === key;
-    const body = reuse ? old : h("div", { class: "tabbody", id: "tabbody" });
-    box.replaceChildren(h("div", { class: "panel" }, head, tabBar, body));
-    if (!reuse) {
-      S.shown = key;
-      renderTab();
-    }
+    if (!S.ui || S.ui.pair !== p.name || !main.contains(S.ui.body)) buildMain(p);
+    updateMain(p);
   }
 
-  function tabKey(p) {
-    const base = p.name + "|" + S.tab + "|";
+  function buildMain(p) {
+    const ui = { pair: p.name };
+    ui.crumbs = h("div", { class: "crumbs" });
+    ui.h1 = h("h1");
+    ui.state = h("span", { class: "pill" });
+    ui.actions = h("div", { class: "actions" });
+    ui.paths = h("div", { class: "paths" });
+    ui.face = h("img", { alt: "Relay" });
+    ui.say = h("div", { class: "say" });
+    ui.hint = h("div", { class: "hint" });
+    ui.track = h("div", { class: "track hidden" }, h("div", { class: "fill" }));
+    ui.hero = h("div", { class: "card hero" }, ui.face, h("div", { class: "bubble", role: "status" }, ui.say, ui.hint, ui.track));
+    ui.tabs = h("div", { class: "toolbar" });
+    ui.search = h("input", { type: "text", placeholder: "Search files…", "aria-label": "Search files", value: S.q });
+    ui.search.addEventListener("input", () => { S.q = ui.search.value.trim().toLowerCase(); S.shown = ""; renderBody(current()); });
+    ui.searchBox = h("label", { class: "search" }, icon("search"), ui.search);
+    ui.body = h("div", { class: "body" });
+    $("#main").replaceChildren(ui.crumbs, h("div", { class: "title-row" }, ui.h1, ui.state, h("div", { class: "grow" }), ui.actions), ui.paths, ui.hero, ui.tabs, ui.body);
+    S.ui = ui;
+    S.shown = "";
+  }
+
+  function updateMain(p) {
+    const ui = S.ui;
+    const m = mood(p);
+    ui.crumbs.replaceChildren(h("span", {}, "Folder pairs"), h("span", {}, "›"), h("b", {}, p.name));
+    ui.h1.textContent = p.name;
+    ui.state.className = "pill " + m.tone;
+    ui.state.textContent = m.label;
+    ui.paths.replaceChildren(h("code", { title: "your working folder" }, short(p.source)), h("span", {}, arrowOf(p)), h("code", { title: "target" }, p.remote || short(p.target)),
+      h("span", {}, (p.mode === "two-way" ? "both ways" : "one way") + (p.is_git ? ` · git ${p.branch || ""}` : "") + ` · this session +${p.added} ~${p.updated} −${p.deleted}`));
+    const want = face(m.face);
+    if (ui.face.getAttribute("src") !== want) {
+      ui.face.src = want;
+      ui.face.className = m.anim ? "anim" : "float";
+    }
+    ui.say.textContent = m.say;
+    ui.hint.textContent = m.hint;
+    ui.track.classList.toggle("hidden", m.progress == null);
+    if (m.progress != null) $(".fill", ui.track).style.width = Math.round(m.progress * 100) + "%";
+
+    const paused = p.user_paused;
+    ui.actions.replaceChildren(
+      p.pending_batch > 0 ? h("button", { class: "btn brand", onclick: () => act("approved", () => api("POST", pairURL(p.name, "approve")), "happy").then(refreshSoon) }, `Approve ${p.pending_batch} changes`) : "",
+      h("button", { class: "btn", onclick: () => act(paused ? "Back to work!" : "Paused", () => api("POST", pairURL(p.name, paused ? "resume" : "pause")), paused ? "happy" : "sleepy").then(refreshSoon) }, icon(paused ? "play" : "pause"), paused ? "Resume" : "Pause"),
+      h("button", { class: "btn", title: "Compare every file by content and copy what differs", onclick: (ev) => syncNow(p, ev.currentTarget) }, icon("sync"), "Sync everything now"),
+      S.info && S.info.can_add ? h("button", { class: "btn ghost danger", onclick: () => askStop(p) }, icon("stop"), "Stop syncing") : "",
+    );
+
+    const tabs = [["files", "Files", "files", p.conflicts.length], ["git", "Commit", "commit", (p.git_status || []).length], ["history", "History", "clock", 0], ["stats", "Stats", "chart", 0], ["activity", "Activity", "list", 0]]
+      .filter(([id]) => id !== "git" || p.is_git);
+    if (!tabs.some(([id]) => id === S.tab)) S.tab = "files";
+    const typing = document.activeElement === ui.search;
+    ui.tabs.replaceChildren(
+      ...tabs.map(([id, name, ic, n]) => h("button", { class: "tab" + (S.tab === id ? " on" : ""), "aria-pressed": S.tab === id ? "true" : "false", onclick: () => { S.tab = id; S.shown = ""; render(); } },
+        icon(ic), name, n ? h("span", { class: "count" + (id === "files" ? " red" : " blue") }, n) : null)),
+      h("div", { class: "grow" }), ui.searchBox,
+    );
+    if (typing) ui.search.focus();
+    renderBody(p);
+  }
+
+  function bodyKey(p) {
+    const base = p.name + "|" + S.tab + "|" + S.q + "|";
     switch (S.tab) {
-      case "files": return base + JSON.stringify([p.changed, p.conflicts, p.guard_reason, p.user_paused, p.pending, p.pending_batch, !!p.watcher, (p.git_status || []).length, p.last_sync, Math.floor(Date.now() / 60000)]);
+      case "files": return base + JSON.stringify([p.changed, p.conflicts, (p.git_status || []).length, S.cleared.get(p.name) || 0, Math.floor(Date.now() / 60000)]);
       case "git": {
-        const typing = document.activeElement && $("#tabbody")?.contains(document.activeElement);
-        return typing && S.shown?.startsWith(base) ? S.shown : base + JSON.stringify(p.git_status);
+        const typing = S.ui && S.ui.body.contains(document.activeElement);
+        return typing && S.shown.startsWith(base) ? S.shown : base + JSON.stringify(p.git_status);
       }
       case "activity": return base + (S.log.get(p.name) || []).length;
-      default: return base + (S.bump || 0); // history and stats reload when asked
+      default: return base + (S.bump || 0);
     }
   }
-
-  function renderTab() {
-    const body = $("#tabbody");
-    const p = current();
-    if (!body || !p) return;
-    ({ files: tabFiles, git: tabGit, history: tabHistory, stats: tabStats, activity: tabActivity })[S.tab](body, p);
+  function renderBody(p) {
+    if (!p || !S.ui) return;
+    const key = bodyKey(p);
+    if (S.shown === key) return;
+    S.shown = key;
+    ({ files: tabFiles, git: tabGit, history: tabHistory, stats: tabStats, activity: tabActivity })[S.tab](S.ui.body, p);
   }
+
+  /** A collapsible group like "Needs your decision 2". */
+  function section(id, title, count, countClass, content, extra) {
+    const sec = h("div", { class: "card section" + (S.closed.has(id) ? " closed" : "") });
+    const toggle = h("button", { class: "toggle", "aria-expanded": S.closed.has(id) ? "false" : "true", onclick: () => {
+      S.closed.has(id) ? S.closed.delete(id) : S.closed.add(id);
+      localStorage.setItem("ferry-closed", JSON.stringify([...S.closed]));
+      sec.classList.toggle("closed");
+      toggle.setAttribute("aria-expanded", S.closed.has(id) ? "false" : "true");
+    } }, h("span", { class: "caret" }, icon("caret")), h("span", { class: "section-title" }, title, count != null ? h("span", { class: "count " + (countClass || "") }, count) : null));
+    sec.append(h("div", { class: "section-head" }, toggle, h("div", { class: "grow" }), extra || null), h("div", { class: "section-body" }, content));
+    return sec;
+  }
+  const matches = (path) => !S.q || path.toLowerCase().includes(S.q);
+  const KIND = { add: ["Added", "solid-green"], update: ["Updated", "solid-blue"], delete: ["Deleted", "solid-red"], rename: ["Renamed", "solid-violet"], kept: ["Kept", "violet"], conflict: ["Conflict", "red"] };
 
   // ---------- files ----------
   function tabFiles(body, p) {
-    body.replaceChildren();
-    // 1. the state right now, in plain words
-    if (p.guard_reason) body.append(h("div", { class: "notice warn" }, "‖ Paused automatically: " + p.guard_reason));
-    else if (p.user_paused) body.append(h("div", { class: "notice warn" }, "‖ Paused. Changes are collected and copied when you resume."));
-    else if (p.pending_batch > 0) body.append(h("div", { class: "notice warn" }, `${p.pending_batch} changes are waiting for your approval (button above).`));
-    else if (p.pending || !p.watcher) body.append(h("div", { class: "notice info" }, "⟳ Syncing…"));
-    else if (!p.conflicts.length) {
-      body.append(h("div", { class: "notice ok" }, "✓ All synced. The target matches your working folder" + (p.last_sync && !p.last_sync.startsWith("0001") ? " (last copy " + ago(p.last_sync) + ")." : ".")));
-    }
+    const out = [];
     if (p.conflicts.length) {
-      body.append(h("h3", {}, "Needs your decision"));
-      for (const c of p.conflicts) body.append(conflictBox(p, c));
-    }
-
-    // 2. what git sees: differences from the target's last commit are not sync problems
-    const dirty = (p.git_status || []).length;
-    if (p.is_git && dirty > 0) {
-      body.append(h("div", { class: "notice info" },
-        h("span", { class: "grow" }, `${dirty} file(s) in the target differ from its last git commit. That's normal after syncing: commit them when you're ready.`),
-        h("button", { class: "btn small", onclick: () => { S.tab = "git"; renderDetail(); } }, "Review and commit"),
+      const rows = p.conflicts.filter(matches).map((c) => h("tr", {},
+        h("td", { class: "file" }, c, h("small", {}, "Changed in both folders since the last sync")),
+        h("td", { class: "opt" }, h("span", { class: "pill red" }, "Needs a decision")),
+        h("td", { class: "end" },
+          h("button", { class: "btn small brand", onclick: () => showDiff(p, c, true) }, icon("eye"), "See both versions"), " ",
+          h("button", { class: "btn small", onclick: () => resolve(p, c, "source", "kept your working folder's version") }, "Keep mine"), " ",
+          h("button", { class: "btn small", onclick: () => resolve(p, c, "target", "kept the target's version") }, "Keep target's")),
       ));
+      out.push(section("conflicts", "Needs your decision", p.conflicts.length, "red",
+        rows.length ? h("table", { class: "table" }, h("thead", {}, h("tr", {}, h("th", {}, "File"), h("th", { class: "opt" }, "Status"), h("th", {}))), h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "No conflicts match your search.")));
     }
 
-    // 3. a log of what was copied, which the user can clear
     const cleared = S.cleared.get(p.name) || 0;
-    const files = (p.changed || []).filter((c) => !p.conflicts.includes(c.path) && Date.parse(c.time) > cleared).sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
-    if (files.length === 0) {
-      body.append(h("p", { class: "muted", style: "margin-top:16px" }, "Files Ferry copies will be listed here, newest first."));
-      return;
+    const files = (p.changed || []).filter((c) => !p.conflicts.includes(c.path) && Date.parse(c.time) > cleared && matches(c.path)).sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
+    const rows = files.slice(0, 500).map((c) => {
+      const [word, cls] = KIND[c.kind] || [c.kind, ""];
+      const folder = c.path.includes("/") ? c.path.slice(0, c.path.lastIndexOf("/") + 1) : "top folder";
+      return h("tr", {},
+        h("td", { class: "file" }, c.path.split("/").pop(), h("small", {}, folder)),
+        h("td", {}, h("span", { class: "pill " + cls }, word)),
+        h("td", { class: "opt muted" }, c.direction === "←" ? "to your working folder" : c.direction === "⇄" ? "merged both ways" : "to the target"),
+        h("td", { class: "opt muted" }, ago(c.time)),
+        h("td", { class: "end" },
+          c.kind !== "delete" ? h("button", { class: "btn small", onclick: () => showDiff(p, c.path, false) }, icon("eye"), "See changes") : "", " ",
+          h("button", { class: "btn small ghost", title: "Stop syncing this file (adds it to .syncignore)", onclick: () => ignoreFile(p, c.path) }, "Ignore")),
+      );
+    });
+    out.push(section("copied", "Copied since Ferry started", files.length, "",
+      rows.length ? h("table", { class: "table" }, h("thead", {}, h("tr", {}, h("th", {}, "File"), h("th", {}, "What happened"), h("th", { class: "opt" }, "Where"), h("th", { class: "opt" }, "When"), h("th", {}))), h("tbody", {}, rows))
+        : h("div", { class: "empty-row" }, S.q ? "No copied files match your search." : "Nothing copied yet. Edit a file in your working folder and it shows up here."),
+      files.length ? h("button", { class: "btn small ghost", onclick: () => { S.cleared.set(p.name, Date.now()); S.shown = ""; renderBody(p); } }, "Clear list") : null));
+
+    if (p.is_git) {
+      const n = (p.git_status || []).length;
+      out.push(section("git", "Not committed yet", n, "blue",
+        h("div", { class: "empty-row" }, n ? `${plural(n, "file")} in the target differ from its last git commit. That's normal after syncing; commit them when you're ready.` : "The target matches its last commit.",
+          n ? h("div", { style: { marginTop: "10px" } }, h("button", { class: "btn small primary", onclick: () => { S.tab = "git"; S.shown = ""; render(); } }, icon("commit"), "Review and commit")) : null)));
     }
-    body.append(h("div", { class: "inline", style: "margin-top:16px" },
-      h("h3", { style: "margin:0;flex:1" }, "Copied since ferry started"),
-      h("button", { class: "btn small ghost", title: "Hide these entries (nothing is changed on disk)", onclick: () => { S.cleared.set(p.name, Date.now()); S.shown = ""; renderDetail(); } }, "Clear list"),
-    ));
-    const list = h("div", { class: "list" });
-    for (const c of files.slice(0, 500)) {
-      list.append(h("div", { class: "row" },
-        h("span", { class: "sym k-" + c.kind, title: c.kind }, SYM[c.kind] || "·"),
-        h("span", { class: "file" }, c.path),
-        h("span", { class: "when" }, "copied " + (KIND_WORD[c.kind] ? "(" + KIND_WORD[c.kind] + ") " : "") + ago(c.time)),
-        h("span", { class: "btns" },
-          c.kind !== "delete" && h("button", { class: "btn small", title: "What changed compared with the last git commit", onclick: () => showDiff(p, c.path, false) }, "Diff"),
-          h("button", { class: "btn small", title: "Stop syncing this file (adds it to .syncignore)", onclick: () => ignoreFile(p, c.path) }, "Ignore"),
-        ),
-      ));
-    }
-    body.append(list);
-    if (files.length > 500) body.append(h("p", { class: "muted" }, `… and ${files.length - 500} more`));
+    body.replaceChildren(...out);
   }
 
-  /** Full resync, then a clear "done" message once the pass has finished. */
+  const resolve = (p, file, choice, label) => act(`${file}: ${label}`, () => api("POST", pairURL(p.name, "resolve"), { path: file, choice }), "happy").then(refreshSoon);
+
+  async function ignoreFile(p, file) {
+    const ok = await relayAsk({ mood: "thinking", title: `Stop syncing ${file}?`, text: "I'll add it to .syncignore in your working folder. Copies I've already made stay where they are.", yes: "Ignore it", no: "Keep syncing it", yesMood: "wink" });
+    if (!ok) return;
+    const r = await act(null, () => api("POST", pairURL(p.name, "ignore"), { path: file }));
+    if (r) toast(r.already ? `${file} was already ignored` : `Ignoring ${file} from now on`, false, "wink");
+    refreshSoon();
+  }
+
+  /** Full resync, then a clear "done" message. */
   async function syncNow(p, btn) {
     btn.disabled = true;
-    btn.textContent = "⟳ Syncing…";
     const before = (S.log.get(p.name) || []).length;
     const ok = await act(null, () => api("POST", pairURL(p.name, "resync")));
     if (ok) {
-      // wait for the pass to settle (the engine reports "settling" while it works)
-      for (let i = 0; i < 40; i++) {
-        await new Promise((r) => setTimeout(r, 250));
+      for (let i = 0; i < 600; i++) {
+        await new Promise((r) => setTimeout(r, 300));
         const st = (await api("GET", "/status").catch(() => [])).find((x) => x.name === p.name);
-        if (st && !st.pending && i >= 2) break;
+        if (st && !st.pending && !st.comparing && i >= 2) break;
       }
       const evs = (S.log.get(p.name) || []).slice(before);
       const copied = evs.filter((e) => ["add", "update", "delete", "rename"].includes(e.kind)).length;
       const errs = evs.filter((e) => e.kind === "error").length;
-      if (errs) toast(`Sync finished with ${errs} error(s); see Activity`, true);
-      else toast(copied ? `✓ Sync finished: ${copied} file(s) copied` : "✓ Sync finished: everything already matched");
+      if (errs) toast(`Finished with ${plural(errs, "error")}; see Activity`, true);
+      else toast(copied ? `Sync finished: ${plural(copied, "file")} copied` : "Sync finished: everything already matched", false, "party");
     }
-    await refresh();
+    btn.disabled = false;
+    refresh();
   }
 
-  function conflictBox(p, file) {
-    const resolve = (choice, label) => act(`${file}: ${label}`, () => api("POST", pairURL(p.name, "resolve"), { path: file, choice })).then(refreshSoon);
-    return h("div", { class: "conflict" },
-      h("div", { class: "file" }, "! ", file),
-      h("div", { class: "muted", style: "font-size:12px" }, "This file was changed in both folders since the last sync. Which version should win?"),
-      h("div", { class: "btns" },
-        h("button", { class: "btn small", onclick: () => showDiff(p, file, true) }, "Compare"),
-        h("button", { class: "btn small", onclick: () => resolve("source", "kept the working folder's version") }, "Keep working folder's"),
-        h("button", { class: "btn small", onclick: () => resolve("target", "kept the target's version") }, "Keep target's"),
-        h("button", { class: "btn small", onclick: () => resolve("newer", "kept the newer version") }, "Keep newer"),
-        h("button", { class: "btn small", onclick: () => resolve("both", "kept both versions") }, "Keep both"),
-        h("button", { class: "btn small", title: "Combine both edits; overlapping lines get <<<<<<< markers", onclick: () => resolve("merge", "merged") }, "Merge"),
-      ),
-    );
-  }
-
-  async function ignoreFile(p, file) {
-    if (!confirm(`Stop syncing ${file}?\n\nIt is added to .syncignore in the working folder. Copies already made are left as they are.`)) return;
-    const r = await act(null, () => api("POST", pairURL(p.name, "ignore"), { path: file }));
-    if (r) toast(r.already ? `${file} was already ignored` : `ignoring ${file} from now on`);
-    refreshSoon();
-  }
-
-  async function showDiff(p, file, conflict) {
-    const text = await act(null, () => api("GET", pairURL(p.name, "diff") + "?path=" + enc(file) + (conflict ? "&conflict=1" : "")));
-    if (text == null) return;
-    const lines = text.replace(/\n$/, "").split("\n");
-    const title = lines.shift();
-    const pre = h("div", { class: "diff" }, lines.length ? lines.map((l) => h("div", { class: l.startsWith("@@") ? "h" : l[0] === "+" ? "a" : l[0] === "-" ? "d" : "" }, l || " ")) : h("div", {}, "no differences"));
-    modal(title, pre, { wide: true });
-  }
-
-  // ---------- git ----------
+  // ---------- commit ----------
   function tabGit(body, p) {
-    body.replaceChildren();
     const lines = p.git_status || [];
-    body.append(h("h3", { style: "margin-top:0" }, `Not committed yet (${lines.length})`));
-    if (lines.length === 0) body.append(h("p", { class: "muted" }, "Nothing to commit: the target matches its last commit."));
-    else {
-      const list = h("div", { class: "list" });
-      for (const l of lines.slice(0, 300)) {
-        const code = l.slice(0, 2), file = l.slice(3);
-        const kind = code.includes("?") || code.includes("A") ? "add" : code.includes("D") ? "delete" : code.includes("R") ? "rename" : "update";
-        list.append(h("div", { class: "row" }, h("span", { class: "sym k-" + kind }, SYM[kind]), h("span", { class: "file" }, file), h("span", { class: "when mono" }, code.trim() || "M")));
-      }
-      body.append(list);
-    }
-    const msg = h("input", { type: "text", placeholder: "Describe the change (leave empty for an automatic summary)" });
+    const rows = lines.filter((l) => matches(l.slice(3))).slice(0, 300).map((l) => {
+      const code = l.slice(0, 2), file = l.slice(3);
+      const kind = code.includes("?") || code.includes("A") ? "add" : code.includes("D") ? "delete" : code.includes("R") ? "rename" : "update";
+      const [word, cls] = KIND[kind];
+      return h("tr", {}, h("td", { class: "file" }, file), h("td", {}, h("span", { class: "pill " + cls }, word)),
+        h("td", { class: "end" }, kind !== "delete" && kind !== "rename" ? h("button", { class: "btn small", onclick: () => showDiff(p, file, false) }, icon("eye"), "See changes") : ""));
+    });
+    const msg = h("input", { type: "text", placeholder: "Describe the change (or leave empty for a summary)" });
     const useAI = h("input", { type: "checkbox" });
     const push = h("input", { type: "checkbox" });
     useAI.addEventListener("change", () => { msg.disabled = useAI.checked; });
-    body.append(
-      h("h3", {}, "Commit"),
-      h("label", { class: "field" }, msg),
+    const form = h("div", { style: { padding: "4px 16px 14px" } },
+      h("label", { class: "field" }, h("span", { class: "label" }, "Commit message"), msg),
       h("label", { class: "check" }, useAI, h("span", {}, "Let Claude write the message from the changes", h("small", { class: "hint" }, "Needs ANTHROPIC_API_KEY where ferry runs; falls back to an automatic summary."))),
       h("label", { class: "check" }, push, h("span", {}, "Push to the remote afterwards")),
-      h("button", {
-        class: "btn primary", disabled: lines.length === 0 ? true : null,
-        onclick: () => {
-          const m = useAI.checked ? "{ai}" : msg.value.trim() || "sync: {summary}";
-          act(useAI.checked ? "asking Claude for a message and committing…" : "committing…", () => api("POST", pairURL(p.name, "commit") + "?message=" + enc(m) + (push.checked ? "&push=1" : "")));
-          msg.value = "";
-        },
-      }, "Commit"),
+      h("button", { class: "btn primary", disabled: lines.length === 0 ? true : null, onclick: () => {
+        const m = useAI.checked ? "{ai}" : msg.value.trim() || "sync: {summary}";
+        act(useAI.checked ? "Asking Claude for a message and committing…" : "Committing…", () => api("POST", pairURL(p.name, "commit") + "?message=" + enc(m) + (push.checked ? "&push=1" : "")), "focused");
+        msg.value = "";
+      } }, icon("commit"), "Commit"),
+    );
+    body.replaceChildren(
+      section("uncommitted", "Not committed yet", lines.length, "blue", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "Nothing to commit: the target matches its last commit.")),
+      section("commitform", "Commit", null, "", form),
     );
   }
 
   // ---------- history ----------
   async function tabHistory(body, p) {
-    body.replaceChildren(h("p", { class: "muted" }, "Loading…"));
+    body.replaceChildren(h("div", { class: "card empty-row" }, "Loading history…"));
     const batches = await act(null, () => api("GET", pairURL(p.name, "history")));
-    if (!batches || current()?.name !== p.name) return;
-    body.replaceChildren();
+    if (!batches || current()?.name !== p.name || S.tab !== "history") return;
     const remote = !!p.remote;
-
-    // go back in time
-    const when = h("select", {},
-      h("option", { value: "15m ago" }, "15 minutes ago"),
-      h("option", { value: "1h ago" }, "1 hour ago"),
-      h("option", { value: "3h ago" }, "3 hours ago"),
-      h("option", { value: "today" }, "the start of today"),
-      h("option", { value: "24h ago" }, "24 hours ago"),
-      h("option", { value: "7d ago" }, "a week ago"),
-      h("option", { value: "custom" }, "a specific time…"),
-    );
-    const custom = h("input", { type: "text", class: "hidden", placeholder: "e.g. 14:30 or 2026-11-07 09:00" });
+    const when = h("select", { style: { width: "auto" } }, ...[["15m ago", "15 minutes ago"], ["1h ago", "1 hour ago"], ["3h ago", "3 hours ago"], ["today", "the start of today"], ["24h ago", "24 hours ago"], ["7d ago", "a week ago"], ["custom", "a specific time…"]].map(([v, l]) => h("option", { value: v }, l)));
+    const custom = h("input", { type: "text", class: "hidden", placeholder: "e.g. 14:30 or 2026-11-07 09:00", style: { width: "220px" } });
     when.addEventListener("change", () => custom.classList.toggle("hidden", when.value !== "custom"));
-    const restoreBtn = h("button", { class: "btn", disabled: remote ? true : null }, "Go back…");
-    restoreBtn.addEventListener("click", async () => {
+    const again = () => { S.bump = (S.bump || 0) + 1; S.shown = ""; renderBody(current()); };
+    const go = h("button", { class: "btn primary", disabled: remote ? true : null, onclick: async () => {
       const at = when.value === "custom" ? custom.value.trim() : when.value;
-      if (!at) return toast("enter a time", true);
+      if (!at) return toast("Enter a time", true);
       const pre = await act(null, () => api("POST", pairURL(p.name, "restore"), { at, dry_run: true }));
       if (!pre) return;
-      if (pre.batches === 0) return toast("nothing to undo: no syncs happened after " + new Date(pre.restored_to).toLocaleString());
-      const shown = pre.files.slice(0, 12).join("\n") + (pre.files.length > 12 ? `\n… and ${pre.files.length - 12} more` : "");
-      if (!confirm(`Go back to ${new Date(pre.restored_to).toLocaleString()}?\n\nThis undoes ${pre.batches} sync(s) touching ${pre.files.length} file(s):\n${shown}\n\nCurrent versions are backed up first.`)) return;
+      if (pre.batches === 0) return toast("Nothing to undo after " + new Date(pre.restored_to).toLocaleString(), false, "thinking");
+      const list = pre.files.slice(0, 6).join(", ") + (pre.files.length > 6 ? ` and ${pre.files.length - 6} more` : "");
+      const ok = await relayAsk({ mood: "thinking", title: `Go back to ${new Date(pre.restored_to).toLocaleString()}?`, text: `I'll undo ${plural(pre.batches, "sync")} touching ${plural(pre.files.length, "file")} (${list}). I back up the current versions first, so you can change your mind.`, yes: "Go back", no: "Not now", yesMood: "wink" });
+      if (!ok) return;
       const r = await act(null, () => api("POST", pairURL(p.name, "restore"), { at }));
-      if (r) toast(`went back: reverted ${r.reverted} change(s)` + (r.problems.length ? `, ${r.problems.length} problem(s)` : ""), r.problems.length > 0);
-      renderTab();
-    });
-    body.append(
-      h("div", { class: "notice info" },
-        h("span", { class: "grow" }, remote ? "Undo isn't available for ssh or cloud targets." : "Go back to how ferry left things at"),
-        !remote && when, !remote && custom, !remote && restoreBtn,
-      ),
-    );
-
-    if (batches.length === 0) {
-      body.append(h("div", { class: "empty" }, h("h2", {}, "No history yet"), "Every sync is recorded here so it can be undone."));
-      return;
-    }
+      if (r) toast(`Went back in time: reverted ${plural(r.reverted, "change")}` + (r.problems.length ? `, ${r.problems.length} problem(s)` : ""), r.problems.length > 0, "wink");
+      again();
+    } }, icon("clock"), "Go back");
+    const timeMachine = h("div", { class: "callout amber", style: { margin: "4px 12px 12px" } },
+      h("span", { class: "grow" }, remote ? "Going back isn't available for ssh or cloud targets." : "Go back to how Ferry left things at"), remote ? "" : when, remote ? "" : custom, remote ? "" : go);
     const newest = batches.find((b) => !b.undone);
-    if (newest && !remote) {
-      body.append(h("div", { style: "margin-bottom:10px" }, h("button", {
-        class: "btn",
-        onclick: async () => {
-          if (!confirm("Undo the most recent sync? Current versions are backed up first.")) return;
-          const r = await act(null, () => api("POST", pairURL(p.name, "undo")));
-          if (r) toast("undone" + (r.problems.length ? ` with ${r.problems.length} problem(s): ${r.problems[0]}` : ""), r.problems.length > 0);
-          renderTab();
-        },
-      }, "↶ Undo the last sync")));
-    }
-    for (const b of batches.slice(0, 100)) {
+    const undoBtn = newest && !remote ? h("button", { class: "btn small", onclick: async () => {
+      const ok = await relayAsk({ mood: "thinking", title: "Undo the last sync?", text: "I'll put those files back the way they were. Current versions are backed up first.", yes: "Undo it", no: "Keep it", yesMood: "wink" });
+      if (!ok) return;
+      const r = await act(null, () => api("POST", pairURL(p.name, "undo")));
+      if (r) toast("Undone" + (r.problems.length ? ` with ${r.problems.length} problem(s): ${r.problems[0]}` : ""), r.problems.length > 0, "wink");
+      again();
+    } }, "↶ Undo the last sync") : null;
+    const rows = batches.slice(0, 100).filter((b) => !S.q || b.entries.some((e) => matches(e.path))).map((b) => {
       const n = { add: 0, update: 0, delete: 0, rename: 0 };
       for (const e of b.entries) n[e.op] = (n[e.op] || 0) + 1;
-      body.append(h("details", { class: "batch" + (b.undone ? " undone" : "") },
-        h("summary", {},
-          h("span", { class: "muted mono" }, new Date(b.time).toLocaleString()),
-          h("span", {}, `+${n.add} ~${n.update} −${n.delete} ↻${n.rename}`),
-          b.undone && h("span", { class: "badge" }, "undone"),
-        ),
-        h("div", { class: "entries" }, b.entries.map((e) => h("div", {}, h("span", { class: "k-" + (e.op === "delete" ? "delete" : e.op) }, e.op), " ", e.path, e.to ? " → " + e.to : "", h("span", { class: "muted" }, ` (${e.side})`)))),
-      ));
-    }
+      return h("tr", { class: b.undone ? "batch undone" : "batch" },
+        h("td", { class: "muted mono" }, new Date(b.time).toLocaleString()),
+        h("td", {}, b.entries.slice(0, 3).map((e) => e.path.split("/").pop()).join(", ") + (b.entries.length > 3 ? ` +${b.entries.length - 3} more` : "")),
+        h("td", { class: "opt" }, n.add ? h("span", { class: "pill green" }, `+${n.add}`) : "", " ", n.update ? h("span", { class: "pill blue" }, `~${n.update}`) : "", " ", n.delete ? h("span", { class: "pill red" }, `−${n.delete}`) : "", " ", n.rename ? h("span", { class: "pill violet" }, `↻${n.rename}`) : ""),
+        h("td", { class: "end" }, b.undone ? h("span", { class: "pill" }, "undone") : ""));
+    });
+    body.replaceChildren(
+      section("timemachine", "Time machine", null, "", timeMachine),
+      section("batches", "Every sync", batches.length, "", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "No history yet. Every sync is recorded here so it can be undone."), undoBtn),
+    );
   }
 
   // ---------- stats ----------
   async function tabStats(body, p) {
-    const since = S.statsSince || "7d";
-    const sel = h("select", { style: "width:auto" },
-      [["24h", "last 24 hours"], ["7d", "last 7 days"], ["30d", "last 30 days"], ["all", "all history"]].map(([v, l]) => h("option", { value: v, selected: v === since ? true : null }, l)),
-    );
-    sel.addEventListener("change", () => { S.statsSince = sel.value; renderTab(); });
-    body.replaceChildren(h("div", { class: "inline", style: "margin-bottom:12px" }, h("span", {}, "Showing"), sel));
-    const s = await act(null, () => api("GET", pairURL(p.name, "stats") + "?since=" + enc(since)));
-    if (!s) return;
+    const sel = h("select", { style: { width: "auto" } }, ...[["24h", "last 24 hours"], ["7d", "last 7 days"], ["30d", "last 30 days"], ["all", "all history"]].map(([v, l]) => h("option", { value: v, selected: v === S.statsSince ? true : null }, l)));
+    sel.addEventListener("change", () => { S.statsSince = sel.value; S.shown = ""; renderBody(current()); });
+    body.replaceChildren(h("div", { class: "card empty-row" }, "Counting…"));
+    const s = await act(null, () => api("GET", pairURL(p.name, "stats") + "?since=" + enc(S.statsSince)));
+    if (!s || current()?.name !== p.name || S.tab !== "stats") return;
     if (s.batches === 0) {
-      body.append(h("div", { class: "empty" }, h("h2", {}, "Nothing synced in this period")));
+      body.replaceChildren(section("stats", "Stats", null, "", h("div", { class: "empty-row" }, "Nothing synced in this period."), sel));
       return;
     }
     const tile = (v, l) => h("div", { class: "tile" }, h("div", { class: "v" }, v), h("div", { class: "l" }, l));
-    body.append(h("div", { class: "tiles" },
-      tile(s.batches, "syncs"), tile(s.added, "files added"), tile(s.updated, "files updated"), tile(s.deleted, "files deleted"), tile(s.renamed, "renamed"),
-      s.undone ? tile(s.undone, "syncs undone") : null,
-    ));
-    if (s.perDay.length > 0) {
-      const max = Math.max(...s.perDay.map((d) => d.files));
-      body.append(h("h3", {}, "File changes per day"), h("div", { class: "bars" },
-        s.perDay.slice(-30).map((d) => h("div", { class: "bar" }, h("span", { class: "muted" }, d.day.slice(5)), h("div", { class: "track" }, h("div", { class: "fill", style: `width:${Math.max(2, (d.files / max) * 100)}%` })), h("span", {}, d.files))),
-      ));
-    }
-    if (s.topFiles.length) {
-      body.append(h("h3", {}, "Most changed files"), h("div", { class: "list" },
-        s.topFiles.map((t) => h("div", { class: "row" }, h("span", { class: "file" }, t.path), h("span", { class: "when" }, t.changes + "×"))),
-      ));
-    }
+    const max = Math.max(...s.perDay.map((d) => d.files), 1);
+    body.replaceChildren(
+      section("stats", "Stats", null, "", h("div", { class: "tiles" }, tile(s.batches, "syncs"), tile(s.added, "files added"), tile(s.updated, "files updated"), tile(s.deleted, "files deleted"), tile(s.renamed, "renamed"), s.undone ? tile(s.undone, "undone") : ""), sel),
+      section("perday", "File changes per day", null, "", h("div", { class: "bars" }, s.perDay.slice(-30).map((d) => h("div", { class: "bar" }, h("span", { class: "muted" }, d.day.slice(5)), h("div", { class: "t" }, h("div", { class: "f", style: { width: Math.max(3, (d.files / max) * 100) + "%" } })), h("span", {}, d.files))))),
+      s.topFiles.length ? section("top", "Most changed files", s.topFiles.length, "", h("table", { class: "table" }, h("tbody", {}, s.topFiles.map((t) => h("tr", {}, h("td", { class: "file" }, t.path), h("td", { class: "end" }, h("span", { class: "pill blue" }, t.changes + "×"))))))) : "",
+    );
   }
 
   // ---------- activity ----------
+  const EVK = { add: ["+", "#19A974"], update: ["~", "#2586E6"], delete: ["−", "#E5484D"], rename: ["↻", "#8B6CF0"], conflict: ["!", "#E5484D"], resolved: ["✓", "#19A974"], error: ["✗", "#E5484D"], warn: ["!", "#E8A120"], paused: ["‖", "#E8A120"], resumed: ["▶", "#19A974"], commit: ["●", "#19A974"], synced: ["⇄", "#3CCBB0"], skip: ["·", "#94A0B6"], kept: ["◇", "#8B6CF0"], info: ["i", "#94A0B6"] };
   function tabActivity(body, p) {
-    const evs = (S.log.get(p.name) || []).filter((e) => e.kind !== "git");
-    if (evs.length === 0) {
-      body.replaceChildren(h("div", { class: "empty" }, h("h2", {}, "Waiting for activity"), "Live events appear here while this page is open."));
-      return;
-    }
-    const log = h("div", { class: "log" }, evs.slice().reverse().map((e) => h("div", { class: "ev" },
-      h("span", { class: "t" }, clock(e.time)),
-      h("span", { class: "k-" + e.kind, style: "width:14px;flex:none;text-align:center" }, SYM[e.kind] || "·"),
-      h("span", { class: "m" }, [e.direction, e.path, e.to ? "→ " + e.to : "", e.message ? (e.path ? "— " : "") + e.message : "", e.dry_run ? "(dry run)" : ""].filter(Boolean).join(" ")),
-    )));
-    body.replaceChildren(log);
+    const evs = (S.log.get(p.name) || []).filter((e) => e.kind !== "git" && (!S.q || (e.path || "").toLowerCase().includes(S.q) || (e.message || "").toLowerCase().includes(S.q)));
+    body.replaceChildren(section("activity", "Live activity", evs.length, "", evs.length
+      ? h("div", { class: "log" }, evs.slice().reverse().map((e) => {
+        const [sym, col] = EVK[e.kind] || ["·", "#94A0B6"];
+        return h("div", { class: "ev" }, h("span", { class: "t" }, clock(e.time)), h("span", { class: "k", style: { background: col } }, sym),
+          h("span", {}, [e.path, e.to ? "→ " + e.to : "", e.message ? (e.path ? "· " : "") + e.message : ""].filter(Boolean).join(" ")));
+      }))
+      : h("div", { class: "empty-row" }, "Live events appear here while this page is open.")));
   }
 
-  // ---------- modals ----------
-  function modal(title, content, opts = {}) {
-    const bg = h("div", { class: "modal-bg" });
-    const close = () => { bg.remove(); document.removeEventListener("keydown", onKey); };
-    const onKey = (e) => { if (e.key === "Escape") close(); };
-    bg.append(h("div", { class: "modal" + (opts.wide ? " wide" : ""), role: "dialog", "aria-modal": "true" },
-      h("div", { class: "modal-head" }, h("h2", {}, title), h("button", { class: "btn ghost", "aria-label": "Close", onclick: close }, "✕")),
-      h("div", { class: "modal-body" }, content),
-    ));
-    bg.addEventListener("click", (e) => { if (e.target === bg) close(); });
+  // ---------- drawer ----------
+  /** A panel that slides in from the right. */
+  function drawer({ title, sub, wide }) {
+    const scrim = h("div", { class: "scrim" });
+    const titleEl = h("h2", {}, title);
+    const closeBtn = h("button", { class: "btn icon ghost", "aria-label": "Close" }, icon("close"));
+    const body = h("div", { class: "drawer-body" });
+    const foot = h("div", { class: "drawer-foot" });
+    const panel = h("div", { class: "drawer" + (wide ? " wide" : ""), role: "dialog", "aria-modal": "true", "aria-label": title },
+      h("div", { class: "drawer-head" }, h("div", { style: { flex: 1, minWidth: 0 } }, titleEl, h("div", { class: "sub" }, sub || "")), closeBtn), body, foot);
+    const prevFocus = document.activeElement;
+    const close = () => {
+      panel.classList.remove("open");
+      scrim.classList.remove("open");
+      document.removeEventListener("keydown", onKey);
+      setTimeout(() => { panel.remove(); scrim.remove(); }, 300);
+      prevFocus?.focus?.();
+    };
+    const onKey = (e) => { if (e.key === "Escape" && !document.querySelector(".ask-wrap")) close(); };
+    scrim.onclick = close;
+    closeBtn.onclick = close;
     document.addEventListener("keydown", onKey);
-    document.body.append(bg);
-    return close;
+    document.body.append(scrim, panel);
+    requestAnimationFrame(() => { scrim.classList.add("open"); panel.classList.add("open"); closeBtn.focus(); });
+    return { panel, body, foot, titleEl, close };
   }
 
-  async function removePair(p) {
-    if (!confirm(`Stop syncing “${p.name}”?\n\nNo files are deleted. You can add the pair again later.`)) return;
+  // ---------- Relay asks ----------
+  /**
+   * Relay asks a question from the bottom of the screen and reacts to where
+   * you are about to click. With hold: true the risky choice has to be
+   * pressed and held, so a slip of the mouse can't do it. Resolves true/false.
+   */
+  function relayAsk({ mood: m = "thinking", title, text, yes = "Yes", no = "Cancel", hold = false, yesMood = "sad", noMood = "happy" }) {
+    return new Promise((resolve) => {
+      const img = h("img", { class: "face bob", src: face(m), alt: "Relay" });
+      const say = h("h3", {}, title);
+      const sub = h("p", {}, text);
+      const noBtn = h("button", { class: "btn brand" }, no);
+      const yesBtn = h("button", { class: "btn" + (hold ? " hold danger" : "") }, h("i", { class: "prog" }), h("span", {}, hold ? "Hold to " + yes.toLowerCase() : yes));
+      const wrap = h("div", { class: "ask-wrap", role: "alertdialog", "aria-modal": "true", "aria-label": title },
+        h("div", { class: "ask" }, img, say, sub, h("div", { class: "row" }, noBtn, yesBtn),
+          hold ? h("div", { class: "note" }, "Press and hold for a second (or hold Space), so a slip of the mouse can't do it.") : null));
+      let done = false;
+      const finish = (v, last) => {
+        if (done) return;
+        done = true;
+        const end = () => { wrap.classList.remove("open"); setTimeout(() => wrap.remove(), 220); document.removeEventListener("keydown", onKey); resolve(v); };
+        if (last) { img.src = face(last.mood); say.textContent = last.say; sub.textContent = last.text || ""; setTimeout(end, 950); }
+        else end();
+      };
+      const onKey = (e) => { if (e.key === "Escape") finish(false); };
+      document.addEventListener("keydown", onKey);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) finish(false); });
+      noBtn.onclick = () => finish(false, hold ? { mood: "party", say: "Yay, I'll keep going!" } : null);
+      noBtn.onmouseenter = noBtn.onfocus = () => { if (!done) img.src = face(noMood); };
+      yesBtn.onmouseenter = yesBtn.onfocus = () => { if (!done) img.src = face(yesMood); };
+      [noBtn, yesBtn].forEach((b) => { b.onmouseleave = () => { if (!done) img.src = face(m); }; });
+      if (!hold) yesBtn.onclick = () => finish(true);
+      else {
+        let start = 0, raf = 0;
+        const tick = () => {
+          const pr = Math.min(1, (performance.now() - start) / 1100);
+          yesBtn.style.setProperty("--p", pr);
+          if (pr >= 1) return finish(true, { mood: "sleepy", say: "Okay. I'll stop here.", text: "Your files stay exactly where they are." });
+          raf = requestAnimationFrame(tick);
+        };
+        const down = (e) => {
+          if (done || start) return;
+          if (e.type === "keydown" && ((e.key !== " " && e.key !== "Enter") || e.repeat)) return;
+          e.preventDefault();
+          start = performance.now();
+          img.src = face("sad");
+          say.textContent = "Are you sure? Keep holding…";
+          raf = requestAnimationFrame(tick);
+        };
+        const up = () => {
+          if (done || !start) return;
+          cancelAnimationFrame(raf);
+          start = 0;
+          yesBtn.style.setProperty("--p", 0);
+          img.src = face("happy");
+          say.textContent = "Phew! I'm still here.";
+        };
+        yesBtn.addEventListener("pointerdown", down);
+        yesBtn.addEventListener("keydown", down);
+        ["pointerup", "pointerleave", "pointercancel", "keyup", "blur"].forEach((ev) => yesBtn.addEventListener(ev, up));
+      }
+      document.body.append(wrap);
+      requestAnimationFrame(() => { wrap.classList.add("open"); noBtn.focus(); });
+    });
+  }
+
+  async function askStop(p) {
+    const ok = await relayAsk({
+      mood: "worried", hold: true, yes: "Stop", no: "Keep syncing",
+      title: `Stop syncing “${p.name}”?`,
+      text: "I'll stop watching these two folders. Nothing is deleted, and you can add the pair again any time.",
+    });
+    if (!ok) return;
     const r = await act(null, () => api("POST", pairURL(p.name, "remove")));
-    if (r) toast(r.savedRemoval ? `stopped and removed ${p.name} from the config` : `stopped syncing ${p.name} (for this session)`);
+    if (r) toast(r.savedRemoval ? `Stopped and removed ${p.name}. See you!` : `Stopped syncing ${p.name} for this session.`, false, "sleepy");
     refresh();
   }
 
+  // ---------- change story (diff) ----------
+  /** Groups unified-diff lines into changes, each with a little context before and after. */
+  function parseDiff(lines) {
+    const notes = [], changes = [];
+    let oldNo = 1, newNo = 1, maxNo = 0, ctx = [], cur = null;
+    const close = () => { if (cur) { changes.push(cur); cur = null; } };
+    for (const l of lines) {
+      if (l.op === "@") {
+        const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(l.text);
+        if (m) { close(); oldNo = +m[1]; newNo = +m[2]; ctx = []; continue; }
+        notes.push(l.text);
+        continue;
+      }
+      if (l.op === " ") {
+        const row = { text: l.text, oldNo, newNo };
+        if (cur) {
+          cur.after.push(row);
+          if (cur.after.length >= 2) close();
+        }
+        ctx.push(row);
+        if (ctx.length > 2) ctx.shift();
+        oldNo++; newNo++;
+      } else {
+        if (cur && cur.after.length) close();
+        if (!cur) cur = { removed: [], added: [], before: ctx.slice(), after: [], at: newNo };
+        if (l.op === "-") { cur.removed.push({ text: l.text, oldNo }); oldNo++; }
+        else { cur.added.push({ text: l.text, newNo }); newNo++; }
+      }
+      maxNo = Math.max(maxNo, oldNo - 1, newNo - 1);
+    }
+    close();
+    for (const c of changes) c.kind = c.removed.length && c.added.length ? "edit" : c.added.length ? "add" : "del";
+    return { notes, changes, maxNo };
+  }
+
+  /** Word-level differences between two lines: [{t, op}] with op "", "+" or "-". */
+  function wordDiff(a, b) {
+    const A = a.match(/\s+|\w+|[^\w\s]/g) || [], B = b.match(/\s+|\w+|[^\w\s]/g) || [];
+    if (A.length * B.length > 60000) return [{ t: a, op: "-" }, { t: b, op: "+" }];
+    const dp = Array.from({ length: A.length + 1 }, () => new Int32Array(B.length + 1));
+    for (let i = A.length - 1; i >= 0; i--) for (let j = B.length - 1; j >= 0; j--) dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    const out = [];
+    let i = 0, j = 0;
+    const push = (t, op) => { const last = out[out.length - 1]; if (last && last.op === op) last.t += t; else out.push({ t, op }); };
+    while (i < A.length || j < B.length) {
+      if (i < A.length && j < B.length && A[i] === B[j]) { push(A[i], ""); i++; j++; }
+      else if (j < B.length && (i >= A.length || dp[i][j + 1] >= dp[i + 1][j])) { push(B[j], "+"); j++; }
+      else { push(A[i], "-"); i++; }
+    }
+    return out;
+  }
+  const sideText = (parts, keep) => h("div", { class: "txt" }, parts.filter((x) => x.op === "" || x.op === keep).map((x) => x.op === "" ? x.t : h(keep === "+" ? "ins" : "del", { class: "w" }, x.t)));
+
+  /** One plain sentence about what changed, for people who don't read diffs. */
+  function story(d, file) {
+    let added = 0, removed = 0, edited = 0;
+    for (const c of d.changes) {
+      const pairs = c.kind === "edit" ? Math.min(c.removed.length, c.added.length) : 0;
+      edited += pairs;
+      added += c.added.length - pairs;
+      removed += c.removed.length - pairs;
+    }
+    const parts = [];
+    if (added) parts.push(`added ${plural(added, "new line")}`);
+    if (edited) parts.push(`edited ${plural(edited, "line")}`);
+    if (removed) parts.push(`removed ${plural(removed, "line")}`);
+    const what = parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] : parts[0] || "changed nothing visible";
+    let where = "";
+    if (d.changes.length && d.maxNo > 20) {
+      const pos = d.changes.map((c) => c.at / d.maxNo);
+      const avg = pos.reduce((a, b) => a + b, 0) / pos.length;
+      where = d.changes.length > 1 && Math.max(...pos) - Math.min(...pos) > .5 ? ", in different parts of the file"
+        : avg < .33 ? " near the top" : avg > .66 ? " near the end" : " in the middle";
+    }
+    return { title: `I found ${plural(d.changes.length, "change")} in ${file}.`, detail: `You ${what}${where}.`, added, removed, edited };
+  }
+
+  async function showDiff(p, file, conflict) {
+    const folder = file.includes("/") ? file.slice(0, file.lastIndexOf("/") + 1) : "";
+    const dr = drawer({ title: file.split("/").pop(), sub: [conflict ? "Changed in both folders" : "What changed", folder].filter(Boolean).join(" · "), wide: true });
+    dr.body.append(h("div", { class: "narrator" }, h("img", { src: face("comparing"), alt: "", style: { width: "150px", height: "71px" } }), h("div", { class: "bubble" }, h("div", { class: "say" }, "Comparing the two versions…"))));
+    let d;
+    try {
+      d = await api("GET", pairURL(p.name, "diff") + "?format=json&path=" + enc(file) + (conflict ? "&conflict=1" : ""));
+    } catch (e) {
+      dr.body.replaceChildren(h("div", { class: "narrator" }, h("img", { src: face("sad"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, "I couldn't compare this file."), h("div", { class: "hint" }, e.message))));
+      return;
+    }
+    const parsed = parseDiff(d.lines);
+    const st = story(parsed, file.split("/").pop());
+    let view = "story", at = 0;
+    const cards = [], marks = [];
+    const counter = h("span", { class: "muted" });
+    const prev = h("button", { class: "btn small", onclick: () => go(at - 1) }, "↑ Previous");
+    const next = h("button", { class: "btn small primary", onclick: () => go(at + 1) }, "Next change ↓");
+    const seg = h("div", { class: "seg", role: "group", "aria-label": "How to show the changes" });
+    const content = h("div");
+
+    function go(i, scroll = true) {
+      if (!cards.length) return;
+      at = Math.max(0, Math.min(cards.length - 1, i));
+      cards.forEach((c, k) => c.classList.toggle("on", k === at));
+      marks.forEach((m, k) => m.classList.toggle("on", k === at));
+      if (scroll) cards[at].scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+      counter.textContent = `Change ${at + 1} of ${cards.length}`;
+      prev.disabled = at === 0;
+      next.disabled = at === cards.length - 1;
+    }
+    const row = (cls, no, op, text) => h("div", { class: "ln " + cls }, h("span", { class: "no" }, no ?? ""), h("span", { class: "op" }, op), h("span", { class: "tx" }, text || " "));
+    function card(c, k) {
+      const n = Math.max(c.removed.length, c.added.length);
+      const title = c.kind === "add" ? `Added ${plural(c.added.length, "line")}` : c.kind === "del" ? `Removed ${plural(c.removed.length, "line")}` : `Edited ${plural(n, "line")}`;
+      const parts = c.before.map((b) => row("ctx", b.newNo, "", b.text));
+      if (c.kind === "edit") {
+        const pairs = Math.min(c.removed.length, c.added.length);
+        for (let i = 0; i < pairs; i++) {
+          const w = wordDiff(c.removed[i].text, c.added[i].text);
+          parts.push(h("div", { class: "edit-pair" }, h("div", { class: "lab" }, `Line ${c.added[i].newNo} · before`), sideText(w, "-"), h("div", { class: "lab" }, "after"), sideText(w, "+")));
+        }
+        for (const r of c.removed.slice(pairs)) parts.push(row("del", r.oldNo, "−", r.text));
+        for (const a of c.added.slice(pairs)) parts.push(row("add", a.newNo, "+", a.text));
+      } else {
+        for (const r of c.removed) parts.push(row("del", r.oldNo, "−", r.text));
+        for (const a of c.added) parts.push(row("add", a.newNo, "+", a.text));
+      }
+      for (const a of c.after) parts.push(row("ctx", a.newNo, "", a.text));
+      return h("div", { class: "change", onclick: () => go(k, false) },
+        h("div", { class: "change-head" }, h("span", { class: "ic " + c.kind }, { add: "+", del: "−", edit: "✎" }[c.kind]), h("b", {}, title), h("span", { class: "muted" }, `near line ${c.at}`), h("span", { class: "grow" }), h("span", { class: "muted" }, `${k + 1} / ${parsed.changes.length}`)),
+        h("div", { class: "lines" }, parts));
+    }
+    function renderView() {
+      seg.replaceChildren(
+        h("button", { class: view === "story" ? "on" : "", onclick: () => { view = "story"; renderView(); } }, "Story"),
+        h("button", { class: view === "classic" ? "on" : "", onclick: () => { view = "classic"; renderView(); } }, "Classic"));
+      cards.length = 0;
+      if (view === "classic") {
+        content.replaceChildren(h("div", { class: "classic lines" }, d.lines.map((l) => l.op === "@" ? h("div", { class: "hdr" }, l.text) : row(l.op === "+" ? "add" : l.op === "-" ? "del" : "ctx", "", l.op === " " ? "" : l.op === "-" ? "−" : "+", l.text))));
+        counter.textContent = "";
+        prev.classList.add("hidden"); next.classList.add("hidden");
+        return;
+      }
+      prev.classList.remove("hidden"); next.classList.remove("hidden");
+      parsed.changes.forEach((c, k) => cards.push(card(c, k)));
+      content.replaceChildren(...cards);
+      if (cards.length) go(at, false); else { counter.textContent = ""; prev.classList.add("hidden"); next.classList.add("hidden"); }
+    }
+
+    const top = [];
+    if (!parsed.changes.length) {
+      const msg = parsed.notes[0] || "These two versions are identical.";
+      top.push(h("div", { class: "narrator" }, h("img", { src: face(parsed.notes.length ? "thinking" : "happy"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, parsed.notes.length ? "I can't show this one line by line." : "Nothing changed here."), h("div", { class: "hint" }, msg))));
+    } else {
+      top.push(h("div", { class: "narrator" }, h("img", { src: face("thinking"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, st.title), h("div", { class: "hint" }, st.detail + " Green is new, red is gone, and highlighted words show exactly what was edited."))));
+      top.push(h("div", { class: "chips" },
+        st.added ? h("span", { class: "pill green" }, `+ ${plural(st.added, "new line")}`) : "",
+        st.edited ? h("span", { class: "pill amber" }, `✎ ${plural(st.edited, "edited line")}`) : "",
+        st.removed ? h("span", { class: "pill red" }, `− ${plural(st.removed, "removed line")}`) : ""));
+      const map = h("div", { class: "map", "aria-label": "Where in the file the changes are" });
+      parsed.changes.forEach((c, k) => {
+        const left = Math.min(98, (Math.max(0, c.at - 1) / Math.max(1, parsed.maxNo)) * 100);
+        const w = Math.max(1.2, ((c.added.length + c.removed.length) / Math.max(1, parsed.maxNo)) * 100);
+        const mk = h("button", { class: "mk " + c.kind, "aria-label": `Change ${k + 1}, near line ${c.at}`, title: `Change ${k + 1}: near line ${c.at}`, style: { left: left + "%", width: Math.min(w, 100 - left) + "%" }, onclick: () => go(k) });
+        marks.push(mk);
+        map.append(mk);
+      });
+      top.push(map, h("div", { class: "map-scale" }, h("span", {}, "start of the file"), h("span", {}, `line ${parsed.maxNo}`)));
+    }
+    top.push(h("div", { class: "sides" }, h("div", { class: "side" }, h("b", {}, "Before"), d.before), h("div", { class: "side" }, h("b", {}, "After"), d.after)));
+    top.push(h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } }, h("span", { class: "muted", style: { fontSize: "12.5px" } }, "Tip: press J and K to jump between changes."), seg));
+    dr.body.replaceChildren(...top, content);
+
+    dr.foot.replaceChildren(h("span", { class: "left" }, counter), prev, next);
+    if (conflict) {
+      const pick = (choice, label) => { resolve(p, file, choice, label); dr.close(); };
+      dr.foot.append(
+        h("button", { class: "btn small", onclick: () => pick("source", "kept your working folder's version") }, "Keep mine"),
+        h("button", { class: "btn small", onclick: () => pick("target", "kept the target's version") }, "Keep target's"),
+        h("button", { class: "btn small", onclick: () => pick("both", "kept both versions") }, "Keep both"),
+        h("button", { class: "btn small brand", title: "Combine both edits; overlaps get <<<<<<< markers", onclick: () => pick("merge", "merged") }, "Merge"));
+    }
+    dr.panel.addEventListener("keydown", (e) => {
+      if (e.target.closest("input, textarea, select")) return;
+      if (e.key === "j") go(at + 1);
+      if (e.key === "k") go(at - 1);
+    });
+    renderView();
+  }
+
+  // ---------- add a pair ----------
   function openAdd() {
     if (!S.info || !S.info.can_add) return toast("Start ferry with “ferry ui” to add pairs from here.", true);
-    const node = $("#add-tpl").content.firstElementChild.cloneNode(true);
-    const form = $("form", node);
-    // form.name / form.target are the form's own attributes, so look inputs up by name
-    const F = (n) => form.elements.namedItem(n);
-    const close = () => { node.remove(); document.removeEventListener("keydown", onKey); };
-    const onKey = (e) => { if (e.key === "Escape") close(); };
-    document.addEventListener("keydown", onKey);
-    node.addEventListener("click", (e) => { if (e.target === node) close(); });
-    form.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", close));
-    $("[data-save-note]", form).textContent = S.info.config_file ? "The pair is saved in " + S.info.config_file + " so it starts again next time." : "This pair lasts until ferry stops (ferry was started with folders on the command line).";
+    const dr = drawer({ title: "New folder pair", sub: "I'll keep these two folders in sync." });
+    const form = h("form", { autocomplete: "off" });
+    form.innerHTML = `
+      <div class="field"><label class="label" for="f-source">Your working folder (source)</label>
+        <div class="inline"><input type="text" id="f-source" name="source" placeholder="Choose the folder you edit in"><button type="button" class="btn small" data-browse="source">Choose…</button></div>
+        <small>Where you edit files. I watch this folder.</small><small class="field-error hidden" data-error="source"></small></div>
+      <div class="field"><label class="label" for="f-target">Where the files should go (target)</label>
+        <div class="inline"><input type="text" id="f-target" name="target" placeholder="Usually a git repository"><button type="button" class="btn small" data-browse="target">Choose…</button></div>
+        <small>You can also type user@server:/path (ssh) or s3://bucket/folder (cloud storage).</small><small class="field-error hidden" data-error="target"></small></div>
+      <div class="field"><span class="label">How should they stay in sync?</span>
+        <div class="choices">
+          <label class="choice"><input type="radio" name="mode" value="one-way" checked>One way →<small>Changes in your working folder are copied to the target.</small></label>
+          <label class="choice"><input type="radio" name="mode" value="two-way">Both ways ⇄<small>Changes on either side are copied to the other. If both change a file, you choose.</small></label>
+        </div></div>
+      <details class="more"><summary>More options</summary>
+        <label class="field" style="margin-top:10px"><span class="label">Name</span><input type="text" name="name" placeholder="e.g. website"><small>Optional. Shown in the list and in notifications.</small></label>
+        <label class="field"><span class="label">When a file is deleted on one side</span><select name="on_delete">
+          <option value="keep">Keep the other copy (safest)</option><option value="propagate">Delete it on the other side too</option><option value="restore">Put it back from the other side (both ways only)</option></select></label>
+        <label class="check"><input type="checkbox" name="merge"><span>Merge edits automatically when both sides changed a text file<small class="hint">Both ways only. Falls back to asking you if the edits overlap.</small></span></label>
+        <label class="field"><span class="label">Files to skip</span><textarea name="ignore" placeholder="dist&#10;*.log"></textarea><small>One pattern per line, like .gitignore. node_modules and .git are always skipped.</small></label>
+        <label class="field"><span class="label">Things that look like passwords or keys</span><select name="secrets">
+          <option value="warn">Copy them, but warn me</option><option value="block">Don't copy those files</option><option value="redact">Copy with the secrets blanked out (one way only)</option><option value="off">Don't check</option></select></label>
+        <label class="field"><span class="label">Also copy to these targets</span><textarea name="targets" placeholder="/path/to/another-repo&#10;s3://my-bucket/backup"></textarea><small>One per line. Each becomes its own one-way pair.</small></label>
+        <label class="check"><input type="checkbox" name="ac_enabled"><span>Commit to git automatically</span></label>
+        <div data-ac class="hidden" style="padding-left:26px">
+          <div class="inline" style="margin-bottom:8px"><span>every</span><select name="ac_interval" style="width:auto"><option value="5m">5 minutes</option><option value="10m" selected>10 minutes</option><option value="30m">30 minutes</option><option value="1h">hour</option></select></div>
+          <label class="check"><input type="checkbox" name="ac_ai"><span>Let Claude write the commit messages<small class="hint">Needs ANTHROPIC_API_KEY where ferry runs.</small></span></label>
+          <label class="check"><input type="checkbox" name="ac_push"><span>Push after committing</span></label>
+        </div>
+      </details>`;
+    const F = (n) => form.elements.namedItem(n); // form.name / form.target are the form's own attributes
+    const formView = h("div", {}, h("div", { class: "narrator" }, h("img", { src: face("excited"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, "Which folders should I look after?"), h("div", { class: "hint" }, S.info.config_file ? "I'll remember this pair in " + S.info.config_file + "." : "This pair lasts until ferry stops."))), form);
+    const pickerView = h("div", { class: "hidden" });
+    dr.body.append(formView, pickerView);
+    const submit = h("button", { class: "btn brand", type: "button" }, "Start syncing");
+    const formFoot = [h("button", { class: "btn ghost", type: "button", onclick: dr.close }, "Cancel"), submit];
+    dr.foot.append(...formFoot);
+
+    const showError = (w, msg) => {
+      const el = $(`[data-error=${w}]`, form);
+      el.textContent = msg;
+      el.classList.toggle("hidden", !msg);
+      F(w).classList.toggle("invalid", !!msg);
+    };
+    for (const w of ["source", "target"]) F(w).addEventListener("input", () => showError(w, ""));
     F("ac_enabled").addEventListener("change", () => $("[data-ac]", form).classList.toggle("hidden", !F("ac_enabled").checked));
-    const LABELS = { source: "Choose your working folder", target: "Choose where the files should go" };
+    form.addEventListener("submit", (e) => { e.preventDefault(); submit.click(); });
     form.querySelectorAll("[data-browse]").forEach((b) => b.addEventListener("click", () => {
       const which = b.dataset.browse;
       const typed = F(which).value.trim();
-      openPicker(form, LABELS[which], typed && !/^(s3:\/\/|ssh:\/\/|[^/\\]+@)/.test(typed) ? typed : S.info.home, (dir) => {
-        F(which).value = dir;
-        showError(which, "");
-      });
+      openPicker(which === "source" ? "Choose your working folder" : "Choose where the files should go", typed && !/^(s3:\/\/|ssh:\/\/|[^/\\]+@)/.test(typed) ? typed : S.info.home, (dir) => { F(which).value = dir; showError(which, ""); });
     }));
-    const showError = (which, msg) => {
-      const el = $(`[data-error=${which}]`, form);
-      el.textContent = msg;
-      el.classList.toggle("hidden", !msg);
-      F(which).classList.toggle("invalid", !!msg);
-    };
-    for (const w of ["source", "target"]) F(w).addEventListener("input", () => showError(w, ""));
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+
+    function openPicker(title, start, pick) {
+      const oldTitle = dr.titleEl.textContent;
+      dr.titleEl.textContent = title;
+      formView.classList.add("hidden");
+      pickerView.classList.remove("hidden");
+      let showHidden = false, cur = null;
+      const back = () => { dr.titleEl.textContent = oldTitle; pickerView.classList.add("hidden"); formView.classList.remove("hidden"); dr.foot.replaceChildren(...formFoot); };
+      const choose = h("button", { class: "btn brand", type: "button", onclick: () => { if (cur) { pick(cur); back(); } } }, "Choose this folder");
+      dr.foot.replaceChildren(h("button", { class: "btn ghost left", type: "button", onclick: back }, "← Back"), choose);
+      const go = async (dir) => {
+        let r;
+        try {
+          r = await api("GET", "/fs?path=" + enc(dir) + (showHidden ? "&hidden=1" : ""));
+        } catch (e) {
+          if (dir !== S.info.home) return go(S.info.home);
+          pickerView.replaceChildren(h("p", { class: "muted" }, e.message));
+          return;
+        }
+        cur = r.path;
+        choose.textContent = `Choose “${r.path.split(/[\\/]/).filter(Boolean).pop() || r.path}”`;
+        const sep = S.info.sep, parts = r.path.split(/[\\/]/).filter(Boolean), win = /^[A-Za-z]:/.test(r.path);
+        const crumbs = h("div", { class: "crumbpath" });
+        parts.forEach((part, i) => {
+          const full = (win ? "" : sep) + parts.slice(0, i + 1).join(sep) + (win && i === 0 ? sep : "");
+          if (i > 0 || !win) crumbs.append(h("span", { class: "sep" }, sep));
+          const last = i === parts.length - 1;
+          crumbs.append(h("button", { type: "button", class: last ? "here" : "", onclick: last ? null : () => go(full) }, part));
+        });
+        const hid = h("input", { type: "checkbox", checked: showHidden ? true : null });
+        hid.addEventListener("change", () => { showHidden = hid.checked; go(r.path); });
+        const join = (n) => r.path.replace(/[\\/]+$/, "") + sep + n;
+        pickerView.replaceChildren(crumbs,
+          h("div", { class: "dirs" },
+            r.parent ? h("button", { type: "button", class: "dir", onclick: () => go(r.parent) }, "↑", h("span", { class: "muted" }, "Up one level")) : "",
+            r.dirs.length ? r.dirs.map((n) => h("button", { type: "button", class: "dir", onclick: () => go(join(n)) }, icon("folder"), h("span", {}, n), h("span", { class: "chev" }, "›"))) : h("div", { class: "dir muted", style: { cursor: "default" } }, "This folder has no sub-folders.")),
+          h("div", { class: "inline", style: { marginTop: "12px", gap: "14px", flexWrap: "wrap" } },
+            r.is_git ? h("span", { class: "pill green" }, "this folder is a git repo") : "",
+            h("button", { type: "button", class: "btn small", onclick: () => go(r.home) }, "Home folder"),
+            h("label", { class: "check", style: { margin: 0 } }, hid, "show hidden folders")),
+          h("p", { class: "hint" }, "Click a folder to open it, then press “Choose” below."));
+      };
+      go(start);
+    }
+
+    submit.onclick = async () => {
       const lines = (s) => s.split("\n").map((x) => x.trim()).filter(Boolean);
       const missing = ["source", "target"].filter((w) => !F(w).value.trim());
       if (missing.includes("source")) showError("source", "Choose the folder you work in.");
       if (missing.includes("target")) showError("target", "Choose where the files should go.");
       if (missing.length) return F(missing[0]).focus();
       const two = F("mode").value === "two-way";
-      const body = {
-        name: F("name").value.trim(), source: F("source").value.trim(), target: F("target").value.trim(), mode: F("mode").value,
-        on_delete: F("on_delete").value, ignore: lines(F("ignore").value), secrets: F("secrets").value,
-      };
+      const body = { name: F("name").value.trim(), source: F("source").value.trim(), target: F("target").value.trim(), mode: F("mode").value, on_delete: F("on_delete").value, ignore: lines(F("ignore").value), secrets: F("secrets").value };
       if (two) {
         body.merge = F("merge").checked;
         if (body.secrets === "redact") return toast("Blanking out secrets only works one way", true);
@@ -844,108 +1258,24 @@ input.invalid { border-color: var(--red); }
         if (two) return toast("Extra targets only work one way", true);
         body.targets = extra;
       }
-      if (F("ac_enabled").checked) {
-        body.auto_commit = { enabled: true, interval: F("ac_interval").value, push: F("ac_push").checked, message: F("ac_ai").checked ? "{ai}" : "sync: {summary}" };
-      }
-      const btn = $("button[type=submit]", form);
-      btn.disabled = true;
+      if (F("ac_enabled").checked) body.auto_commit = { enabled: true, interval: F("ac_interval").value, push: F("ac_push").checked, message: F("ac_ai").checked ? "{ai}" : "sync: {summary}" };
+      submit.disabled = true;
       const r = await act(null, () => api("POST", "/pairs", body));
-      btn.disabled = false;
+      submit.disabled = false;
       if (!r) return;
-      toast("syncing " + r.added.join(", "));
-      close();
+      toast("Now syncing " + r.added.join(", "), false, "party");
+      dr.close();
       S.sel = r.added[0];
       await refresh();
-    });
-    document.body.append(node);
-    F("source").focus();
-  }
-
-  /**
-   * Swaps the add-pair form for a folder browser (one at a time, titled with
-   * what is being chosen). pick(dir) gets the chosen folder; Back returns to
-   * the form without changing anything.
-   */
-  function openPicker(form, title, start, pick) {
-    const view = $("[data-picker-view]", form), foot = $("[data-picker-foot]", form);
-    const formView = $("[data-form-view]", form), formFoot = $("[data-form-foot]", form), head = $("[data-title]", form);
-    const oldTitle = head.textContent;
-    let showHidden = false, current = null;
-    const done = () => {
-      view.classList.add("hidden");
-      foot.classList.add("hidden");
-      formView.classList.remove("hidden");
-      formFoot.classList.remove("hidden");
-      head.textContent = oldTitle;
     };
-    head.textContent = title;
-    formView.classList.add("hidden");
-    formFoot.classList.add("hidden");
-    view.classList.remove("hidden");
-    foot.classList.remove("hidden");
-
-    const chooseBtn = h("button", { type: "button", class: "btn primary", onclick: () => { if (current) { pick(current); done(); } } }, "Choose this folder");
-    foot.replaceChildren(h("button", { type: "button", class: "btn left", onclick: done }, "← Back"), chooseBtn);
-
-    const go = async (dir) => {
-      let r;
-      try {
-        r = await api("GET", "/fs?path=" + enc(dir) + (showHidden ? "&hidden=1" : ""));
-      } catch (e) {
-        // a typed folder that doesn't exist yet: start from home instead
-        if (dir !== S.info.home) return go(S.info.home);
-        view.replaceChildren(h("p", { class: "muted" }, e.message));
-        return;
-      }
-      current = r.path;
-      const base = r.path.split(/[\\/]/).filter(Boolean).pop() || r.path;
-      chooseBtn.textContent = `Choose “${base}”`;
-
-      // clickable breadcrumb: / Users / you / code
-      const sep = S.info.sep;
-      const parts = r.path.split(/[\\/]/).filter(Boolean);
-      const isWin = /^[A-Za-z]:/.test(r.path);
-      const crumbs = h("div", { class: "crumbs", "aria-label": "Current folder" });
-      parts.forEach((part, i) => {
-        const full = (isWin ? "" : sep) + parts.slice(0, i + 1).join(sep) + (isWin && i === 0 ? sep : "");
-        if (i > 0 || !isWin) crumbs.append(h("span", { class: "slash" }, sep));
-        const last = i === parts.length - 1;
-        crumbs.append(h("button", { type: "button", class: "crumb" + (last ? " here" : ""), onclick: last ? null : () => go(full) }, part));
-      });
-      if (parts.length === 0) crumbs.append(h("span", { class: "crumb here" }, r.path));
-
-      const hiddenBox = h("input", { type: "checkbox", checked: showHidden ? true : null });
-      hiddenBox.addEventListener("change", () => { showHidden = hiddenBox.checked; go(r.path); });
-      const join = (d) => r.path.replace(/[\\/]+$/, "") + sep + d;
-
-      view.replaceChildren(
-        crumbs,
-        h("div", { class: "dirs", role: "list" },
-          r.parent && h("button", { type: "button", class: "dir", onclick: () => go(r.parent) }, h("span", {}, "↑"), h("span", { class: "muted" }, "Up one level")),
-          r.dirs.length
-            ? r.dirs.map((d) => h("button", { type: "button", class: "dir", title: "Open " + d, onclick: () => go(join(d)) }, "📁", h("span", {}, d), h("span", { class: "chev" }, "›")))
-            : h("div", { class: "dir muted", style: "cursor:default" }, "This folder has no sub-folders."),
-        ),
-        h("div", { class: "tools" },
-          r.is_git && h("span", { class: "badge ok" }, "this folder is a git repo"),
-          h("button", { type: "button", class: "btn small", onclick: () => go(r.home) }, "⌂ Home folder"),
-          ...(r.drives || []).map((d) => h("button", { type: "button", class: "btn small", title: "Open drive " + d, onclick: () => go(d) }, "💽 " + d.replace(/\\$/, ""))),
-          h("label", { class: "check", style: "margin:0" }, hiddenBox, "show hidden folders"),
-        ),
-        h("p", { class: "hint" }, "Click a folder to open it, then press “Choose” at the bottom."),
-      );
-    };
-    go(start);
+    setTimeout(() => F("source").focus(), 320);
   }
-
-  $("#add-btn").addEventListener("click", openAdd);
 
   // ---------- start ----------
+  setupRail();
   (async () => {
     try {
       S.info = await api("GET", "/info");
-      $("#version").textContent = S.info.version ? "v" + S.info.version : "";
-      if (!S.info.can_add) $("#add-btn").classList.add("hidden");
     } catch (e) {
       setConn(false);
       if (/token/i.test(e.message)) toast("This page needs the access token: open the link ferry printed.", true);
