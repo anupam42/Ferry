@@ -17,6 +17,7 @@ import path from "node:path";
 import * as ai from "./ai.ts";
 import type { Engine } from "./engine/engine.ts";
 import * as g from "./gitclient.ts";
+import * as conn from "./integrations.ts";
 import { errMsg } from "./util.ts";
 
 export interface RepoManager {
@@ -35,10 +36,16 @@ interface Repo {
 
 const idOf = (root: string) => crypto.createHash("sha256").update(root).digest("hex").slice(0, 12);
 
+async function originURL(root: string): Promise<string> {
+  const r = Bun.spawnSync(["git", "-C", root, "remote", "get-url", "origin"], { env: { ...process.env, LC_ALL: "C" } });
+  if (r.exitCode !== 0) throw new g.GitClientError("this repository has no remote called origin", "no-remote");
+  return r.stdout.toString().trim();
+}
+
 /** Actions that rewrite files in the work tree: a pair syncing this repository is paused first. */
 const CHANGES_FILES = new Set([
   "branch-switch", "pull", "merge", "cherry-pick", "revert", "undo", "discard", "stash", "stash-apply",
-  "resolve", "finish", "pr-checkout",
+  "resolve", "finish", "pr-checkout", "issue-start",
 ]);
 
 export class GitApi {
@@ -112,7 +119,14 @@ export class GitApi {
       case "stashes": return json(await g.stashes(root));
       case "tags": return json(await g.tags(root));
       case "worktrees": return json(await g.worktrees(root));
-      case "prs": return json(await g.pullRequests(root));
+      case "prs": {
+        // GitHub through gh; GitLab and Azure DevOps through their APIs once connected (glab as a fallback for GitLab)
+        const remote = conn.parseRemote(await originURL(root));
+        if (remote.kind === "azure") return json({ provider: "Azure DevOps", items: await conn.azurePullRequests(remote) });
+        if (remote.kind === "gitlab" && conn.status().gitlab.connected) return json({ provider: "GitLab", items: await conn.gitlabMergeRequests(remote) });
+        return json(await g.pullRequests(root));
+      }
+      case "issues": return json(await conn.jiraMyIssues());
       case "ai-message": {
         const st = await g.state(root);
         const lines = st.files.filter((f) => f.staged).map((f) => `${f.x}  ${f.path}`);
@@ -161,7 +175,20 @@ export class GitApi {
       case "worktree-remove": await g.removeWorktree(root, b.path, b.force === true); return done();
       case "resolve": await g.resolveConflict(root, b.path, b.choice); return done();
       case "finish": await g.finishOperation(root, b.action === "abort" ? "abort" : "continue"); return done();
-      case "pr-checkout": await g.checkoutPullRequest(root, b.number); return done();
+      case "pr-checkout": {
+        const remote = conn.parseRemote(await originURL(root));
+        if (remote.kind === "github" || (remote.kind === "gitlab" && !conn.status().gitlab.connected)) await g.checkoutPullRequest(root, b.number);
+        else return done({ branch: await g.checkoutRemoteBranch(root, b.branch) });
+        return done();
+      }
+      case "issue-start": {
+        // a branch named after the issue, and (if asked) the issue moved to "in progress"
+        const key = String(b.key ?? "");
+        const name = typeof b.branch === "string" && b.branch.trim() ? b.branch : conn.branchForIssue(key, String(b.summary ?? ""));
+        const branch = await g.createBranch(root, name, "", true);
+        const moved = b.transition === true ? await conn.jiraStartProgress(key).catch((e) => "!" + errMsg(e)) : "";
+        return done({ branch, moved });
+      }
     }
     return fail("unknown action " + action, 404);
   }

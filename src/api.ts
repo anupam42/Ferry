@@ -9,6 +9,8 @@
 //   POST /pairs/{name}/resolve       {"path": "...", "choice": "source|target|newer|both|merge"}
 //   POST /pairs/{name}/undo          undo the last sync batch
 //   GET  /events/recent              the last 300 notable events (for notifications after a reload)
+//   GET  /connections                who is connected to GitLab, Azure DevOps and Jira (no secrets)
+//   POST /connections/{gitlab|azure|jira}[/remove]   connect (checks the token first) or disconnect
 //   POST /pairs/{name}/restore       {"at": "2h ago"}: undo every batch after that time
 //   POST /pairs/{name}/ignore        {"path": "..."}: add the file to the source's .syncignore
 //   GET  /pairs/{name}/stats?since=7d   history totals (JSON)
@@ -32,6 +34,7 @@ import { statusJSON } from "./engine/engine.ts";
 import { batchesSince } from "./engine/journal.ts";
 import { eventJSON, parseChoice, type Event } from "./engine/types.ts";
 import { GitApi, type RepoManager } from "./gitapi.ts";
+import * as conn from "./integrations.ts";
 import { errMsg, parseWhen } from "./util.ts";
 import webPage from "./web/index.html" with { type: "text" };
 import logoSVG from "../assets/logo/icon.svg" with { type: "text" };
@@ -174,6 +177,7 @@ export class ApiServer {
     }
     if (req.method === "GET" && url.pathname === "/fs") return this.listDir(url);
     if (parts[0] === "git" && parts.length >= 2) return this.git.handle(req, url, parts);
+    if (parts[0] === "connections") return this.connections(req, parts);
     if (req.method === "GET" && url.pathname === "/events") return this.events(req);
     if (req.method === "GET" && url.pathname === "/events/recent") return json(this.recent);
     if (req.method === "POST" && url.pathname === "/pairs") return this.addPair(req);
@@ -272,6 +276,23 @@ export class ApiServer {
       }
     }
     return json(e.stats(t));
+  }
+
+  /** GitLab, Azure DevOps and Jira: who is connected, connect, disconnect. Tokens are never sent back. */
+  private async connections(req: Request, parts: string[]): Promise<Response> {
+    if (req.method === "GET" && parts.length === 1) return json(conn.status());
+    const p = parts[1] as conn.Provider;
+    if (req.method !== "POST" || !["gitlab", "azure", "jira"].includes(p)) return text("404 page not found", 404);
+    if (!this.opts.repos) return text("connections need ferry ui", 405);
+    if (parts[2] === "remove") {
+      conn.disconnect(p);
+      return json({ disconnected: p });
+    }
+    try {
+      return json(await conn.connect(p, await this.body(req)));
+    } catch (e) {
+      return new Response(JSON.stringify({ error: errMsg(e), code: e instanceof conn.IntegrationError ? e.code : "" }) + "\n", { status: 400, headers: { "Content-Type": "application/json" } });
+    }
   }
 
   /** Sub-folders of a folder, for the web app's folder picker. */

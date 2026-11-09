@@ -174,7 +174,7 @@ a.btn { text-decoration: none; }
 .field > .label, .field .label { display: block; font-weight: 650; margin-bottom: 6px; }
 .field small, .hint { display: block; color: var(--muted); font-size: 12.5px; margin-top: 5px; }
 .field-error { color: var(--red) !important; font-weight: 600; }
-input[type=text], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--card-solid); border-radius: 14px; padding: 10px 14px; }
+input[type=text], input[type=password], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--card-solid); border-radius: 14px; padding: 10px 14px; }
 textarea { min-height: 70px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
 input.invalid { border-color: var(--red); }
 .inline { display: flex; gap: 8px; align-items: center; }
@@ -340,6 +340,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     <button class="rail-btn" id="nav-git" title="Git" aria-label="Git client"></button>
     <button class="rail-btn" id="nav-activity" title="Notifications" aria-label="Notifications"><span class="badge hidden" id="note-badge"></span></button>
     <div class="grow"></div>
+    <button class="rail-btn" id="nav-conn" title="Connections: GitLab, Azure DevOps, Jira" aria-label="Connections"></button>
     <button class="rail-btn" id="nav-theme" aria-label="Switch light or dark mode"></button>
   </nav>
   <aside class="pairs-col">
@@ -410,6 +411,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     pr: '<circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M6 7.5v9M18 16.5V9a3 3 0 0 0-3-3h-4M13 3l-2 3 2 3"/>',
     tree: '<path d="M12 3v18M12 8l-6 4M12 12l6 4"/>',
     cloud: '<path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.5 1.5A3.5 3.5 0 0 0 7 18z"/>',
+    plug: '<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>',
+    ticket: '<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 5v12"/>',
   };
   function icon(name) {
     const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -709,6 +712,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     $("#nav-pairs").append(icon("home"));
     $("#nav-activity").append(icon("bell"));
     $("#nav-git").append(icon("branch"));
+    $("#nav-conn").append(icon("plug"));
+    $("#nav-conn").onclick = openConnections;
     const setMode = (m, tab) => {
       S.mode = m;
       localStorage.setItem("ferry-mode", m);
@@ -1126,8 +1131,10 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
    * Relay asks a question from the bottom of the screen and reacts to where
    * you are about to click. With hold: true the risky choice has to be
    * pressed and held, so a slip of the mouse can't do it. Resolves true/false.
+   * The safe "no" is the highlighted button, unless primary: "yes" (for asks
+   * that build something rather than remove it).
    */
-  function relayAsk({ mood: m = "thinking", title, text, yes = "Yes", no = "Cancel", hold = false, yesMood = "sad", noMood = "happy", fields = null }) {
+  function relayAsk({ mood: m = "thinking", title, text, yes = "Yes", no = "Cancel", hold = false, yesMood = "sad", noMood = "happy", fields = null, primary = "no" }) {
     return new Promise((resolve) => {
       const img = h("img", { class: "face bob", src: face(m), alt: "Relay" });
       const say = h("h3", {}, title);
@@ -1139,8 +1146,9 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
         return f.type === "check" ? h("label", { class: "check" }, el, h("span", {}, f.label)) : h("label", { class: "field" }, h("span", { class: "label" }, f.label), el, f.hint ? h("small", {}, f.hint) : null);
       })) : null;
       const values = () => Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.type === "checkbox" ? el.checked : el.value.trim()]));
-      const noBtn = h("button", { class: "btn brand" }, no);
-      const yesBtn = h("button", { class: "btn" + (hold ? " hold danger" : "") }, h("i", { class: "prog" }), h("span", {}, hold ? "Hold to " + yes.toLowerCase() : yes));
+      const yesFirst = primary === "yes" && !hold;
+      const noBtn = h("button", { class: "btn" + (yesFirst ? " ghost" : " brand") }, no);
+      const yesBtn = h("button", { class: "btn" + (hold ? " hold danger" : yesFirst ? " brand" : "") }, h("i", { class: "prog" }), h("span", {}, hold ? "Hold to " + yes.toLowerCase() : yes));
       const wrap = h("div", { class: "ask-wrap", role: "alertdialog", "aria-modal": "true", "aria-label": title },
         h("div", { class: "ask" }, img, say, sub, form, h("div", { class: "row" }, noBtn, yesBtn),
           hold ? h("div", { class: "note" }, "Press and hold for a second (or hold Space), so a slip of the mouse can't do it.") : null));
@@ -1623,7 +1631,9 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 
     const n = st ? st.files.filter((f) => !f.conflicted).length : 0;
     const tabs = [["changes", "Changes", "files", n], ["history", "History", "clock", 0], ["branches", "Branches", "branch", 0], ["stashes", "Stashes", "box", st ? st.stashes : 0],
-      ["prs", "Pull requests", "pr", 0], ["tags", "Tags", "tag", 0], ["worktrees", "Worktrees", "tree", 0]];
+      ["prs", "Pull requests", "pr", 0], ["issues", "Jira", "ticket", 0], ["tags", "Tags", "tag", 0], ["worktrees", "Worktrees", "tree", 0]]
+      .filter(([id]) => id !== "issues" || (S.conns && S.conns.jira.connected));
+    if (!tabs.some(([id]) => id === S.gitTab)) S.gitTab = "changes";
     ui.tabs.replaceChildren(...tabs.map(([id, name, ic, c]) => h("button", { class: "tab" + (S.gitTab === id ? " on" : ""), "aria-pressed": S.gitTab === id ? "true" : "false", onclick: () => { S.gitTab = id; S.gshown = ""; render(); } },
       icon(ic), name, c ? h("span", { class: "count blue" }, c) : null)));
     renderGitBody(st);
@@ -1707,7 +1717,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     if (S.gshown === key || (typing && S.gshown.startsWith(S.repoSel + "|" + S.gitTab))) return;
     S.gshown = key;
     if (!st) { ui.body.replaceChildren(h("div", { class: "card empty-row" }, S.repoError || "Loading…")); return; }
-    ({ changes: gitChanges, history: gitHistory, branches: gitBranches, stashes: gitStashes, prs: gitPRs, tags: gitTags, worktrees: gitWorktrees })[S.gitTab](ui.body, st);
+    ({ changes: gitChanges, history: gitHistory, branches: gitBranches, stashes: gitStashes, prs: gitPRs, issues: gitIssues, tags: gitTags, worktrees: gitWorktrees })[S.gitTab](ui.body, st);
   }
 
   const STATUS = (f) => f.conflicted ? ["Conflict", "red"] : f.untracked ? ["New", "solid-green"] : (f.x === "A" ? ["New", "solid-green"] : f.x === "R" ? ["Renamed", "solid-violet"] : (f.x === "D" || f.y === "D") ? ["Deleted", "solid-red"] : ["Modified", "solid-blue"]);
@@ -1757,7 +1767,10 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       if (amend.checked && !msg.value && st.lastCommit) msg.value = st.lastCommit.subject;
     };
     const commitBtn = h("button", { class: "btn primary", disabled: !staged && !st.head ? true : null }, icon("commit"), staged ? `Commit ${plural(staged, "file")} to ${st.branch || "HEAD"}` : "Commit");
+    const issueKey = (st.branch.match(/^([A-Z][A-Z0-9_]+-\d+)/) || [])[1];
+    if (issueKey && S.conns && S.conns.jira.connected) msg.placeholder = `${issueKey}: what did you change?`;
     commitBtn.onclick = async () => {
+      if (issueKey && msg.value.trim() && !msg.value.includes(issueKey)) msg.value = `${issueKey}: ${msg.value.trim()}`;
       const coAuthors = coAuth.value.split(/,(?=[^>]*(?:<|$))/).map((x) => x.trim()).filter(Boolean);
       const r = await tryAct("commit", { message: msg.value, amend: amend.checked, co_authors: coAuthors }, (r) => amend.checked ? `Updated the last commit (${r.commit})` : `Committed ${r.commit}`, "party");
       if (r) { msg.value = ""; coAuth.value = ""; }
@@ -1863,7 +1876,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     const commits = await act(null, () => api("GET", gitURL("log") + "?limit=" + (50 + S.logSkip)));
     if (!commits || S.gitTab !== "history") return;
     const rows = commits.map((c) => h("tr", { style: { cursor: "pointer" }, onclick: () => showCommit(c.hash) },
-      h("td", { class: "file" }, c.subject, ...c.refs.map((ref) => h("span", { class: "pill refpill " + (ref.startsWith("tag: ") ? "amber" : ref.includes("/") ? "violet" : "blue") }, ref.replace("tag: ", "🏷 ")))),
+      h("td", { class: "file" }, ...linkIssues(c.subject), ...c.refs.map((ref) => h("span", { class: "pill refpill " + (ref.startsWith("tag: ") ? "amber" : ref.includes("/") ? "violet" : "blue") }, ref.replace("tag: ", "🏷 ")))),
       h("td", { class: "opt muted" }, c.author),
       h("td", { class: "opt muted" }, ago(c.date)),
       h("td", { class: "end mono muted" }, c.short)));
@@ -1917,7 +1930,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
         if (ok) { dr.close(); tryAct("revert", { hash: c.hash }, "Reverted: a new commit undoes it", "wink"); }
       } }, "Revert"),
       h("button", { class: "btn small brand", onclick: async () => {
-        const ok = await relayAsk({ mood: "excited", title: `Copy this commit onto ${st && st.branch ? st.branch : "the current branch"}?`, text: "Cherry-picking applies the same change again as a new commit on your current branch.", yes: "Cherry-pick", no: "Cancel", yesMood: "party" });
+        const ok = await relayAsk({ primary: "yes", mood: "excited", title: `Copy this commit onto ${st && st.branch ? st.branch : "the current branch"}?`, text: "Cherry-picking applies the same change again as a new commit on your current branch.", yes: "Cherry-pick", no: "Cancel", yesMood: "party" });
         if (ok) { dr.close(); tryAct("cherry-pick", { hash: c.hash }, "Cherry-picked onto " + (st ? st.branch : "your branch"), "party"); }
       } }, "Cherry-pick"));
   }
@@ -1937,7 +1950,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
           if (ok) tryAct("merge", { branch: x.name }, (r) => r.conflicts.length ? "" : `Merged ${x.name} into ${st.branch}`, "party");
         } }, "Merge into " + st.branch), " ",
         h("button", { class: "btn small ghost", onclick: async () => {
-          const v = await relayAsk({ mood: "thinking", title: `Rename ${x.name}`, text: "Only the local name changes; a branch on the remote keeps its old name until you push again.", yes: "Rename", no: "Cancel", fields: [{ name: "to", label: "New name", value: x.name }] });
+          const v = await relayAsk({ primary: "yes", mood: "thinking", title: `Rename ${x.name}`, text: "Only the local name changes; a branch on the remote keeps its old name until you push again.", yes: "Rename", no: "Cancel", fields: [{ name: "to", label: "New name", value: x.name }] });
           if (v) tryAct("branch-rename", { from: x.name, to: v.to }, "Renamed to " + v.to, "wink");
         } }, "Rename"), " ",
         x.current ? "" : h("button", { class: "btn small ghost danger", onclick: async () => {
@@ -1986,7 +1999,10 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     try {
       res = await api("GET", gitURL("prs"));
     } catch (e) {
-      body.replaceChildren(h("div", { class: "card hero" }, h("img", { src: face("thinking"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, e.code === "no-cli" ? "I need a little helper for this." : "I couldn't get the pull requests."), h("div", { class: "hint" }, e.message))));
+      const fixable = e.code === "no-cli" || e.code === "not-connected" || e.code === "auth";
+      body.replaceChildren(h("div", { class: "card hero" }, h("img", { src: face("thinking"), alt: "" }), h("div", { class: "bubble" },
+        h("div", { class: "say" }, fixable ? "I need to be connected for this." : "I couldn't get the pull requests."), h("div", { class: "hint" }, e.message),
+        fixable && e.code !== "no-cli" ? h("div", { style: { marginTop: "10px" } }, h("button", { class: "btn small brand", onclick: openConnections }, icon("plug"), "Open Connections")) : "")));
       return;
     }
     if (S.gitTab !== "prs") return;
@@ -2000,7 +2016,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
         h("td", {}, checks, " ", review ? h("span", { class: "pill " + review[1] }, review[0]) : ""),
         h("td", { class: "end" },
           h("a", { class: "btn small", href: p.url, target: "_blank", rel: "noopener noreferrer" }, "Open"), " ",
-          h("button", { class: "btn small brand", onclick: () => tryAct("pr-checkout", { number: p.number }, `Checked out #${p.number} so you can try it`, "excited") }, "Check out")));
+          h("button", { class: "btn small brand", onclick: () => tryAct("pr-checkout", { number: p.number, branch: p.branch }, `Checked out #${p.number} so you can try it`, "excited") }, "Check out")));
     });
     body.replaceChildren(section("g-prs", res.provider === "GitLab" ? "Merge requests" : "Pull requests", res.items.length, "blue", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "No open pull requests.")));
   }
@@ -2047,7 +2063,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
           if (ok) tryAct("worktree-remove", { path: w.path }, "Removed the worktree", "sleepy");
         } }, "Remove"))));
     const add = h("button", { class: "btn small brand", onclick: async () => {
-      const v = await relayAsk({ mood: "excited", title: "New worktree", text: "A worktree is a second folder for the same repository, checked out on another branch, so you can work on two branches at once.", yes: "Create it", no: "Cancel", yesMood: "party", fields: [
+      const v = await relayAsk({ primary: "yes", mood: "excited", title: "New worktree", text: "A worktree is a second folder for the same repository, checked out on another branch, so you can work on two branches at once.", yes: "Create it", no: "Cancel", yesMood: "party", fields: [
         { name: "branch", label: "Branch", placeholder: "e.g. hotfix" }, { name: "create", type: "check", label: "It's a new branch", value: true },
         { name: "path", label: "Folder", placeholder: st.root + "-hotfix", hint: "Leave empty to put it next to this repository." }, { name: "open", type: "check", label: "Open it in Ferry too", value: true }] });
       if (!v) return;
@@ -2055,6 +2071,122 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       tryAct("worktree-add", { path: dir, branch: v.branch, create: v.create, open: v.open }, (r) => "Created " + short(r.path), "party");
     } }, icon("plus"), "New worktree");
     body.replaceChildren(section("g-wt", "Worktrees", list.length, "", h("table", { class: "table" }, h("tbody", {}, rows)), add));
+  }
+
+  // ---------- Jira ----------
+  /** Text with Jira issue keys (SHOP-42) turned into links, when Jira is connected. */
+  function linkIssues(t) {
+    const site = S.conns && S.conns.jira.connected ? S.conns.jira.where : "";
+    if (!site) return [t];
+    const out = [];
+    let last = 0;
+    for (const m of t.matchAll(/\b[A-Z][A-Z0-9_]+-\d+\b/g)) {
+      out.push(t.slice(last, m.index));
+      out.push(h("a", { href: `${site}/browse/${m[0]}`, target: "_blank", rel: "noopener noreferrer", onclick: (e) => e.stopPropagation(), class: "pill blue refpill", style: { textDecoration: "none" } }, m[0]));
+      last = m.index + m[0].length;
+    }
+    out.push(t.slice(last));
+    return out;
+  }
+
+  async function gitIssues(body, st) {
+    body.replaceChildren(h("div", { class: "card empty-row" }, "Asking Jira for your issues…"));
+    let res;
+    try {
+      res = await api("GET", gitURL("issues"));
+    } catch (e) {
+      body.replaceChildren(h("div", { class: "card hero" }, h("img", { src: face("thinking"), alt: "" }), h("div", { class: "bubble" }, h("div", { class: "say" }, "I couldn't reach Jira."), h("div", { class: "hint" }, e.message),
+        h("div", { style: { marginTop: "10px" } }, h("button", { class: "btn small brand", onclick: openConnections }, icon("plug"), "Open Connections")))));
+      return;
+    }
+    if (S.gitTab !== "issues") return;
+    const tone = (c) => (c === "indeterminate" ? "blue" : c === "done" ? "green" : "");
+    const rows = res.issues.map((i) => h("tr", {},
+      h("td", { class: "file" }, h("a", { href: i.url, target: "_blank", rel: "noopener noreferrer", class: "pill blue refpill", style: { textDecoration: "none", marginLeft: 0, marginRight: "8px" } }, i.key), i.summary, h("small", {}, [i.type, i.priority && i.priority + " priority", "updated " + ago(i.updated)].filter(Boolean).join(" · "))),
+      h("td", {}, h("span", { class: "pill " + tone(i.category) }, i.status)),
+      h("td", { class: "end" }, h("button", { class: "btn small brand", onclick: async () => {
+        const name = await (async () => {
+          const v = await relayAsk({ mood: "excited", title: `Start work on ${i.key}?`, text: `I'll make a branch for “${i.summary}” from ${st.branch || "here"} and switch to it. Commits there get ${i.key} in their message, so Jira links them.`, yes: "Start work", no: "Cancel", yesMood: "party", noMood: "thinking", primary: "yes",
+            fields: [{ name: "branch", label: "Branch name", value: branchFor(i.key, i.summary) }, { name: "transition", type: "check", label: "Move the issue to In Progress", value: i.category !== "indeterminate" }] });
+          return v;
+        })();
+        if (!name) return;
+        const r = await tryAct("issue-start", { key: i.key, summary: i.summary, branch: name.branch, transition: name.transition }, (r) => `On ${r.branch}` + (r.moved && !r.moved.startsWith("!") ? `; ${i.key} is now ${r.moved}` : ""), "party");
+        if (r && r.moved && r.moved.startsWith("!")) toast(`Couldn't move ${i.key}: ${r.moved.slice(1)}`, true);
+      } }, icon("branch"), "Start work"), " ", h("a", { class: "btn small", href: i.url, target: "_blank", rel: "noopener noreferrer" }, "Open"))));
+    body.replaceChildren(section("g-issues", "My Jira issues", res.issues.length, "blue", rows.length ? h("table", { class: "table" }, h("tbody", {}, rows)) : h("div", { class: "empty-row" }, "Nothing assigned to you that's still open. Nice!")));
+  }
+  const branchFor = (key, summary) => {
+    const slug = summary.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").slice(0, 40).replace(/-$/, "");
+    return slug ? `${key}-${slug}` : key;
+  };
+
+  // ---------- connections ----------
+  const SERVICES = [
+    { id: "github", name: "GitHub", blurb: "Pull requests and their checks.", how: "GitHub uses the GitHub CLI: install it and run “gh auth login” in a terminal. Nothing to enter here." },
+    { id: "gitlab", name: "GitLab", blurb: "Merge requests, pipelines and approvals (gitlab.com or your own server).", fields: [
+      { name: "url", label: "GitLab address", placeholder: "https://gitlab.com", value: "https://gitlab.com", hint: "Just the server: https://gitlab.com, or your company's GitLab address. Not a profile or project page." },
+      { name: "token", label: "Personal access token", placeholder: "glpat-…", secret: true }],
+      help: "Create one under User settings → Access tokens, with the read_api scope.", link: "https://gitlab.com/-/user_settings/personal_access_tokens" },
+    { id: "azure", name: "Azure DevOps", blurb: "Pull requests, reviewer votes and build status in Azure Repos.", fields: [
+      { name: "org", label: "Organization", placeholder: "the name after dev.azure.com/" },
+      { name: "token", label: "Personal access token", placeholder: "paste the token", secret: true }],
+      help: "Create one under User settings → Personal access tokens, with Code (Read) access.", link: "https://dev.azure.com/" },
+    { id: "jira", name: "Jira", blurb: "Your issues, branches named after them, and commits linked back.", fields: [
+      { name: "url", label: "Jira address", placeholder: "https://your-team.atlassian.net", hint: "Just the site, like https://your-team.atlassian.net." },
+      { name: "email", label: "Your Jira email", placeholder: "you@company.com" },
+      { name: "token", label: "API token", placeholder: "paste the token", secret: true }],
+      help: "Create an API token in your Atlassian account settings.", link: "https://id.atlassian.com/manage-profile/security/api-tokens" },
+  ];
+
+  async function openConnections() {
+    const dr = drawer({ title: "Connections", sub: "Let Ferry talk to the services you use" });
+    const paint = async () => {
+      S.conns = await api("GET", "/connections").catch(() => S.conns);
+      const c = S.conns || {};
+      const n = ["gitlab", "azure", "jira"].filter((k) => c[k] && c[k].connected).length;
+      const cards = SERVICES.map((svc) => {
+        const st = c[svc.id];
+        const card = h("div", { class: "card section", style: { marginBottom: "12px", padding: "14px 16px", background: "var(--card2)" } });
+        const head = h("div", { class: "inline", style: { justifyContent: "space-between", gap: "10px", flexWrap: "wrap" } },
+          h("div", {}, h("b", { style: { fontSize: "16px" } }, svc.name), h("div", { class: "muted", style: { fontSize: "13px" } }, svc.blurb)),
+          st && st.connected ? h("span", { class: "pill green" }, "✓ connected") : svc.id === "github" ? h("span", { class: "pill" }, "via gh CLI") : h("span", { class: "pill" }, "not connected"));
+        card.append(head);
+        if (svc.id === "github") { card.append(h("p", { class: "hint" }, svc.how)); return card; }
+        if (st && st.connected) {
+          card.append(h("p", { class: "hint", style: { marginTop: "8px" } }, `As ${st.user || "you"} · ${st.where}`),
+            st.fromEnv ? h("p", { class: "hint" }, "Set by environment variables where ferry runs; change them there.")
+              : h("button", { class: "btn small ghost danger", onclick: async () => { await act(`Disconnected ${svc.name}`, () => api("POST", `/connections/${svc.id}/remove`), "sleepy"); paint(); refreshGit(); } }, "Disconnect"));
+          return card;
+        }
+        const inputs = {};
+        const form = h("div", { style: { marginTop: "12px" } }, svc.fields.map((f) => {
+          const el = h("input", { type: f.secret ? "password" : "text", placeholder: f.placeholder, value: f.value || "", autocomplete: "off" });
+          inputs[f.name] = el;
+          return h("label", { class: "field" }, h("span", { class: "label" }, f.label), el, f.hint ? h("small", {}, f.hint) : null);
+        }));
+        const btn = h("button", { class: "btn brand small" }, "Connect");
+        btn.onclick = async () => {
+          btn.disabled = true;
+          btn.textContent = "Checking…";
+          const values = Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.value.trim()]));
+          const r = await act(null, () => api("POST", `/connections/${svc.id}`, values));
+          btn.disabled = false;
+          btn.textContent = "Connect";
+          if (r) { toast(`Connected to ${svc.name} as ${r.user}`, false, "party"); paint(); refreshGit(); }
+        };
+        card.append(form, h("div", { class: "inline", style: { justifyContent: "space-between", flexWrap: "wrap" } },
+          h("span", { class: "hint", style: { margin: 0 } }, svc.help, " ", h("a", { href: svc.link, target: "_blank", rel: "noopener noreferrer" }, "Create a token")), btn));
+        return card;
+      });
+      dr.body.replaceChildren(
+        h("div", { class: "narrator" }, h("img", { src: face(n ? "happy" : "excited"), alt: "" }), h("div", { class: "bubble" },
+          h("div", { class: "say" }, n ? `I'm connected to ${plural(n, "service")}.` : "Which services do you use?"),
+          h("div", { class: "hint" }, "Tokens stay on this computer, in a file only you can read. The browser never sees them."))),
+        ...cards);
+    };
+    dr.foot.replaceChildren(h("span", { class: "hint left", style: { margin: 0 } }, "Pull requests and Jira show up in the Git area."), h("button", { class: "btn", onclick: dr.close }, "Done"));
+    paint();
   }
 
   // ---------- add a repository ----------
@@ -2166,6 +2298,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       setConn(false);
       if (/token/i.test(e.message)) toast("This page needs the access token: open the link ferry printed.", true);
     }
+    // connections first: they decide which tabs a repository shows (Jira's Issues tab)
+    S.conns = await api("GET", "/connections").catch(() => null);
     await refresh();
     S.notes = await api("GET", "/events/recent").catch(() => []);
     paintBadge();

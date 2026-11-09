@@ -860,6 +860,18 @@ export async function pullRequests(root: string): Promise<{ provider: string; it
   };
 }
 
+/** Fetches a branch from origin and switches to a local branch that tracks it. */
+export async function checkoutRemoteBranch(root: string, branch: unknown): Promise<string> {
+  const b = await branchName(root, branch);
+  await git(root, ["fetch", "--quiet", "origin", b], { timeoutMs: 5 * 60_000 });
+  if (await gitOk(root, ["show-ref", "--verify", "-q", "refs/heads/" + b])) {
+    await git(root, ["switch", b]);
+    return b;
+  }
+  await git(root, ["switch", "--track", "-c", b, "origin/" + b]);
+  return b;
+}
+
 export async function checkoutPullRequest(root: string, number: unknown): Promise<void> {
   const n = Number(number);
   if (!Number.isInteger(n) || n <= 0) throw new GitClientError("not a pull request number");

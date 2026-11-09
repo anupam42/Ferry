@@ -38,7 +38,7 @@ Work in one folder, commit from another. **Ferry** watches a working folder and 
 ## Contents
 
 - [Install](#install) · [Quick start](#quick-start) · [Web app](#web-app)
-- [Features](#features): [Sync](#sync) · [Choosing what to sync](#choosing-what-to-sync) · [Conflicts and merging](#conflicts-and-merging) · [Safety](#safety) · [History and undo](#history-and-undo) · [Git](#git) · [Remote targets over ssh](#remote-targets-over-ssh) · [Cloud storage targets](#cloud-storage-targets) · [Scheduling](#scheduling) · [Dashboard](#dashboard) · [Status, plan and doctor](#status-plan-and-doctor) · [Integrations](#integrations) · [Background service](#background-service)
+- [Features](#features): [Sync](#sync) · [Choosing what to sync](#choosing-what-to-sync) · [Conflicts and merging](#conflicts-and-merging) · [Safety](#safety) · [History and undo](#history-and-undo) · [Git](#git) · [Remote targets over ssh](#remote-targets-over-ssh) · [Cloud storage targets](#cloud-storage-targets) · [Scheduling](#scheduling) · [Dashboard](#dashboard) · [Status, plan and doctor](#status-plan-and-doctor) · [Connections](#connections-gitlab-azure-devops-and-jira) · [Integrations](#integrations) · [Background service](#background-service)
 - [Commands](#commands) · [Dashboard keys](#dashboard-keys) · [Config file](#config-file) · [Behaviour notes](#behaviour-notes) · [Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Todo](#todo)
 
 ## Install
@@ -102,6 +102,7 @@ The web app does what the terminal dashboard does, with buttons instead of keys:
   - **Fetch, pull and push**, with an ahead / behind count and help when the two sides have diverged.
   - **Merge conflict help:** keep yours, keep theirs or keep both, then continue or abort.
   - **Pull requests and their checks** (through `gh`, or `glab` for GitLab), plus tags and worktrees.
+  - **Jira issues** assigned to you (once Jira is connected): "Start work" makes a branch named after the issue and can move it to In Progress. Commits on that branch get the issue key in their message, and issue keys in History link to Jira.
 
   Repositories your pairs sync into appear on their own. A Git action that would change files there (switching branches, pulling…) pauses that pair first, and discarded changes go to the Trash.
 
@@ -215,6 +216,18 @@ The web app does what the terminal dashboard does, with buttons instead of keys:
 - **`ferry status`**: every pair that has run, whether its process is still alive, its state (watching, paused, conflicts…), the time of the last sync, counts, branch, uncommitted and staged files, and held conflicts. It works while the background service runs. `--json` is meant for scripts and editors, and `--running` hides stopped pairs.
 - **`ferry plan`**: a dry run that writes nothing and lists exactly what the next pass would do, as `text` (default), `markdown` or `json`. `--diff` adds a diff for each file. The Markdown output uses collapsible sections, so you can paste it into a pull request or an issue.
 - **`ferry doctor`**: checks git and your git identity, optional tools (git-lfs, gh, ssh, notify-send), the data folder, held conflicts and the background service. For each pair it also checks that the source exists, that the target is a git repo, whether native file events work (with the inotify limit on Linux and `/mnt/c` inside WSL), that ssh reaches remote targets, and the sync window. Each problem comes with a fix. It exits with 1 if anything is broken.
+
+### Connections: GitLab, Azure DevOps and Jira
+The plug button on the web app's rail connects Ferry to your accounts. Ferry checks each token by signing in once before saving it.
+
+| Service | What you get | You need |
+|---|---|---|
+| GitHub | pull requests and checks, checkout | the `gh` CLI, signed in (`gh auth login`) |
+| GitLab (gitlab.com or your own server) | merge requests, pipeline status, approvals, checkout | a personal access token with the `read_api` scope |
+| Azure DevOps | pull requests, reviewer votes, build status, checkout | your organization URL and a personal access token with **Code (Read)** |
+| Jira (Cloud or Server) | a Jira tab with your open issues, "Start work", issue links in history | your site URL, your email and an API token (from id.atlassian.com); moving issues needs permission to transition them |
+
+Ferry chooses the service from the repository's `origin` URL. Tokens are saved in `connections.json` in Ferry's data folder, readable only by you (mode 0600). They are never sent to the web page, and only the service's own address is contacted. Environment variables take priority over the saved file: `GITLAB_TOKEN` (with `GITLAB_URL` for your own server), `AZURE_DEVOPS_PAT` with `AZURE_DEVOPS_ORG`, and `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`. The API: `GET /connections` (status only), `POST /connections/{gitlab|azure|jira}` to connect, `POST /connections/{name}/remove` to disconnect.
 
 ### Integrations
 - **`--json`**: NDJSON events on stdout, for scripts, CI or an editor extension:
