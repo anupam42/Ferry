@@ -1,0 +1,26 @@
+@use "tokens" as *;
+@use "mixins" as *;
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  font: #{fs(md)}/1.5 $font-sans;
+  color: var(--text);
+  background: var(--bg);
+  background-attachment: fixed;
+  zoom: var(--zoom); // interface size; heights divide by it to keep fitting the window
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+h1, h2, h3 { margin: 0; }
+:focus-visible { @include focus-ring; }
+
+.mono { font-family: $font-mono; font-size: fs(sm); }
+.muted { color: var(--muted); }
+.hidden { display: none !important; }
+.sr-only { @include visually-hidden; }
+
+// Settings → Motion → Reduce: everything stops moving
+[data-motion="reduce"] *, [data-motion="reduce"] *::before, [data-motion="reduce"] *::after {
+  animation-duration: 0s !important; animation-iteration-count: 1 !important; transition: none !important; scroll-behavior: auto !important;
+}

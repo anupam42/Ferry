@@ -1,0 +1,6 @@
+// The global stylesheet (app.css): tokens as custom properties, base styles and
+// shared controls. Component-specific styles live in each .svelte file.
+@use "themes";
+@use "base";
+@use "controls";
+@use "patterns";

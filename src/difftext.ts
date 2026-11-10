@@ -1,10 +1,7 @@
 // A unified-style line diff without external tools.
 
-/** One rendered diff line. op is " ", "+", "-" or "@" (hunk header / note). */
-export interface Line {
-  op: " " | "+" | "-" | "@";
-  text: string;
-}
+export type { Line } from "./shared/pairs.ts";
+import type { Line } from "./shared/pairs.ts";
 
 const MAX_CELLS = 25_000_000; // guard against huge LCS tables
 

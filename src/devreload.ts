@@ -109,8 +109,10 @@ export async function supervise(args: string[], log: (msg: string) => void): Pro
   };
 
   let timer: ReturnType<typeof setTimeout> | null = null;
-  // the OS can report one save several times, late: only a new modification time counts
+  // the OS can report one save several times, late: only a new modification time counts,
+  // and (macOS replays recent history) nothing saved before we started
   const seen = new Map<string, number>();
+  const startedAt = Date.now();
   const watcher = fs.watch(src, { recursive: true }, (_ev, name) => {
     const f = name ? String(name) : "";
     // the page reloads itself without a restart; only server code needs one
@@ -119,7 +121,7 @@ export async function supervise(args: string[], log: (msg: string) => void): Pro
     try {
       mtime = fs.statSync(path.join(src, f)).mtimeMs;
     } catch {}
-    if (seen.get(f) === mtime) return;
+    if (seen.get(f) === mtime || mtime < startedAt) return;
     seen.set(f, mtime);
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void restart(f), 150);

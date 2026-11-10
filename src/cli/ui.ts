@@ -34,7 +34,8 @@ export async function cmdUI(args: string[]): Promise<void> {
     .string("host", "127.0.0.1", "address to listen on (anything but localhost needs --serve-token)")
     .int("port", 7878, "port for the web app (the next free one is used if it's taken)")
     .bool("no-open", false, "don't open the browser")
-    .bool("dev", false, "for working on Ferry: reload the page when src/web changes, restart when the code does");
+    .bool("dev", false, "for working on Ferry: reload the page when src/web changes, restart when the code does")
+    .bool("next", false, "open the new web app (Svelte, being built) instead of the current page");
   f.usage = () => {
     process.stderr.write("Usage: ferry ui [flags] [--config file | <source> <target>]\n");
     f.printDefaults();
@@ -66,7 +67,10 @@ export async function cmdUI(args: string[]): Promise<void> {
       api?.pageChanged(kind);
       println(paint("90", kind === "css" ? "dev: styles updated" : "dev: page reloaded"));
     });
+    watchNextApp((kind) => api?.pageChanged(kind, "next"));
   }
+  // running from source: build the new web app (web/ → src/web/next) if it's missing or out of date
+  if (sourcePage()) await ensureNextApp(f.getBool("dev"));
 
   // where pairs come from, and where pairs added in the browser go
   let pairs: Pair[];
@@ -193,7 +197,7 @@ export async function cmdUI(args: string[]): Promise<void> {
   if (dev && process.env[PORT_FILE_ENV]) fs.writeFileSync(process.env[PORT_FILE_ENV]!, String(api.port));
 
   const shown = host === "0.0.0.0" || host === "::" ? "localhost" : host.includes(":") ? `[${host}]` : host;
-  let url = `http://${shown}:${port}/`;
+  let url = `http://${shown}:${port}/${f.getBool("next") ? "next" : ""}`;
   if (settings.serveToken !== "") url += "?token=" + encodeURIComponent(settings.serveToken);
   println(`${paint("1", "ferry " + VERSION)} web app running at ${paint("1;36", url)}`);
   println(paint("90", pairs.length === 0 ? "no folder pairs yet: add one in the browser" : `${pairs.length} pair(s) syncing`));
@@ -241,3 +245,56 @@ function openBrowser(url: string): void {
   const cmd = isMac ? ["open", url] : isWindows ? ["rundll32", "url.dll,FileProtocolHandler", url] : ["xdg-open", url];
   if (!startDetached(cmd)) println(paint("33", "! ") + "couldn't open a browser; open " + url + " yourself");
 }
+
+// ---------- the new web app (web/, built by scripts/build-web.ts) ----------
+
+type WebBuild = typeof import("../../scripts/build-web.ts");
+/** The build script, only when running from source (a computed path, so the binary doesn't bundle Svelte and Sass). */
+async function webBuild(): Promise<WebBuild | null> {
+  const file = path.join(import.meta.dir, "..", "..", "scripts", "build-web.ts");
+  if (!fs.existsSync(file) || !fs.existsSync(path.join(import.meta.dir, "..", "..", "web"))) return null;
+  return (await import(file)) as WebBuild;
+}
+
+async function ensureNextApp(dev: boolean): Promise<void> {
+  const b = await webBuild();
+  if (!b || (!dev && !b.webOutdated())) return;
+  try {
+    const r = await b.buildWeb({ dev });
+    println(paint("90", `built the new web app in ${r.ms} ms (open /next)`));
+  } catch (e) {
+    println(paint("33", "! ") + "the new web app didn't build: " + (e as Error).message.split("\n").slice(0, 6).join("\n"));
+  }
+}
+
+/** ferry ui --dev: rebuild the new web app when web/ changes, and tell open pages what changed. */
+function watchNextApp(changed: (kind: "css" | "page") => void): void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let running = false, again = false;
+  const run = async () => {
+    const b = await webBuild();
+    if (!b) return;
+    if (running) { again = true; return; }
+    running = true;
+    try {
+      const r = await b.buildWeb({ dev: true });
+      if (r.js) changed("page");
+      else if (r.css) changed("css");
+      if (r.js || r.css) println(paint("90", `dev: rebuilt the new web app in ${r.ms} ms`));
+    } catch (e) {
+      println(paint("33", "! ") + (e as Error).message.split("\n").slice(0, 8).join("\n"));
+    } finally {
+      running = false;
+      if (again) { again = false; void run(); }
+    }
+  };
+  const dir = path.join(import.meta.dir, "..", "..", "web");
+  if (!fs.existsSync(dir)) return;
+  // kept in a module variable: an unreferenced watcher can be collected and go quiet
+  nextWatcher = fs.watch(dir, { recursive: true }, () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => void run(), 80);
+  });
+  println(paint("90", "dev: watching web/ for the new web app"));
+}
+let nextWatcher: fs.FSWatcher | null = null;

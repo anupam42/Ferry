@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ferry</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<script>
+  // apply the saved look before anything is drawn, so the page never flashes the wrong one
+  (() => {
+    const root = document.documentElement;
+    const saved = localStorage.getItem("ferry-theme");
+    const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+    root.dataset.theme = dark ? "dark" : "light";
+    let look = {};
+    try { look = JSON.parse(localStorage.getItem("ferry-look") || "{}"); } catch {}
+    for (const k of ["accent", "bg", "size", "motion", "rail", "railpos", "dock"]) if (look[k]) root.dataset[k] = look[k];
+  })();
+</script>
+<link rel="stylesheet" href="/next/app.css">
+<script type="module" src="/next/app.js"></script>
+</head>
+<body>
+<div id="app"></div>
+</body>
+</html>

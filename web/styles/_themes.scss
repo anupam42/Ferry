@@ -1,0 +1,45 @@
+// Turns the semantic tokens into CSS custom properties, and generates the
+// accent, background and size variations, all from the maps in _tokens.scss.
+@use "sass:list";
+@use "sass:map";
+@use "tokens" as *;
+
+@mixin emit($theme) {
+  @each $name, $value in $theme { --#{$name}: #{$value}; }
+}
+
+:root, [data-theme="light"] {
+  @include emit($theme-light);
+  --zoom: 1;
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  @include emit($theme-dark);
+  color-scheme: dark;
+}
+
+@each $name, $modes in $accents {
+  $light: map.get($modes, light);
+  $dark: map.get($modes, dark);
+  [data-accent="#{$name}"] { --accent: #{list.nth($light, 1)}; --accent-2: #{list.nth($light, 2)}; }
+  [data-theme="dark"][data-accent="#{$name}"] { --accent: #{list.nth($dark, 1)}; --accent-2: #{list.nth($dark, 2)}; }
+}
+[data-accent] { --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent); }
+
+// every background as a variable too, so Settings can preview each one
+:root {
+  @each $name, $modes in $backgrounds {
+    --bg-#{$name}-l: #{map.get($modes, light)};
+    --bg-#{$name}-d: #{map.get($modes, dark)};
+  }
+}
+@each $name, $modes in $backgrounds {
+  @if $name != relay {
+    [data-bg="#{$name}"] { --bg: var(--bg-#{$name}-l); }
+    [data-theme="dark"][data-bg="#{$name}"] { --bg: var(--bg-#{$name}-d); }
+  }
+}
+
+@each $name, $zoom in $sizes {
+  [data-size="#{$name}"] { --zoom: #{$zoom}; }
+}

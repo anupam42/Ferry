@@ -36,6 +36,7 @@ import { batchesSince } from "./engine/journal.ts";
 import { eventJSON, parseChoice, type Event } from "./engine/types.ts";
 import { MAX_DIFF_LINES } from "./gitclient.ts";
 import type { PageChange, PageWatcher } from "./devreload.ts";
+import { serveNext } from "./webnext.ts";
 import { GitApi, type RepoManager } from "./gitapi.ts";
 import * as conn from "./integrations.ts";
 import { readSettings, saveGit, SettingsError } from "./settingsapi.ts";
@@ -125,8 +126,8 @@ export class ApiServer {
   }
 
   /** ferry ui --dev: tells open pages that the page changed ("css" can be swapped in without a reload). */
-  pageChanged(kind: PageChange): void {
-    const chunk = `event: dev\ndata: ${JSON.stringify({ kind })}\n\n`;
+  pageChanged(kind: PageChange, app: "current" | "next" = "current"): void {
+    const chunk = `event: dev\ndata: ${JSON.stringify({ kind, app })}\n\n`;
     for (const s of this.subs) s(chunk);
   }
 
@@ -186,6 +187,10 @@ export class ApiServer {
     }
     if (req.method === "GET" && url.pathname === "/status") {
       return json(this.engines.map((e) => statusJSON(e.getStatus())));
+    }
+    if (req.method === "GET") {
+      const next = await serveNext(url); // the new web app (Svelte), while it's being built
+      if (next) return next;
     }
     if (req.method === "GET" && url.pathname === "/info") {
       const m = this.opts.manager;
