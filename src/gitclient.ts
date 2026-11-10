@@ -11,8 +11,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { diff as lineDiff, type Line } from "./difftext.ts";
-import type { FileChange, IncomingCommit, PushIssue, RemoteCheck, RepoState } from "./shared/git.ts";
-export type { FileChange, IncomingCommit, PushIssue, RemoteCheck, RepoState } from "./shared/git.ts";
+import type { Branch, Commit, CommitDetail, FileChange, IncomingCommit, PushIssue, RemoteCheck, RepoState } from "./shared/git.ts";
+export type { Branch, Commit, CommitDetail, FileChange, IncomingCommit, PushIssue, RemoteCheck, RepoState } from "./shared/git.ts";
 import { scanSecretContent, secretNameHit } from "./engine/secrets.ts";
 import { moveToTrash } from "./engine/trash.ts";
 import { exec, which } from "./proc.ts";
@@ -433,20 +433,6 @@ export async function stashDrop(root: string, ref: unknown): Promise<void> {
 
 // ---------- history ----------
 
-export interface Commit {
-  hash: string;
-  short: string;
-  parents: string[];
-  author: string;
-  email: string;
-  date: string;
-  subject: string;
-  refs: string[];
-  /** the first line of the message body (a merged pull request's title, say) */
-  note?: string;
-  /** true for the commit HEAD points at */
-  head?: boolean;
-}
 
 /**
  * Commits, newest first, in date order: a commit never comes before its
@@ -478,10 +464,6 @@ function parseCommits(out: string): Commit[] {
   });
 }
 
-export interface CommitDetail extends Commit {
-  body: string;
-  files: { path: string; from?: string; status: string; added: number; removed: number }[];
-}
 
 export async function commitDetail(root: string, hash: unknown): Promise<CommitDetail> {
   const h = commitId(hash);
@@ -522,16 +504,6 @@ export async function commitFileDiff(root: string, hash: unknown, file: unknown)
 
 // ---------- branches ----------
 
-export interface Branch {
-  name: string;
-  current: boolean;
-  upstream: string;
-  ahead: number;
-  behind: number;
-  gone: boolean;
-  date: string;
-  subject: string;
-}
 
 export async function branches(root: string): Promise<{ local: Branch[]; remote: { name: string; date: string; subject: string }[] }> {
   const fmt = "%(refname:short)%1f%(HEAD)%1f%(upstream:short)%1f%(upstream:track)%1f%(committerdate:iso-strict)%1f%(contents:subject)";

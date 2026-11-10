@@ -72,3 +72,43 @@ export interface PushIssue {
   text: string; // what was found, short
   commit: string; // short id of the commit that added it
 }
+
+export interface Commit {
+  hash: string;
+  short: string;
+  parents: string[];
+  author: string;
+  email: string;
+  date: string;
+  subject: string;
+  refs: string[];
+  /** the first line of the message body (a merged pull request's title, say) */
+  note?: string;
+  /** true for the commit HEAD points at */
+  head?: boolean;
+}
+
+export interface CommitDetail extends Commit {
+  body: string;
+  files: { path: string; from?: string; status: string; added: number; removed: number }[];
+}
+
+export interface Branch {
+  name: string;
+  current: boolean;
+  upstream: string;
+  ahead: number;
+  behind: number;
+  gone: boolean;
+  date: string;
+  subject: string;
+}
+
+/** GET /git/{id}/branches */
+export interface BranchList { local: Branch[]; remote: { name: string; date: string; subject: string }[] }
+/** GET /git/{id}/stashes */
+export interface Stash { ref: string; message: string; when: string; branch: string }
+/** GET /git/{id}/tags */
+export interface Tag { name: string; commit: string; date: string; message: string }
+/** GET /git/{id}/worktrees */
+export interface Worktree { path: string; branch: string; head: string; main: boolean; locked: boolean; detached: boolean }

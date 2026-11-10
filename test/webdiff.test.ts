@@ -104,3 +104,36 @@ describe("Relay's mood for a repository", () => {
     expect(fileList(["src/a.ts", "b.ts", "c/d.ts", "e.ts"])).toBe("a.ts, b.ts, d.ts and 1 more");
   });
 });
+
+describe("the history graph", () => {
+  const { graphLayout, edgePath, avatar } = require("../web/lib/graph.ts") as typeof import("../web/lib/graph.ts");
+  // newest first: a merge (m) of a branch (b) back into main (a)
+  //   m ─┬─ a2 ── a1
+  //      └─ b1 ───┘
+  const commits = [
+    { hash: "m", parents: ["a2", "b1"] },
+    { hash: "a2", parents: ["a1"] },
+    { hash: "b1", parents: ["a1"] },
+    { hash: "a1", parents: [] },
+  ];
+  test("keeps the main line in the first lane and forks the branch beside it", () => {
+    const { rows, width } = graphLayout(commits, "m");
+    expect(rows.map((r) => r.col)).toEqual([0, 0, 1, 0]);
+    expect(width).toBe(2);
+    // the merge sends a line down to each parent
+    expect(rows[0]!.lines.filter((l) => l.half === "bottom").map((l) => l.to).sort()).toEqual([0, 1]);
+    // the branch curves back into a1
+    expect(rows[3]!.lines.some((l) => l.half === "top" && l.from === 1 && l.to === 0)).toBe(true);
+    // the branch's lane has its own colour
+    expect(rows[2]!.c).not.toBe(rows[1]!.c);
+  });
+  test("draws straight lines in a lane and curves between lanes", () => {
+    expect(edgePath({ from: 0, to: 0, half: "all", c: 0 })).toBe("M10 0V44");
+    expect(edgePath({ from: 1, to: 0, half: "top", c: 0 })).toMatch(/^M24 0C/);
+  });
+  test("gives each person a steady colour and initials", () => {
+    expect(avatar("Anupam Udupi", "a@x").initials).toBe("AU");
+    expect(avatar("Sam Lee", "s@x").initials).toBe("SL");
+    expect(avatar("Ana", "ana@x").colour).toBe(avatar("Ana B", "ana@x").colour); // keyed by email
+  });
+});

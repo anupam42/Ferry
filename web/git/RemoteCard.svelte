@@ -28,13 +28,13 @@
     </div>
     <div class="list">
       {#each rc.incoming.slice(0, 3) as c (c.hash)}
-        <div class="commit">
+        <button type="button" class="commit" onclick={() => (git.commit = c.hash)}>
           <span class="avatar" aria-hidden="true">{initials(c.author)}</span>
           <span class="subj">{c.subject}</span>
           <span class="muted">{plural(c.files.length, "file")}</span>
           <span class="mono faint">{c.short}</span>
           <span class="muted when">{ago(c.date)}</span>
-        </div>
+        </button>
       {/each}
       {#if rc.incoming.length > 3}<button type="button" class="more" onclick={() => (git.view = "history")}>+ {rc.incoming.length - 3} more in History</button>{/if}
     </div>
@@ -57,7 +57,7 @@
   .title { flex: 1; min-width: 200px; b { display: block; } small { color: var(--muted); } }
   .actions { display: flex; gap: space(2); }
   .list { margin: space(3) 0 space(2); display: flex; flex-direction: column; gap: 2px; }
-  .commit { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto auto; gap: space(3); align-items: center; padding: space(1) + 2 space(2); border-radius: $radius-md; font-size: 13.5px;
+  .commit { width: 100%; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto auto; gap: space(3); align-items: center; padding: space(1) + 2 space(2); border-radius: $radius-md; font-size: 13.5px;
     &:hover { background: var(--card2); } }
   .avatar { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: $weight-heavy; }
   .subj { @include ellipsis; }

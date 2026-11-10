@@ -9,7 +9,12 @@
   import { look } from "../lib/look.svelte.ts";
   import { short } from "../lib/sync.svelte.ts";
   import type { RepoEntry } from "../lib/types.ts";
+  import BranchesView from "./BranchesView.svelte";
   import ChangesView from "./ChangesView.svelte";
+  import HistoryView from "./HistoryView.svelte";
+  import StashesView from "./StashesView.svelte";
+  import TagsView from "./TagsView.svelte";
+  import WorktreesView from "./WorktreesView.svelte";
   import Elsewhere from "./Elsewhere.svelte";
   import OperationCard from "./OperationCard.svelte";
   import RemoteCard from "./RemoteCard.svelte";
@@ -77,6 +82,16 @@
         {:else}<RelayLoading say="Opening the repository" sub="Looking at branches and changes." />{/if}
       {:else if git.view === "changes"}
         <ChangesView {st} />
+      {:else if git.view === "history"}
+        <HistoryView {st} />
+      {:else if git.view === "branches"}
+        <BranchesView {st} />
+      {:else if git.view === "stashes"}
+        <StashesView />
+      {:else if git.view === "tags"}
+        <TagsView {st} />
+      {:else if git.view === "worktrees"}
+        <WorktreesView {st} />
       {:else}
         <Elsewhere name={viewName} />
       {/if}

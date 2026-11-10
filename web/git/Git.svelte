@@ -4,6 +4,7 @@
   import { app } from "../lib/app.svelte.ts";
   import { git } from "../lib/git.svelte.ts";
   import AddRepo from "./AddRepo.svelte";
+  import CommitDrawer from "./CommitDrawer.svelte";
   import ConflictDrawer from "./ConflictDrawer.svelte";
   import RepoList from "./RepoList.svelte";
   import RepoView from "./RepoView.svelte";
@@ -34,6 +35,7 @@
 {#if git.adding}<AddRepo />{/if}
 {#if git.review}<ReviewDrawer />{/if}
 {#if git.conflict}<ConflictDrawer />{/if}
+{#if git.commit}<CommitDrawer />{/if}
 
 <style lang="scss">
   @use "tokens" as *;

@@ -26,6 +26,8 @@ class Git {
   adding = $state(false);
   review = $state<string | null>(null);
   conflict = $state<string | null>(null);
+  /** the commit open in the commit drawer */
+  commit = $state<string | null>(null);
 
   current = $derived(this.repos.find((r) => r.id === this.selected) ?? null);
   url = (action: string) => `/git/${this.selected}/${action}`;
