@@ -335,7 +335,9 @@ export class ApiServer {
 
   /** Sub-folders of a folder, for the web app's folder picker. */
   private listDir(url: URL): Response {
-    const raw = url.searchParams.get("path") || os.homedir();
+    let raw = url.searchParams.get("path") || os.homedir();
+    // a bare drive letter ("D:") means that drive's root, not its current folder
+    if (process.platform === "win32" && /^[A-Za-z]:$/.test(raw)) raw += "\\";
     const dir = path.resolve(raw.startsWith("~") ? path.join(os.homedir(), raw.slice(1)) : raw);
     const hidden = url.searchParams.get("hidden") === "1";
     let entries: fs.Dirent[];
@@ -345,7 +347,7 @@ export class ApiServer {
       return text(`can't open ${dir}: ${errMsg(err)}`, 404);
     }
     const dirs = entries
-      .filter((d) => (d.isDirectory() || (d.isSymbolicLink() && isDir(path.join(dir, d.name)))) && (hidden || !d.name.startsWith(".")))
+      .filter((d) => (d.isDirectory() || (d.isSymbolicLink() && isDir(path.join(dir, d.name)))) && (hidden || !(d.name.startsWith(".") || WIN_SYSTEM_DIRS.has(d.name.toLowerCase()))))
       .map((d) => d.name)
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
     const parent = path.dirname(dir);
@@ -474,6 +476,9 @@ function isDir(p: string): boolean {
     return false;
   }
 }
+
+/** Windows system folders at the root of a drive; hidden in the picker like dot-folders. */
+const WIN_SYSTEM_DIRS = new Set(["$recycle.bin", "system volume information", "$winreagent", "config.msi", "recovery"]);
 
 /** Drive roots on Windows (C:\, D:\, …) so the folder picker can leave C:. Empty elsewhere. */
 function drives(): string[] {

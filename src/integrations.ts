@@ -186,6 +186,29 @@ const azureAuth = (token: string) => "Basic " + Buffer.from(":" + token).toStrin
 const azureGet = <T>(c: { token: string }, url: string) =>
   call<T>(url + (url.includes("?") ? "&" : "?") + "api-version=7.1", { headers: { Authorization: azureAuth(c.token), Accept: "application/json" } }, "Azure DevOps");
 
+/** An authenticated GitLab API call (path after /api/v4), for review comments. Throws "not-connected" without a token. */
+export async function gitlabApi<T>(method: "GET" | "POST" | "PUT", p: string, body?: unknown): Promise<T> {
+  const c = creds().gitlab;
+  if (!c) throw new IntegrationError("connect GitLab first (Connections, on the left)", "not-connected");
+  return call<T>(c.url + "/api/v4" + p, {
+    method, headers: { "PRIVATE-TOKEN": c.token, Accept: "application/json", ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }, "GitLab");
+}
+
+/** An authenticated Azure DevOps call (a full https://dev.azure.com/… URL), for review comments. */
+export async function azureApi<T>(method: "GET" | "POST" | "PATCH", url: string, body?: unknown): Promise<T> {
+  const c = creds().azure;
+  if (!c) throw new IntegrationError("connect Azure DevOps first (Connections, on the left)", "not-connected");
+  return call<T>(url + (url.includes("?") ? "&" : "?") + "api-version=7.1", {
+    method, headers: { Authorization: azureAuth(c.token), Accept: "application/json", ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }, "Azure DevOps");
+}
+
+/** The connected Azure DevOps organization (to check a repository belongs to it). */
+export const azureOrg = (): string => creds().azure?.org ?? "";
+
 const jiraAuth = (c: { email: string; token: string }) => "Basic " + Buffer.from(`${c.email}:${c.token}`).toString("base64");
 const jiraGet = <T>(c: { url: string; email: string; token: string }, p: string) =>
   call<T>(c.url + p, { headers: { Authorization: jiraAuth(c), Accept: "application/json" } }, "Jira");

@@ -3,9 +3,10 @@
 //   GET  /git/repos                         repositories: opened directly, and pair targets
 //   POST /git/repos                         {"action": "clone"|"create"|"add", "url", "path"}
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
-//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|file}
+//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|file|
+//                  folder|remote-check|undo-timeline|push-check|blame|file-history|search}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
-//                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|
+//                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|restore|branch-at|
 //                   shape-diff|shape-message|shape-commit}   (GET /git/{id}/shape: the timeline to shape, see shape.ts)
 //
 // When a repository is also the target of a folder pair, actions that change
@@ -20,6 +21,7 @@ import { batchTime, history } from "./engine/journal.ts";
 import type { Engine } from "./engine/engine.ts";
 import * as g from "./gitclient.ts";
 import * as conn from "./integrations.ts";
+import * as reviews from "./reviews.ts";
 import * as shaper from "./shape.ts";
 import { errMsg } from "./util.ts";
 
@@ -48,10 +50,14 @@ async function originURL(root: string): Promise<string> {
 /** Actions that rewrite files in the work tree: a pair syncing this repository is paused first. */
 const CHANGES_FILES = new Set([
   "branch-switch", "pull", "merge", "cherry-pick", "revert", "undo", "discard", "stash", "stash-apply",
-  "resolve", "finish", "pr-checkout", "issue-start",
+  "resolve", "finish", "pr-checkout", "issue-start", "restore",
 ]);
 
+/** Background remote checks fetch at most this often per repository; force=1 (before a push) always fetches. */
+const REMOTE_CHECK_EVERY_MS = 60_000;
+
 export class GitApi {
+  private lastFetch = new Map<string, number>();
   constructor(private engines: Engine[], private repos: RepoManager | null) {}
 
   async list(): Promise<Repo[]> {
@@ -81,8 +87,8 @@ export class GitApi {
       if (req.method === "POST") return await this.write(repo, action, await body(req));
       return fail("method not allowed", 405);
     } catch (e) {
-      const code = e instanceof g.GitClientError ? e.code : "";
-      return json({ error: errMsg(e), code }, e instanceof g.GitClientError ? 409 : 500);
+      const known = e instanceof g.GitClientError || e instanceof conn.IntegrationError;
+      return json({ error: errMsg(e), code: known ? (e as g.GitClientError).code : "" }, known ? 409 : 500);
     }
   }
 
@@ -119,6 +125,20 @@ export class GitApi {
       case "diff": return json(await g.fileDiff(root, q.get("path"), q.get("staged") === "1"));
       case "conflict": return json(await g.conflictDiff(root, q.get("path")));
       case "files": return json(await g.trackedFiles(root));
+      case "folder": return json(await g.folderEntries(root, q.get("dir")));
+      case "undo-timeline": return json(await g.undoTimeline(root, Number(q.get("limit") ?? 150)));
+      case "push-check": return json(await g.prePushCheck(root));
+      case "blame": return json(await g.blame(root, q.get("path")));
+      case "file-history": return json(await g.fileHistory(root, q.get("path")));
+      case "search": return json(await g.searchHistory(root, q.get("q"), q.get("mode"), q.get("all") === "1"));
+      case "pr-conversation": return json(await reviews.conversation(root, q.get("number")));
+      case "remote-check": {
+        const now = Date.now();
+        const due = q.get("force") === "1" || now - (this.lastFetch.get(root) ?? 0) >= REMOTE_CHECK_EVERY_MS;
+        if (due) this.lastFetch.set(root, now);
+        const r = await g.remoteCheck(root, due);
+        return json({ ...r, checkedAt: new Date(this.lastFetch.get(root) ?? now).toISOString() });
+      }
       case "file": {
         // raw=1: an image's bytes, for pictures a README references (only image types are served)
         if (q.get("raw") === "1") {
@@ -166,7 +186,12 @@ export class GitApi {
       case "commit": return done({ commit: await g.commit(root, b.message, { amend: b.amend === true, coAuthors: b.co_authors }) });
       case "undo": return done(await g.undoCommit(root));
       case "fetch": await g.fetchAll(root); return done();
-      case "pull": await g.pull(root, b.strategy); return done();
+      case "pull": return done(await g.pull(root, b.strategy));
+      case "restore": await g.restoreTo(root, b.hash); return done();
+      case "pr-reply": await reviews.reply(root, b.number, b.thread, b.body); return done();
+      case "pr-comment": await reviews.comment(root, b.number, b.subject, b.body); return done();
+      case "pr-resolve": await reviews.resolve(root, b.number, b.thread, b.resolved === true); return done();
+      case "branch-at": return done({ branch: await g.branchAt(root, b.name, b.hash) });
       case "push": return done({ branch: await g.push(root, b.force === true) });
       case "branch-create": return done({ branch: await g.createBranch(root, b.name, b.from, b.checkout !== false) });
       case "branch-switch": return done({ branch: await g.switchBranch(root, b.name) });

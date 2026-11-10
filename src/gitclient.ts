@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { diff as lineDiff, type Line } from "./difftext.ts";
+import { scanSecretContent, secretNameHit } from "./engine/secrets.ts";
 import { moveToTrash } from "./engine/trash.ts";
 import { exec, which } from "./proc.ts";
 
@@ -478,11 +479,16 @@ export interface Commit {
 export async function log(root: string, o: { skip?: number; limit?: number; ref?: string; all?: boolean } = {}): Promise<Commit[]> {
   if (!(await gitOk(root, ["rev-parse", "--verify", "-q", "HEAD"]))) return [];
   const limit = Math.min(Math.max(o.limit ?? 50, 1), 1000);
-  const args = ["log", "--date-order", `--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b%x1e`, `-n${limit}`, `--skip=${Math.max(0, o.skip ?? 0)}`];
+  const args = ["log", "--date-order", LOG_FORMAT, `-n${limit}`, `--skip=${Math.max(0, o.skip ?? 0)}`];
   if (o.all) args.push("--branches", "--remotes", "--tags", "HEAD");
   else if (o.ref) args.push(plain(o.ref, "branch"));
   args.push("--");
-  const out = await git(root, args);
+  return parseCommits(await git(root, args));
+}
+
+/** Commits from `git log` with LOG_FORMAT. */
+const LOG_FORMAT = "--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b%x1e";
+function parseCommits(out: string): Commit[] {
   return out.split("\x1e").map((r) => r.replace(/^\n+/, "")).filter((r) => r.trim()).map((r) => {
     const [hash, short, parents, author, email, date, subject, refs, body] = r.split("\x1f");
     const decor = refs ? refs.split(", ") : [];
@@ -616,21 +622,87 @@ export async function fetchAll(root: string): Promise<void> {
 /**
  * Pulls the current branch. Without a strategy only a fast-forward is
  * allowed; when the branches have diverged this fails with code "diverged"
- * so the user can choose merge or rebase.
+ * so the user can choose merge or rebase. Uncommitted edits are set aside
+ * and put back afterwards (--autostash), so they never block or get lost.
  */
-export async function pull(root: string, strategy: unknown): Promise<void> {
-  const args = ["pull", "--quiet"];
-  if (strategy === "rebase") args.push("--rebase", "--autostash");
+export async function pull(root: string, strategy: unknown): Promise<{ clashed: string[] }> {
+  const args = ["pull", "--quiet", "--autostash"];
+  if (strategy === "rebase") args.push("--rebase");
   else if (strategy === "merge") args.push("--no-rebase", "--no-edit");
   else args.push("--ff-only");
   try {
     await git(root, args, { timeoutMs: 10 * 60_000 });
+    // the pull worked, but putting the set-aside edits back can clash with what came in:
+    // git leaves both versions in the file and keeps a copy in the stash
+    const st = await state(root);
+    return { clashed: st.operation ? [] : st.files.filter((f) => f.conflicted).map((f) => f.path) };
   } catch (e) {
     const m = (e as Error).message;
     if (/not possible to fast-forward|diverg/i.test(m)) throw new GitClientError("your branch and the remote both have new commits", "diverged");
     if (/conflict/i.test(m)) throw new GitClientError("the pull stopped on conflicts: resolve them below", "conflicts");
+    if (/would be overwritten/i.test(m)) throw new GitClientError("your uncommitted edits clash with the incoming changes: commit or stash them first", "dirty");
     throw e;
   }
+}
+
+export interface IncomingCommit {
+  hash: string;
+  short: string;
+  subject: string;
+  author: string;
+  date: string;
+  files: string[];
+}
+
+export interface RemoteCheck {
+  upstream: string; // "" when the branch doesn't track anything
+  fetched: boolean; // this call talked to the remote
+  error: string; // why the fetch failed (offline, no access…), "" if it worked
+  ahead: number;
+  behind: number;
+  incoming: IncomingCommit[]; // newest first, at most 30
+  overlap: string[]; // files changed both by incoming commits and by you (uncommitted or unpushed)
+}
+
+/**
+ * What the remote has that you don't, and whether it touches what you're
+ * working on. fetch=true asks the branch's own remote first (quietly, never
+ * prompting for credentials).
+ */
+export async function remoteCheck(root: string, fetch: boolean): Promise<RemoteCheck> {
+  let st = await state(root);
+  const out: RemoteCheck = { upstream: st.upstream, fetched: false, error: "", ahead: st.ahead, behind: st.behind, incoming: [], overlap: [] };
+  if (!st.upstream || !st.branch) return out;
+  if (fetch) {
+    const cfg = await exec(["git", "-C", root, "config", "--get", `branch.${st.branch}.remote`], { env: env() });
+    const remote = cfg.code === 0 ? cfg.stdout.trim() : "";
+    if (remote && remote !== ".") {
+      const r = await exec(["git", "-C", root, "fetch", "--quiet", "--prune", "--", remote], { env: env({ GCM_INTERACTIVE: "never" }), timeoutMs: 60_000 });
+      out.fetched = r.code === 0;
+      if (r.code !== 0) out.error = cleanMessage(r.stderr || r.error || "fetch failed");
+      st = await state(root);
+      out.ahead = st.ahead;
+      out.behind = st.behind;
+    }
+  }
+  if (out.behind > 0) {
+    const log = await exec(["git", "-C", root, "log", "-30", "--format=%x1e%H%x1f%h%x1f%s%x1f%an%x1f%aI", "--name-only", "HEAD..@{upstream}"], { env: env() });
+    if (log.code === 0) {
+      for (const rec of log.stdout.split("\x1e").filter((s) => s.trim())) {
+        const [head, ...rest] = rec.split("\n");
+        const [hash, short, subject, author, date] = head!.split("\x1f");
+        out.incoming.push({ hash: hash ?? "", short: short ?? "", subject: subject ?? "", author: author ?? "", date: date ?? "", files: rest.map((s) => s.trim()).filter(Boolean) });
+      }
+    }
+    const theirs = new Set(out.incoming.flatMap((c) => c.files));
+    const mine = new Set(st.files.map((f) => f.path));
+    if (out.ahead > 0) {
+      const d = await exec(["git", "-C", root, "diff", "--name-only", "@{upstream}...HEAD"], { env: env() });
+      if (d.code === 0) for (const p of d.stdout.split("\n")) if (p.trim()) mine.add(p.trim());
+    }
+    out.overlap = [...mine].filter((p) => theirs.has(p)).sort();
+  }
+  return out;
 }
 
 export async function push(root: string, force: boolean): Promise<string> {
@@ -650,6 +722,277 @@ export async function push(root: string, force: boolean): Promise<string> {
     throw e;
   }
   return st.branch;
+}
+
+// ---------- the safety net: every place HEAD has been, and branches you deleted ----------
+
+export interface ReflogEntry {
+  hash: string;
+  short: string;
+  selector: string; // HEAD@{n}
+  date: string;
+  action: string; // "commit", "rebase (finish)", "reset", "checkout", "merge feature", …
+  detail: string; // the rest of git's note, e.g. "moving from main to feature"
+  subject: string; // the commit's own message
+  current: boolean;
+}
+
+export interface LostBranch {
+  name: string;
+  hash: string;
+  short: string;
+  subject: string;
+  date: string; // when you last left it
+}
+
+/**
+ * The reflog of HEAD, newest first: every commit, checkout, reset, rebase,
+ * merge and pull, so any of them can be gone back to. Also branches that
+ * were deleted, found from "moving from <branch>" checkouts whose branch is
+ * gone, with the commit they were last at.
+ */
+export async function undoTimeline(root: string, limit = 150): Promise<{ entries: ReflogEntry[]; lost: LostBranch[]; branch: string }> {
+  const st = await state(root);
+  const r = await exec(["git", "-C", root, "log", "-g", "--date=iso-strict", `-n${Math.min(Math.max(limit, 1), 500)}`, "--format=%H%x1f%h%x1f%gd%x1f%gs%x1f%s", "HEAD"], { env: env() });
+  const entries: ReflogEntry[] = [];
+  if (r.code === 0) {
+    for (const line of r.stdout.split("\n").filter(Boolean)) {
+      const [hash, short, gd, gs, subject] = line.split("\x1f");
+      const date = /\{(.+)\}/.exec(gd ?? "")?.[1] ?? "";
+      const note = gs ?? "";
+      const colon = note.indexOf(": ");
+      const action = colon > 0 ? note.slice(0, colon) : note;
+      entries.push({ hash: hash ?? "", short: short ?? "", selector: "", date, action, detail: colon > 0 ? note.slice(colon + 2) : "", subject: subject ?? "", current: false });
+    }
+    entries.forEach((e, i) => { e.selector = `HEAD@{${i}}`; });
+    if (entries[0]) entries[0].current = true;
+  }
+  // deleted branches: the commit a branch was at when you last moved away from it
+  const existing = new Set((await exec(["git", "-C", root, "for-each-ref", "--format=%(refname:short)", "refs/heads"], { env: env() })).stdout.split("\n").map((s) => s.trim()).filter(Boolean));
+  const lost = new Map<string, LostBranch>();
+  for (let i = 0; i < entries.length; i++) {
+    const m = /^moving from (\S+) to /.exec(entries[i]!.action === "checkout" ? entries[i]!.detail : "");
+    if (!m) continue;
+    const name = m[1]!;
+    if (existing.has(name) || lost.has(name) || /^[0-9a-f]{7,40}$/.test(name) || name === "HEAD") continue;
+    const before = entries[i + 1]; // HEAD just before leaving it is where the branch was
+    if (before) lost.set(name, { name, hash: before.hash, short: before.short, subject: before.subject, date: entries[i]!.date });
+  }
+  return { entries, lost: [...lost.values()], branch: st.branch };
+}
+
+/**
+ * Moves the current branch back (or forward) to a commit from the timeline.
+ * Uncommitted edits are kept (git reset --keep refuses if they'd be lost),
+ * and the reflog keeps the place it moved from, so this can be undone too.
+ */
+export async function restoreTo(root: string, hash: unknown): Promise<void> {
+  const h = commitId(hash);
+  const op = (await operation(root)).kind;
+  if (op) throw new GitClientError(`finish or abort the ${op} first`, "busy");
+  try {
+    await git(root, ["reset", "--keep", h]);
+  } catch (e) {
+    if (/would be overwritten|not uptodate|entry .* not uptodate/i.test((e as Error).message)) {
+      throw new GitClientError("some uncommitted edits would be lost: commit or stash them first", "dirty");
+    }
+    throw e;
+  }
+}
+
+/** Puts a branch back (or makes a new one) at a commit; never moves anything that exists. */
+export async function branchAt(root: string, name: unknown, hash: unknown): Promise<string> {
+  const n = plain(name, "branch name");
+  const h = commitId(hash);
+  if (!(await gitOk(root, ["check-ref-format", "--branch", n]))) throw new GitClientError(`"${n}" isn't a valid branch name`);
+  if (await gitOk(root, ["rev-parse", "--verify", "-q", "refs/heads/" + n])) throw new GitClientError(`a branch called ${n} already exists`, "exists");
+  await git(root, ["branch", n, h]);
+  return n;
+}
+
+// ---------- checks before a push ----------
+
+export interface PushIssue {
+  level: "block" | "warn";
+  kind: "secret" | "env-file" | "conflict-marker" | "large-file" | "debug";
+  file: string;
+  line: number; // 0 when it's about the whole file
+  text: string; // what was found, short
+  commit: string; // short id of the commit that added it
+}
+
+const LARGE_WARN = 5 * 1024 * 1024, LARGE_BLOCK = 50 * 1024 * 1024;
+const DEBUG_RES: [RegExp, RegExp, string][] = [
+  [/\.(m?[jt]sx?|vue|svelte)$/i, /\bconsole\.log\(|^\s*debugger;?\s*$/, "console.log / debugger"],
+  [/\.py$/i, /\bbreakpoint\(\)|\bpdb\.set_trace\(\)/, "breakpoint()"],
+  [/\.(rb)$/i, /\bbinding\.pry\b|\bbyebug\b/, "binding.pry"],
+  [/\.(go)$/i, /\bfmt\.Println\("DEBUG/, "debug print"],
+];
+
+/**
+ * Looks at what a push would send (the commits not on the remote yet) for
+ * things that are hard to take back once shared: secrets and .env files,
+ * conflict markers, very large files, and leftover debugging.
+ */
+export async function prePushCheck(root: string): Promise<{ commits: number; issues: PushIssue[] }> {
+  const st = await state(root);
+  if (!st.branch || !st.head) return { commits: 0, issues: [] };
+  const range = st.upstream ? ["@{upstream}..HEAD"] : ["HEAD", "--not", "--remotes"];
+  const count = await exec(["git", "-C", root, "rev-list", "--count", ...range], { env: env() });
+  const commits = count.code === 0 ? +count.stdout.trim() || 0 : 0;
+  if (!commits) return { commits: 0, issues: [] };
+  const issues: PushIssue[] = [];
+  const seen = new Set<string>();
+  const add = (i: PushIssue) => {
+    const k = `${i.kind}|${i.file}|${i.line}|${i.text}`;
+    if (!seen.has(k) && issues.length < 200) { seen.add(k); issues.push(i); }
+  };
+  // what each outgoing commit added, line by line
+  const p = await exec(["git", "-C", root, "log", "-p", "--no-color", "--no-ext-diff", "-U0", "--format=%x1e%h", "-n500", ...range], { env: env(), timeoutMs: 120_000 });
+  if (p.code === 0) {
+    for (const rec of p.stdout.split("\x1e")) {
+      const nl = rec.indexOf("\n");
+      if (nl < 0) continue;
+      const short = rec.slice(0, nl).trim();
+      let file = "", ln = 0, checked = 0;
+      for (const line of rec.slice(nl + 1).split("\n")) {
+        if (line.startsWith("+++ ")) {
+          file = line === "+++ /dev/null" ? "" : line.replace(/^\+\+\+ b\//, "");
+          if (file) {
+            const what = secretNameHit(file);
+            if (what) add({ level: what === "environment file" ? "block" : "warn", kind: "env-file", file, line: 0, text: what, commit: short });
+          }
+        } else if (line.startsWith("@@")) {
+          ln = +(/\+(\d+)/.exec(line)?.[1] ?? 0);
+        } else if (line.startsWith("+") && file) {
+          const text = line.slice(1);
+          if (checked++ < 20_000) {
+            for (const name of scanSecretContent(Buffer.from(text))) add({ level: "block", kind: "secret", file, line: ln, text: name, commit: short });
+            if (/^(<{7}|>{7}|={7})( |$)/.test(text)) add({ level: "block", kind: "conflict-marker", file, line: ln, text: text.slice(0, 40), commit: short });
+            for (const [ext, re, what] of DEBUG_RES) if (ext.test(file) && re.test(text)) add({ level: "warn", kind: "debug", file, line: ln, text: what, commit: short });
+          }
+          ln++;
+        }
+      }
+    }
+  }
+  // big files at HEAD among the ones these commits touched
+  const names = await exec(["git", "-C", root, "log", "--format=", "--name-only", "--diff-filter=AM", "-n500", ...range], { env: env() });
+  const touched = [...new Set(names.stdout.split("\n").map((s) => s.trim()).filter(Boolean))].slice(0, 2000);
+  for (let i = 0; i < touched.length; i += 150) { // in batches: Windows caps a command line at ~32K characters
+    const sizes = await exec(["git", "-C", root, "ls-tree", "-l", "-z", "HEAD", "--", ...touched.slice(i, i + 150)], { env: env() });
+    for (const rec of sizes.stdout.split("\0").filter(Boolean)) {
+      const tab = rec.indexOf("\t");
+      const size = +(rec.slice(0, tab).trim().split(/\s+/)[3] ?? 0);
+      const file = rec.slice(tab + 1);
+      if (size >= LARGE_WARN) add({ level: size >= LARGE_BLOCK ? "block" : "warn", kind: "large-file", file, line: 0, text: (size / 1048576).toFixed(1) + " MB", commit: "" });
+    }
+  }
+  issues.sort((a, b) => (a.level === b.level ? 0 : a.level === "block" ? -1 : 1));
+  return { commits, issues };
+}
+
+// ---------- understanding code: blame, a file's history, searching history ----------
+
+export interface BlameChunk {
+  start: number; // first line, 1-based
+  lines: string[];
+  hash: string;
+  short: string;
+  author: string;
+  date: string;
+  subject: string;
+  uncommitted: boolean;
+}
+
+/** Who last changed each line of a file, grouped into runs of lines from the same commit. */
+export async function blame(root: string, file: unknown): Promise<{ path: string; chunks: BlameChunk[]; truncated: boolean }> {
+  const p = repoPath(root, file);
+  const out = await git(root, ["blame", "--porcelain", "-w", "--", p], { timeoutMs: 60_000 });
+  const info = new Map<string, { author: string; time: number; subject: string }>();
+  const chunks: BlameChunk[] = [];
+  const lines = out.split("\n");
+  const MAX = 6000;
+  let truncated = false, cur = "", lineNo = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]!;
+    const head = /^([0-9a-f]{40}) \d+ (\d+)/.exec(l);
+    if (head) { cur = head[1]!; lineNo = +head[2]!; if (!info.has(cur)) info.set(cur, { author: "", time: 0, subject: "" }); continue; }
+    const meta = info.get(cur);
+    if (l.startsWith("author ") && meta) meta.author = l.slice(7);
+    else if (l.startsWith("author-time ") && meta) meta.time = +l.slice(12);
+    else if (l.startsWith("summary ") && meta) meta.subject = l.slice(8);
+    else if (l.startsWith("\t")) {
+      if (lineNo > MAX) { truncated = true; break; }
+      const last = chunks[chunks.length - 1];
+      if (last && last.hash === cur && last.start + last.lines.length === lineNo) last.lines.push(l.slice(1));
+      else {
+        const m = info.get(cur)!;
+        const uncommitted = /^0+$/.test(cur);
+        chunks.push({ start: lineNo, lines: [l.slice(1)], hash: cur, short: cur.slice(0, 7), author: uncommitted ? "You" : m.author, date: m.time ? new Date(m.time * 1000).toISOString() : "", subject: uncommitted ? "Not committed yet" : m.subject, uncommitted });
+      }
+    }
+  }
+  return { path: p, chunks, truncated };
+}
+
+export interface FileVersion {
+  hash: string;
+  short: string;
+  author: string;
+  date: string;
+  subject: string;
+  path: string; // the file's name at that commit (it may have been renamed since)
+  status: string; // A, M, D, R…
+  added: number;
+  removed: number;
+}
+
+/** Every commit that changed a file, newest first, following it through renames. */
+export async function fileHistory(root: string, file: unknown, limit = 100): Promise<FileVersion[]> {
+  const p = repoPath(root, file);
+  const n = `-n${Math.min(Math.max(limit, 1), 500)}`;
+  // git prints either name-status or numstat, not both: two passes, matched by commit
+  const [out, nums] = await Promise.all([
+    git(root, ["log", "--follow", "-M", n, "--format=%x1e%H%x1f%h%x1f%an%x1f%aI%x1f%s", "--name-status", "--", p]),
+    git(root, ["log", "--follow", "-M", n, "--format=%x1e%H", "--numstat", "--", p]),
+  ]);
+  const counts = new Map<string, [number, number]>();
+  for (const rec of nums.split("\x1e").filter((s) => s.trim())) {
+    const [hash, ...rest] = rec.split("\n");
+    let a = 0, r = 0;
+    for (const l of rest) { const m = /^(\d+|-)\t(\d+|-)\t/.exec(l); if (m) { a += m[1] === "-" ? 0 : +m[1]!; r += m[2] === "-" ? 0 : +m[2]!; } }
+    counts.set(hash!.trim(), [a, r]);
+  }
+  const res: FileVersion[] = [];
+  for (const rec of out.split("\x1e").filter((s) => s.trim())) {
+    const [head, ...rest] = rec.split("\n");
+    const [hash, short, author, date, subject] = head!.split("\x1f");
+    const v: FileVersion = { hash: hash ?? "", short: short ?? "", author: author ?? "", date: date ?? "", subject: subject ?? "", path: p, status: "M", added: 0, removed: 0 };
+    for (const l of rest.filter(Boolean)) {
+      const ns = l.split("\t");
+      if (/^[ACDMRTU]/.test(ns[0] ?? "")) { v.status = ns[0]![0]!; v.path = ns[ns.length - 1] ?? p; }
+    }
+    [v.added, v.removed] = counts.get(v.hash) ?? [0, 0];
+    res.push(v);
+  }
+  return res;
+}
+
+/**
+ * Searches all of history. "code": commits that added or removed the text
+ * (git log -S). "message": commits whose message mentions it.
+ */
+export async function searchHistory(root: string, query: unknown, mode: unknown, all: boolean): Promise<Commit[]> {
+  if (typeof query !== "string" || query.trim().length < 2) throw new GitClientError("type at least two characters");
+  const q = query.trim();
+  if (!(await gitOk(root, ["rev-parse", "--verify", "-q", "HEAD"]))) return [];
+  const args = ["log", "--date-order", "-n200", LOG_FORMAT];
+  if (mode === "code") args.push("-S" + q);
+  else args.push("-i", "-F", "--grep=" + q);
+  if (all) args.push("--branches", "--remotes", "--tags", "HEAD");
+  args.push("--");
+  return parseCommits(await git(root, args, { timeoutMs: 120_000 }));
 }
 
 // ---------- merging, cherry-pick, revert ----------
@@ -739,6 +1082,8 @@ export async function resolveConflict(root: string, file: unknown, choice: unkno
       throw new GitClientError("choice must be ours, theirs, both or done");
   }
   await git(root, ["add", "--", p]);
+  // outside a merge or rebase (edits put back after a pull) the file is just your uncommitted work again
+  if (!(await operation(root)).kind) await git(root, ["reset", "-q", "--", p]);
 }
 
 /** Finishes or cancels the merge, rebase, cherry-pick or revert in progress. */
@@ -912,6 +1257,58 @@ export async function checkoutPullRequest(root: string, number: unknown): Promis
 export async function trackedFiles(root: string): Promise<string[]> {
   const out = await git(root, ["ls-files", "-z"]);
   return out.split("\0").filter(Boolean);
+}
+
+export interface FolderEntry {
+  name: string;
+  path: string;
+  dir: boolean;
+  size: number | null; // files only, from the working tree
+  commit: { hash: string; short: string; subject: string; author: string; date: string } | null; // last commit that touched it
+}
+
+/** Most entries one folder listing looks up commits for; the rest are listed without. */
+const FOLDER_COMMIT_LIMIT = 200;
+
+/**
+ * One folder of the repository, like a code host's file browser: its direct
+ * sub-folders and files, each with the last commit that touched it. dir is
+ * repo-relative ("" for the top).
+ */
+export async function folderEntries(root: string, dir: unknown): Promise<{ dir: string; entries: FolderEntry[] }> {
+  const d = dir === undefined || dir === null || String(dir).trim() === "" ? "" : repoPath(root, dir).replace(/\/+$/, "");
+  const prefix = d ? d + "/" : "";
+  const dirs = new Set<string>(), files: string[] = [];
+  for (const p of await trackedFiles(root)) {
+    if (!p.startsWith(prefix)) continue;
+    const rest = p.slice(prefix.length), slash = rest.indexOf("/");
+    if (slash === -1) files.push(rest);
+    else dirs.add(rest.slice(0, slash));
+  }
+  const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+  const entries: FolderEntry[] = [
+    ...[...dirs].sort(cmp).map((name) => ({ name, path: prefix + name, dir: true, size: null, commit: null })),
+    ...files.sort(cmp).map((name) => {
+      let size: number | null = null;
+      try {
+        size = fs.statSync(path.join(root, prefix + name)).size;
+      } catch {}
+      return { name, path: prefix + name, dir: false, size, commit: null };
+    }),
+  ];
+  // last commit per entry, a few git processes at a time
+  const todo = entries.slice(0, FOLDER_COMMIT_LIMIT);
+  let next = 0;
+  const worker = async () => {
+    while (next < todo.length) {
+      const e = todo[next++];
+      const out = await exec(["git", "-C", root, "log", "-1", "--format=%H%x1f%h%x1f%s%x1f%an%x1f%aI", "--", ":(literal)" + e.path], { env: env() });
+      const [hash, short, subject, author, date] = out.code === 0 ? out.stdout.trim().split("\x1f") : [];
+      if (hash) e.commit = { hash, short, subject: subject ?? "", author: author ?? "", date: date ?? "" };
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
+  return { dir: d, entries };
 }
 
 export interface FileContent {
