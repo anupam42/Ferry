@@ -79,3 +79,35 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 
 .float { @include motion { animation: bob 3.2s ease-in-out infinite; } }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+// ---------- charts (Insights) ----------
+// a heatmap cell: level 0–4 on one blue ramp
+.heat {
+  display: block; border-radius: 3px; background: var(--heat-0);
+  &.l1 { background: var(--heat-1); } &.l2 { background: var(--heat-2); } &.l3 { background: var(--heat-3); } &.l4 { background: var(--heat-4); }
+  &.future { background: transparent; }
+}
+// an SVG chart: recessive grid and axes, thin marks, labels in text colours
+svg.chart {
+  display: block; width: 100%; height: auto; overflow: visible;
+  .grid { stroke: var(--line); stroke-width: 1; &.base { stroke: color-mix(in srgb, var(--muted) 45%, transparent); } }
+  .axis { fill: var(--muted); font-size: 11px; &.title { font-size: 12px; font-weight: $weight-semibold; } }
+  .direct { fill: var(--text); font-size: 12px; font-weight: $weight-semibold; paint-order: stroke; stroke: var(--card-solid); stroke-width: 3px; stroke-linejoin: round; }
+  .bar { fill: var(--chart-bar); &.open { fill: color-mix(in srgb, var(--chart-bar) 18%, transparent); stroke: var(--chart-bar); stroke-width: 1.5; } }
+  .avg { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; opacity: .7; }
+  .hit { fill: transparent; &:hover { fill: color-mix(in srgb, var(--muted) 10%, transparent); } }
+  .zone { fill: var(--accent-soft); } .zone-label { fill: var(--accent); font-size: 12px; font-weight: $weight-bold; }
+  .median { stroke: color-mix(in srgb, var(--muted) 55%, transparent); stroke-dasharray: 4 4; }
+  .dot { fill: color-mix(in srgb, var(--chart-bar) 45%, transparent); stroke: var(--card-solid); stroke-width: 2; cursor: pointer;
+    &.top { fill: var(--chart-bar); } &:hover, &:focus-visible { outline: none; stroke: var(--text); } }
+  .commit-dot { fill: var(--text); }
+}
+// "■ commits per week  — 4-week average"
+.key {
+  display: inline-flex; align-items: center; gap: space(1) + 2; color: var(--muted); font-size: 12px; flex-wrap: wrap;
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-left: space(2);
+    &.bar { background: var(--chart-bar); } &.bar.open { background: transparent; border: 1.5px solid var(--chart-bar); }
+    &.line { height: 2px; width: 16px; border-radius: 1px; background: var(--text); opacity: .7; }
+    &.dot { border-radius: 50%; background: color-mix(in srgb, var(--chart-bar) 45%, transparent); } &.dot.top { background: var(--chart-bar); }
+    &.commit { border-radius: 50%; width: 9px; height: 9px; background: var(--text); } }
+}

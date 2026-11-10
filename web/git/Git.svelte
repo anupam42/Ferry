@@ -6,7 +6,10 @@
   import AddRepo from "./AddRepo.svelte";
   import CommitDrawer from "./CommitDrawer.svelte";
   import ConflictDrawer from "./ConflictDrawer.svelte";
+  import ChecksDrawer from "./ChecksDrawer.svelte";
   import FileDrawer from "./FileDrawer.svelte";
+  import PrDrawer from "./PrDrawer.svelte";
+  import ShapeDrawer from "./ShapeDrawer.svelte";
   import RepoList from "./RepoList.svelte";
   import RepoView from "./RepoView.svelte";
   import ReviewDrawer from "./ReviewDrawer.svelte";
@@ -36,6 +39,9 @@
 {#if git.adding}<AddRepo />{/if}
 {#if git.review}<ReviewDrawer />{/if}
 {#if git.conflict}<ConflictDrawer />{/if}
+{#if git.shaping && git.current && git.state}<ShapeDrawer />{/if}
+{#if git.pr}<PrDrawer />{/if}
+{#if git.checks}<ChecksDrawer />{/if}
 {#if git.file}<FileDrawer />{/if}
 {#if git.commit}<CommitDrawer />{/if}
 

@@ -2,7 +2,7 @@
 import { api, ApiError, enc } from "./api.ts";
 import { act, app, ask, toast } from "./app.svelte.ts";
 import { plural } from "./format.ts";
-import type { PushIssue, RemoteCheckResponse, RepoEntry, RepoStateResponse } from "./types.ts";
+import type { PullRequest, PushIssue, RemoteCheckResponse, RepoEntry, RepoStateResponse } from "./types.ts";
 
 export type GitView = "files" | "changes" | "history" | "insights" | "branches" | "stashes" | "prs" | "issues" | "tags" | "worktrees" | "undo";
 export type RemoteJob = "" | "fetch" | "pull" | "push";
@@ -28,6 +28,11 @@ class Git {
   conflict = $state<string | null>(null);
   /** the commit open in the commit drawer */
   commit = $state<string | null>(null);
+  /** the pull request open in the conversation drawer, or whose checks are shown */
+  pr = $state<{ pr: PullRequest; provider: string } | null>(null);
+  checks = $state<PullRequest | null>(null);
+  /** Shape my history is open */
+  shaping = $state(false);
   /** the file open in the file drawer */
   file = $state<string | null>(null);
   /** the folder the Files view shows, per repository */

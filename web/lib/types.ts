@@ -29,4 +29,4 @@ export interface Release {
 }
 
 export type Mode = "sync" | "git" | "settings";
-export type { Blame, BlameChunk, Branch, BranchList, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, FolderListing as RepoFolder, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheckResponse, RepoEntry, RepoStateResponse, Stash, Tag, UndoTimeline, Worktree } from "../../src/shared/git.ts";
+export type { Conversation, InsightsResponse, ShapeBatch, ShapeResult, ShapeTimeline, Issue, IssueList, PullRequest, PullRequestList, Review, ReviewComment, ReviewThread, Blame, BlameChunk, Branch, BranchList, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, FolderListing as RepoFolder, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheckResponse, RepoEntry, RepoStateResponse, Stash, Tag, UndoTimeline, Worktree } from "../../src/shared/git.ts";

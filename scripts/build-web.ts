@@ -25,7 +25,8 @@ function scss(source: string, file: string): string {
   return sass.compileString(source, { loadPaths: [STYLES, path.dirname(file)], style: "expanded", syntax: "scss", url: new URL("file://" + file) }).css;
 }
 
-function sveltePlugin(dev: boolean): BunPlugin {
+/** Compiles .svelte and .svelte.ts; each component's scoped CSS goes into styles (file → css), for app.css. */
+function sveltePlugin(dev: boolean, styles: Map<string, string>): BunPlugin {
   return {
     name: "ferry-svelte",
     setup(build) {
@@ -34,8 +35,9 @@ function sveltePlugin(dev: boolean): BunPlugin {
         const pre = await preprocess(source, {
           style: ({ content, attributes }) => (attributes.lang === "scss" ? { code: scss(content, file) } : undefined),
         }, { filename: file });
-        const out = compile(pre.code, { filename: file, generate: "client", css: "injected", dev, runes: true });
+        const out = compile(pre.code, { filename: file, generate: "client", css: "external", dev, runes: true });
         for (const w of out.warnings) console.warn(`${path.relative(ROOT, file)}: ${w.message}`);
+        if (out.css?.code) styles.set(file, out.css.code); else styles.delete(file);
         return { contents: out.js.code, loader: "js" };
       });
       build.onLoad({ filter: /\.svelte\.ts$/ }, async ({ path: file }) => {
@@ -53,19 +55,24 @@ export async function buildWeb(o: { dev?: boolean } = {}): Promise<{ js: boolean
   const t0 = performance.now();
   const dev = !!o.dev;
   fs.mkdirSync(WEB_OUT, { recursive: true });
+  const styles = new Map<string, string>();
   const res = await Bun.build({
     entrypoints: [path.join(WEB_SRC, "main.ts")],
     target: "browser",
     format: "esm",
     minify: !dev,
     sourcemap: dev ? "inline" : "none",
-    plugins: [sveltePlugin(dev)],
+    plugins: [sveltePlugin(dev, styles)],
     define: { "import.meta.env.DEV": JSON.stringify(dev) },
     conditions: ["browser", "svelte", dev ? "development" : "production"],
   });
   if (!res.success) throw new AggregateError(res.logs, "the web app didn't build:\n" + res.logs.map((l) => String(l)).join("\n"));
   const js = await res.outputs[0]!.text();
-  const css = sass.compile(path.join(STYLES, "main.scss"), { loadPaths: [STYLES], style: dev ? "expanded" : "compressed" }).css;
+  // the global styles, then every component's scoped styles (in a stable order, so an unchanged app makes an unchanged file)
+  const style = dev ? "expanded" : "compressed";
+  const scoped = [...styles].sort(([a], [b]) => a.localeCompare(b)).map(([, c]) => c).join("\n");
+  const css = sass.compile(path.join(STYLES, "main.scss"), { loadPaths: [STYLES], style }).css + "\n"
+    + (dev ? scoped : sass.compileString(scoped, { style, syntax: "css" }).css);
   const html = fs.readFileSync(path.join(WEB_SRC, "index.html"), "utf8");
   const write = (name: string, text: string) => {
     const file = path.join(WEB_OUT, name);

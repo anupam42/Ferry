@@ -62,3 +62,9 @@ export function dayLabel(iso: string, now = new Date()): string {
   if (d.toDateString() === new Date(now.getTime() - 86400e3).toDateString()) return "Yesterday";
   return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" });
 }
+
+/** A branch name for a Jira issue: SHOP-42-fix-the-login-button. */
+export function branchFor(key: string, summary: string): string {
+  const slug = summary.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").slice(0, 40).replace(/-$/, "");
+  return slug ? `${key}-${slug}` : key;
+}

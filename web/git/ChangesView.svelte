@@ -6,6 +6,7 @@
   import { plural } from "../lib/format.ts";
   import { discardFiles, git } from "../lib/git.svelte.ts";
   import type { FileChange, RepoStateResponse } from "../lib/types.ts";
+  import ShapeCallout from "./ShapeCallout.svelte";
 
   let { st }: { st: RepoStateResponse } = $props();
   const files = $derived(st.files.filter((f) => !f.conflicted));
@@ -58,6 +59,7 @@
   }
 </script>
 
+<ShapeCallout {st} count={files.length} />
 <Section id="g-changes" title="Changes" count={files.length} tone="blue">
   {#snippet extra()}
     {#if files.length}

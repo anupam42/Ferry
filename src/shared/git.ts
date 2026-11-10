@@ -177,3 +177,144 @@ export interface FolderListing { dir: string; entries: FolderEntry[] }
 export interface Blame { path: string; chunks: BlameChunk[]; truncated: boolean }
 /** GET /git/{id}/undo-timeline */
 export interface UndoTimeline { entries: ReflogEntry[]; lost: LostBranch[]; branch: string }
+
+export interface PullRequest {
+  number: number;
+  title: string;
+  branch: string;
+  base: string;
+  author: string;
+  draft: boolean;
+  url: string;
+  updated: string;
+  review: string; // APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | ""
+  checks: { passed: number; failed: number; pending: number; items: { name: string; state: string; url: string }[] }; // check state: passed | failed | pending
+}
+
+export interface ReviewComment {
+  id: string;
+  author: string;
+  body: string; // markdown
+  date: string;
+  mine: boolean;
+}
+
+export interface SnippetLine {
+  op: " " | "+" | "-";
+  no: number | null; // line number in the new file (old file for removed lines)
+  text: string;
+  target: boolean; // the line the comment is on
+}
+
+export interface ReviewThread {
+  id: string;
+  path: string;
+  line: number | null;
+  resolved: boolean;
+  outdated: boolean; // the code it pointed at has changed since
+  canResolve: boolean;
+  snippet: SnippetLine[];
+  comments: ReviewComment[];
+}
+
+export interface Review {
+  author: string;
+  state: string; // APPROVED | CHANGES_REQUESTED | COMMENTED | …
+  body: string;
+  date: string;
+}
+
+export interface Conversation {
+  provider: "GitHub" | "GitLab" | "Azure DevOps";
+  number: number;
+  title: string;
+  url: string;
+  body: string;
+  author: string;
+  state: string;
+  branch: string;
+  base: string;
+  subjectId: string; // what a new general comment attaches to
+  me: string;
+  comments: ReviewComment[]; // the general conversation, oldest first
+  reviews: Review[];
+  threads: ReviewThread[];
+}
+
+export interface Issue {
+  key: string;
+  summary: string;
+  status: string;
+  category: string; // "new" | "indeterminate" | "done"
+  type: string;
+  priority: string;
+  updated: string;
+  url: string;
+}
+
+/** GET /git/{id}/prs */
+export interface PullRequestList { provider: string; items: PullRequest[] }
+/** GET /git/{id}/issues */
+export interface IssueList { site: string; issues: Issue[] }
+
+// ---------- insights: heatmaps of commits and files ----------
+
+export interface Insights {
+  /** the day the year ends on (today, in this computer's time zone), YYYY-MM-DD */
+  today: string;
+  /** commits per author-local day, YYYY-MM-DD → count */
+  days: Record<string, number>;
+  /** a few commits per day, newest first, for "what happened that day" */
+  dayCommits: Record<string, { hash: string; short: string; subject: string; author: string }[]>;
+  /** commits by weekday (0 = Monday) and hour (0–23, in the author's own time zone) */
+  hours: number[][];
+  /** the last 12 months, oldest first, YYYY-MM */
+  months: string[];
+  /** the files changed in the most commits, with commits per month (same order as months) */
+  files: { path: string; commits: number; added: number; removed: number; months: number[] }[];
+  authors: { name: string; email: string; commits: number }[];
+  /** files by how often they change against how big they are now (lines), for the hotspot chart */
+  hotspots: { path: string; commits: number; lines: number; authors: number }[];
+  /** pairs of files that keep landing in the same commits */
+  together: { a: string; b: string; count: number; share: number }[];
+  me: string;
+  total: number;
+  added: number;
+  removed: number;
+  activeDays: number;
+  streak: number;
+  longestStreak: number;
+  /** true when the year had more commits than were read */
+  partial: boolean;
+}
+
+/** GET /git/{id}/insights: Insights, plus Ferry's own record of syncs into this repository (null when no pair syncs here) */
+export interface InsightsResponse extends Insights {
+  sync: { pairs: string[]; days: Record<string, number>; since: string } | null;
+}
+
+// ---------- shape my history: the syncs since the last commit, made into commits ----------
+
+/** One sync, as the timeline shows it. */
+export interface ShapeBatch {
+  id: string;
+  pair: string;
+  time: string;
+  files: { path: string; op: "add" | "update" | "delete" }[];
+}
+
+export interface ShapeTimeline {
+  /** the commit the shaped commits go on top of ("" for a repository with no commits yet) */
+  head: string;
+  branch: string;
+  /** when that commit was made, so the timeline starts there */
+  since: string;
+  batches: ShapeBatch[];
+  /** changed files Ferry didn't write (edited in the repository directly): they stay uncommitted */
+  unrecorded: string[];
+  /** pairs that sync into this repository */
+  pairs: string[];
+}
+
+/** POST /git/{id}/shape-commit */
+export interface ShapeResult { commits: { hash: string; message: string; files: number }[]; skipped: number }

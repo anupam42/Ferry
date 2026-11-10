@@ -12,12 +12,14 @@
   import BranchesView from "./BranchesView.svelte";
   import ChangesView from "./ChangesView.svelte";
   import FilesView from "./FilesView.svelte";
+  import InsightsView from "./InsightsView.svelte";
+  import JiraView from "./JiraView.svelte";
+  import PrsView from "./PrsView.svelte";
   import HistoryView from "./HistoryView.svelte";
   import StashesView from "./StashesView.svelte";
   import TagsView from "./TagsView.svelte";
   import UndoView from "./UndoView.svelte";
   import WorktreesView from "./WorktreesView.svelte";
-  import Elsewhere from "./Elsewhere.svelte";
   import OperationCard from "./OperationCard.svelte";
   import RemoteCard from "./RemoteCard.svelte";
 
@@ -49,7 +51,6 @@
         onclick: () => remoteJob("push", () => doPush()) },
     ];
   });
-  const viewName = $derived(items.find((i) => i.id === git.view)?.name ?? git.view);
 </script>
 
 <div class="layout" class:dock-h={horizontal}>
@@ -88,6 +89,8 @@
         <ChangesView {st} />
       {:else if git.view === "history"}
         <HistoryView {st} />
+      {:else if git.view === "insights"}
+        <InsightsView {st} />
       {:else if git.view === "branches"}
         <BranchesView {st} />
       {:else if git.view === "stashes"}
@@ -96,10 +99,12 @@
         <TagsView {st} />
       {:else if git.view === "worktrees"}
         <WorktreesView {st} />
-      {:else if git.view === "undo"}
-        <UndoView {st} />
+      {:else if git.view === "prs"}
+        <PrsView />
+      {:else if git.view === "issues"}
+        <JiraView {st} />
       {:else}
-        <Elsewhere name={viewName} />
+        <UndoView {st} />
       {/if}
     </div>
   </div>

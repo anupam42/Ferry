@@ -30,26 +30,8 @@ async function git(root: string, args: string[], o: { env?: Record<string, strin
   return r.stdout;
 }
 
-/** One sync, as the timeline shows it. */
-export interface ShapeBatch {
-  id: string;
-  pair: string;
-  time: string;
-  files: { path: string; op: "add" | "update" | "delete" }[];
-}
-
-export interface ShapeTimeline {
-  /** the commit the shaped commits go on top of ("" for a repository with no commits yet) */
-  head: string;
-  branch: string;
-  /** when that commit was made, so the timeline starts there */
-  since: string;
-  batches: ShapeBatch[];
-  /** changed files Ferry didn't write (edited in the repository directly): they stay uncommitted */
-  unrecorded: string[];
-  /** pairs that sync into this repository */
-  pairs: string[];
-}
+import type { ShapeBatch, ShapeTimeline } from "./shared/git.ts";
+export type { ShapeBatch, ShapeTimeline } from "./shared/git.ts";
 
 /** A file's content after a sync: bytes, null (the file was gone), or unknown (no backup of it). */
 type Content = Buffer | null | "unknown";

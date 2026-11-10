@@ -11,8 +11,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { diff as lineDiff, type Line } from "./difftext.ts";
-import type { Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
-export type { Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
+import type { Insights, PullRequest, Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
+export type { Insights, PullRequest, Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
 import { scanSecretContent, secretNameHit } from "./engine/secrets.ts";
 import { moveToTrash } from "./engine/trash.ts";
 import { exec, which } from "./proc.ts";
@@ -1055,18 +1055,6 @@ export async function removeWorktree(root: string, dir: unknown, force: boolean)
 
 // ---------- pull requests (GitHub through gh, GitLab through glab) ----------
 
-export interface PullRequest {
-  number: number;
-  title: string;
-  branch: string;
-  base: string;
-  author: string;
-  draft: boolean;
-  url: string;
-  updated: string;
-  review: string; // APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | ""
-  checks: { passed: number; failed: number; pending: number; items: { name: string; state: string; url: string }[] };
-}
 
 async function host(root: string): Promise<"github" | "gitlab" | ""> {
   const url = (await git(root, ["remote", "get-url", "origin"]).catch(() => "")).trim();
@@ -1235,34 +1223,6 @@ export async function rawImage(root: string, file: unknown): Promise<{ type: str
 
 // ---------- insights: heatmaps of commits and files ----------
 
-export interface Insights {
-  /** the day the year ends on (today, in this computer's time zone), YYYY-MM-DD */
-  today: string;
-  /** commits per author-local day, YYYY-MM-DD → count */
-  days: Record<string, number>;
-  /** a few commits per day, newest first, for "what happened that day" */
-  dayCommits: Record<string, { hash: string; short: string; subject: string; author: string }[]>;
-  /** commits by weekday (0 = Monday) and hour (0–23, in the author's own time zone) */
-  hours: number[][];
-  /** the last 12 months, oldest first, YYYY-MM */
-  months: string[];
-  /** the files changed in the most commits, with commits per month (same order as months) */
-  files: { path: string; commits: number; added: number; removed: number; months: number[] }[];
-  authors: { name: string; email: string; commits: number }[];
-  /** files by how often they change against how big they are now (lines), for the hotspot chart */
-  hotspots: { path: string; commits: number; lines: number; authors: number }[];
-  /** pairs of files that keep landing in the same commits */
-  together: { a: string; b: string; count: number; share: number }[];
-  me: string;
-  total: number;
-  added: number;
-  removed: number;
-  activeDays: number;
-  streak: number;
-  longestStreak: number;
-  /** true when the year had more commits than were read */
-  partial: boolean;
-}
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const MAX_INSIGHT_COMMITS = 20_000;

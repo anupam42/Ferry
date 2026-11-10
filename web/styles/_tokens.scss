@@ -67,6 +67,8 @@ $theme-light: (
   "green": color(green-700), green-soft: #DDF7EC, "red": color(red-600), red-soft: #FDE7E9, amber: color(amber-700), amber-soft: #FFF1D6,
   "violet": color(violet-600), violet-soft: #ECE6FF,
   ins: #CFF5E3, ins-text: #0B5D3E, del: #FFD9DD, del-text: #8E1D29,
+  // charts: one blue ramp, light to dark, for heatmaps; bars use its middle step
+  heat-0: rgba(9, 35, 72, .07), heat-1: #B7D3F6, heat-2: #6DA7EC, heat-3: #2A78D6, heat-4: #184F95, chart-bar: #2A78D6,
   shadow: (0 10px 30px rgba(9, 35, 72, .08), 0 2px 6px rgba(9, 35, 72, .05)),
   overlay: rgba(9, 35, 72, .28),
 );
@@ -79,6 +81,7 @@ $theme-dark: (
   "green": color(green-400), green-soft: rgba(74, 222, 155, .13), "red": color(red-400), red-soft: rgba(255, 123, 134, .13),
   amber: color(amber-400), amber-soft: rgba(247, 190, 85, .13), "violet": color(violet-300), violet-soft: rgba(183, 156, 255, .14),
   ins: rgba(74, 222, 155, .2), ins-text: #8FF0C3, del: rgba(255, 123, 134, .2), del-text: #FFB3BA,
+  heat-0: rgba(255, 255, 255, .07), heat-1: #184F95, heat-2: #2A78D6, heat-3: #5598E7, heat-4: #9EC5F4, chart-bar: #5598E7,
   shadow: 0 12px 34px rgba(0, 0, 0, .35),
   overlay: rgba(2, 8, 22, .55),
 );
