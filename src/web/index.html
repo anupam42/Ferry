@@ -114,6 +114,58 @@ body { zoom: var(--zoom); }
 [data-rail="wide"] .rail .avatar .dot { left: 48px; right: auto; top: 8px; }
 .rail-brand { text-align: left; font-size: 17px !important; font-weight: 800 !important; letter-spacing: -.01em; line-height: 1.15; }
 .rail-brand small { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+/* ---------- the release notice: hangs from the top edge on two strings ---------- */
+.rn { --hang: 16px; position: fixed; top: 0; left: 50%; z-index: 44; transform: translateX(-50%); padding-top: var(--hang); pointer-events: none; max-width: calc(100vw - 24px); }
+.rn > * { pointer-events: auto; }
+/* the strings, from the top edge down to the card's two rings */
+.rn-pin { position: absolute; top: 0; width: 2px; height: calc(var(--hang) + 6px); background: linear-gradient(var(--faint), color-mix(in srgb, var(--faint) 60%, transparent)); border-radius: 2px; transition: left .35s cubic-bezier(.3,1.3,.5,1), right .35s cubic-bezier(.3,1.3,.5,1), height .35s; }
+.rn-pin::after { content: ""; position: absolute; left: 50%; bottom: -3px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; border: 2px solid var(--faint); background: var(--card-solid); }
+.rn-pin.l { left: 26px; } .rn-pin.r { right: 26px; }
+.rn-card { position: relative; transform-origin: 50% calc(var(--hang) * -1); border-radius: 18px; background: var(--card-solid);
+  box-shadow: 0 14px 34px rgba(9,35,72,.18), 0 2px 6px rgba(9,35,72,.08); border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  animation: rn-drop .9s cubic-bezier(.3,1.25,.5,1) backwards; }
+/* arrives with a drop and a swing, settles; sways a little when you come close */
+@keyframes rn-drop { 0% { transform: translateY(-140%) rotate(0); } 45% { transform: translateY(0) rotate(4deg); } 65% { transform: rotate(-2.5deg); } 82% { transform: rotate(1.2deg); } 100% { transform: rotate(0); } }
+.rn.swing .rn-card { animation: rn-swing .8s cubic-bezier(.3,1.2,.5,1); }
+@keyframes rn-swing { 0% { transform: rotate(0); } 25% { transform: rotate(3.5deg); } 50% { transform: rotate(-2.5deg); } 75% { transform: rotate(1deg); } 100% { transform: rotate(0); } }
+.rn:not(.collapsed) .rn-card:hover { animation: rn-sway 2.4s ease-in-out infinite; }
+@keyframes rn-sway { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(.8deg); } 70% { transform: rotate(-.8deg); } }
+.rn.leaving .rn-card { animation: rn-up .32s cubic-bezier(.5,0,.75,0) forwards; } .rn.leaving .rn-pin { opacity: 0; transition: opacity .2s; }
+@keyframes rn-up { to { transform: translateY(-160%) rotate(-3deg); opacity: 0; } }
+/* expanded */
+.rn-full { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 10px; white-space: nowrap; }
+.rn-face { width: 40px; height: 31px; flex: none; animation: relay-idle 5.5s ease-in-out infinite; transform-origin: 50% 85%; }
+.rn-ic { display: none; }
+.rn-text { font-size: 13.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.rn-text b { font-weight: 800; }
+.rn-sum { color: var(--muted); }
+.rn-count { flex: none; font: 800 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #fff; padding: 6px 12px; border-radius: 99px; background: linear-gradient(135deg, #F28A3C, #EF5D5D); box-shadow: 0 4px 12px rgba(239,93,93,.3); font-variant-numeric: tabular-nums; }
+.rn.k-available .rn-go, .rn.k-new .rn-go { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+.rn-go { flex: none; }
+.rn-btn { flex: none; width: 30px; height: 30px; border: 0; border-radius: 50%; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.rn-btn:hover { background: var(--card2); color: var(--text); }
+.rn-btn:focus-visible { outline: none; box-shadow: 0 0 0 2.5px var(--accent); }
+.rn-btn svg { width: 16px; height: 16px; }
+.rn-fold svg { transform: rotate(180deg); } /* fold up: the caret points up */
+/* collapsed: just Relay on a little hanging tag */
+.rn-tag { display: none; align-items: center; gap: 8px; border: 0; background: none; padding: 6px 12px 6px 8px; border-radius: 18px; cursor: pointer; color: var(--text); font: inherit; }
+.rn.collapsed { --hang: 10px; }
+.rn.collapsed .rn-full { display: none; }
+.rn.collapsed .rn-tag { display: flex; }
+.rn.collapsed .rn-pin.l { left: 18px; } .rn.collapsed .rn-pin.r { right: 18px; }
+.rn.collapsed .rn-card { border-radius: 16px; animation: rn-idle-sway 4s ease-in-out infinite; }
+.rn.collapsed.swing .rn-card { animation: rn-swing .8s cubic-bezier(.3,1.2,.5,1); }
+@keyframes rn-idle-sway { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+.rn-tag img { width: 30px; height: 23px; }
+.rn-tag:hover img { animation: relay-wiggle .55s ease-in-out infinite alternate; }
+.rn-tag-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
+.rn-tag-text b { font: 800 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.rn-tag-text small { font-size: 11px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.rn.k-countdown .rn-tag-text small { color: #E0592A; }
+.rn-tag:focus-visible { outline: none; box-shadow: 0 0 0 2.5px var(--accent); }
+@media (max-width: 760px) { .rn-text .rn-sum { display: none; } .rn-full { white-space: normal; } }
+@media (prefers-reduced-motion: reduce) { .rn-card, .rn-face, .rn-tag img { animation: none !important; } }
+[data-motion="reduce"] .rn-card, [data-motion="reduce"] .rn-face { animation: none !important; }
 /* ---------- what's new ---------- */
 .new-dot { position: absolute; top: 9px; right: 9px; width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 0 2px var(--pill); animation: dot-breathe 2.4s ease-in-out infinite; }
 [data-rail="wide"] .new-dot { position: static; order: 3; margin-left: auto; }
@@ -2283,7 +2335,111 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   /** Which release the user has seen: a version, plus how many changes an unreleased one had (so new ones show up). */
   const relKey = (r) => r.version + (r.unreleased ? "+" + r.groups.reduce((n, g) => n + g.items.length, 0) : "");
   const relCount = (r) => r.groups.reduce((n, g) => n + g.items.length, 0);
-  const relWhen = (r) => r.unreleased ? "In development" : r.date ? new Date(r.date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
+  const relWhen = (r) => r.planned ? "Planned " + new Date(r.planned).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+    : r.unreleased ? "In development" : r.date ? new Date(r.date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
+
+  // ---------- the release notice: hangs from the top edge; collapses to Relay on a tag ----------
+  /**
+   * What's worth announcing, most important first: a newer version you can
+   * update to, a planned release (with a countdown), the version being built,
+   * or a new version you haven't looked at yet. Dismissed per release.
+   */
+  async function pickNotice() {
+    let rel;
+    try { rel = await getRelease(); } catch { return null; }
+    const top = rel.releases[0];
+    const last = JSON.parse(localStorage.getItem("ferry-update-last") || "null");
+    if (last && last.r && last.r.newer && localStorage.getItem("ferry-update-check") === "on") {
+      return { kind: "available", version: last.r.version, current: rel.version };
+    }
+    if (!top) return null;
+    if (top.planned) {
+      const at = new Date(top.planned).getTime();
+      return { kind: at > Date.now() ? "countdown" : "due", version: top.version, at, release: top };
+    }
+    if (top.unreleased) return { kind: "soon", version: top.version, release: top };
+    if ((localStorage.getItem("ferry-seen-release") || "") !== relKey(top)) return { kind: "new", version: top.version, release: top };
+    return null;
+  }
+  const noticeKey = (n) => n.kind + ":" + n.version;
+
+  /** 2d 04h 12m 08s; shorter for the collapsed tag (2d 4h, 3h 12m, 12m 30s). */
+  function countdown(ms, short) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const d = Math.floor(s / 86400), hh = Math.floor((s % 86400) / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
+    const p = (n) => String(n).padStart(2, "0");
+    if (short) return d ? `${d}d ${hh}h` : hh ? `${hh}h ${mm}m` : `${mm}m ${p(ss)}s`;
+    return (d ? `${d}d ` : "") + `${p(hh)}h ${p(mm)}m ${p(ss)}s`;
+  }
+
+  let noticeTimer = null;
+  async function refreshNotice() {
+    const n = await pickNotice();
+    const old = $(".rn");
+    const dismissed = JSON.parse(localStorage.getItem("ferry-notice-dismissed") || "[]");
+    if (!n || dismissed.includes(noticeKey(n))) { if (old) old.remove(); clearInterval(noticeTimer); return; }
+    if (old && old.dataset.key === noticeKey(n)) return; // already showing this one
+    if (old) old.remove();
+    clearInterval(noticeTimer);
+
+    const collapsed = () => localStorage.getItem("ferry-notice-collapsed") === noticeKey(n);
+    const r = n.release;
+    const when = n.at ? new Date(n.at) : null;
+    const msg = {
+      available: () => [`Ferry `, h("b", {}, n.version), ` is out. You're on ${n.current}.`],
+      countdown: () => ["On ", h("b", {}, when.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })), " at ", h("b", {}, when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })), `, Ferry ${n.version} will be released`],
+      due: () => [`Ferry `, h("b", {}, n.version), ` was planned for ${when.toLocaleDateString(undefined, { month: "short", day: "numeric" })}: it may be out now`],
+      soon: () => [`Ferry `, h("b", {}, n.version), ` is on its way · ${plural(relCount(r), "change")} so far`],
+      new: () => [`Ferry `, h("b", {}, n.version), ` is here${r.summary ? ": " : ""}`, r.summary ? h("span", { class: "rn-sum" }, r.summary) : null],
+    }[n.kind]();
+    const action = {
+      available: ["How to update", () => tryPlace("settings-updates")],
+      countdown: ["What's coming", () => openWhatsNew(n.version)],
+      due: ["Check for updates", () => tryPlace("settings-updates")],
+      soon: ["Preview", () => openWhatsNew(n.version)],
+      new: ["See what's new", () => openWhatsNew()],
+    }[n.kind];
+    const tagLine = { available: "Update", countdown: "", due: "Out now?", soon: "Soon", new: "New" }[n.kind];
+    const mood = { available: "excited", countdown: "excited", due: "surprised", soon: "focused", new: "party" }[n.kind];
+
+    const count = n.kind === "countdown" ? h("span", { class: "rn-count", role: "timer", "aria-label": "Time left" }) : null;
+    const tagSmall = h("small", {}, tagLine);
+    const tick = () => {
+      if (n.kind !== "countdown") return;
+      const left = n.at - Date.now();
+      if (left <= 0) { clearInterval(noticeTimer); el.remove(); refreshNotice(); return; }
+      count.textContent = countdown(left);
+      tagSmall.textContent = countdown(left, true);
+    };
+    const setCollapsed = (on) => {
+      if (on) localStorage.setItem("ferry-notice-collapsed", noticeKey(n)); else localStorage.removeItem("ferry-notice-collapsed");
+      el.classList.toggle("collapsed", on);
+      el.classList.remove("swing"); void el.offsetWidth; el.classList.add("swing");
+      (on ? tag : collapseBtn).focus();
+    };
+    const tag = h("button", { type: "button", class: "rn-tag", "aria-label": `Ferry ${n.version}: show the notice`, onclick: () => setCollapsed(false) },
+      h("img", { src: face(mood), alt: "" }), h("span", { class: "rn-tag-text" }, h("b", {}, n.version), tagSmall));
+    const collapseBtn = h("button", { type: "button", class: "rn-btn rn-fold", "aria-label": "Fold it up", title: "Fold it up", onclick: () => setCollapsed(true) }, icon("caret"));
+    const el = h("div", { class: "rn k-" + n.kind + (collapsed() ? " collapsed" : ""), role: "region", "aria-label": "Release notice" },
+      h("span", { class: "rn-pin l", "aria-hidden": "true" }), h("span", { class: "rn-pin r", "aria-hidden": "true" }),
+      h("div", { class: "rn-card" },
+        tag,
+        h("div", { class: "rn-full" },
+          h("img", { class: "rn-face", src: face(mood), alt: "" }),
+          h("span", { class: "rn-ic" }, icon(n.kind === "available" ? "rocket" : n.kind === "countdown" ? "clock" : "sparkle")),
+          h("span", { class: "rn-text" }, msg),
+          count,
+          h("button", { type: "button", class: "btn small rn-go", onclick: action[1] }, action[0]),
+          collapseBtn,
+          h("button", { type: "button", class: "rn-btn", "aria-label": "Dismiss for this release", title: "Dismiss for this release", onclick: () => {
+            localStorage.setItem("ferry-notice-dismissed", JSON.stringify([...dismissed, noticeKey(n)].slice(-20)));
+            el.classList.add("leaving");
+            setTimeout(() => el.remove(), 320);
+          } }, icon("close")))));
+    el.dataset.key = noticeKey(n);
+    document.body.append(el);
+    if (n.kind === "countdown") { tick(); noticeTimer = setInterval(tick, 1000); }
+  }
 
   /** A "Try it" place from the changelog, opened in the app. */
   function tryPlace(place) {
@@ -2329,7 +2485,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
 
     const prevFocus = document.activeElement;
     const close = (markSeen) => {
-      if (markSeen) { localStorage.setItem("ferry-seen-release", relKey(all[0])); paintNewDot(); }
+      if (markSeen) { localStorage.setItem("ferry-seen-release", relKey(all[0])); paintNewDot(); refreshNotice(); }
       document.removeEventListener("keydown", onKey, true);
       wrap.classList.remove("open");
       setTimeout(() => wrap.remove(), 220);
@@ -2455,7 +2611,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     };
     const check = async (force) => {
       paintUp("busy");
-      try { const r = await checkForUpdate(force); r ? paintUp("done", r) : paintUp("idle"); }
+      try { const r = await checkForUpdate(force); r ? paintUp("done", r) : paintUp("idle"); refreshNotice(); }
       catch (e) { paintUp("error", e.message); }
     };
     const updates = h("section", { class: "rel-card" },
@@ -6019,8 +6175,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     connectEvents();
     setInterval(refresh, 3000);
     // after an update: show what's new once (not on a dev hot reload); then the daily update check, if it's turned on
-    paintNewDot().then((unseen) => { if (unseen && !(devState && devState.scroll)) setTimeout(() => openWhatsNew(), 900); });
-    checkForUpdate(false).then((r) => { if (r && r.newer) toast(`Ferry ${r.version} is available: see Settings → Updates`, false, "excited"); }).catch(() => {});
+    paintNewDot().then((unseen) => { if (unseen && !(devState && devState.scroll)) setTimeout(() => openWhatsNew(), 900); refreshNotice(); });
+    checkForUpdate(false).then((r) => { if (r && r.newer) { toast(`Ferry ${r.version} is available: see Settings → Updates`, false, "excited"); refreshNotice(); } }).catch(() => {});
   })();
 })();
 </script>

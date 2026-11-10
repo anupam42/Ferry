@@ -19,6 +19,7 @@ export interface Release {
   version: string;
   date: string; // YYYY-MM-DD, or "" (unreleased or not known)
   unreleased: boolean;
+  planned: string; // "YYYY-MM-DDTHH:MM" (the reader's local time) when a release is scheduled, else ""
   summary: string;
   groups: { kind: "new" | "improved" | "fixed" | "breaking" | "other"; items: ChangeItem[] }[];
 }
@@ -35,7 +36,10 @@ export function parseChangelog(md: string): Release[] {
     const head = /^##\s+\[?v?(\d+\.\d+\.\d+[\w.-]*)\]?(?:\s*[-–—]\s*(.+))?\s*$/.exec(line);
     if (head) {
       const when = (head[2] ?? "").trim();
-      cur = { version: head[1]!, date: /^\d{4}-\d{2}-\d{2}$/.test(when) ? when : "", unreleased: /unreleased/i.test(when), summary: "", groups: [] };
+      // "Planned 2026-12-05 15:00" (or just a date): a release that's scheduled, with a countdown in the app
+      const plan = /planned\s+(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}:\d{2}))?/i.exec(when);
+      const planned = plan ? `${plan[1]}T${(plan[2] ?? "09:00").padStart(5, "0")}` : "";
+      cur = { version: head[1]!, date: /^\d{4}-\d{2}-\d{2}$/.test(when) ? when : "", unreleased: /unreleased/i.test(when) || !!plan, planned, summary: "", groups: [] };
       out.push(cur);
       group = null;
       continue;

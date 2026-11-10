@@ -6,6 +6,8 @@ Settings → Updates, and in "What's new" after an update.
 How an entry is written:
 
 - `## <version> - <YYYY-MM-DD>`, or `## <version> - Unreleased` while it's being built (the date may be left off).
+  When a release is scheduled, write `## <version> - Planned <YYYY-MM-DD> <HH:MM>`: the app hangs a
+  notice at the top with a countdown to it.
 - A line starting with `>` right after it: the release in one sentence.
 - Sections `### New`, `### Improved`, `### Fixed` and `### Breaking`.
 - One change per line: `- **Title**: one or two plain sentences.` Add `[try: <place>]` to show a
