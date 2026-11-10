@@ -12,6 +12,8 @@
     const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
     const root = document.documentElement;
     root.dataset.theme = dark ? "dark" : "light";
+    // before anything is saved: a browser that has never opened Ferry (so "What's new" starts quietly instead of greeting a new user)
+    window.ferryFirstVisit = !Object.keys(localStorage).some((k) => k.startsWith("ferry-"));
     // accent colour, interface size and motion from Settings → Appearance
     let look = {};
     try { look = JSON.parse(localStorage.getItem("ferry-look") || "{}"); } catch {}
@@ -112,6 +114,122 @@ body { zoom: var(--zoom); }
 [data-rail="wide"] .rail .avatar .dot { left: 48px; right: auto; top: 8px; }
 .rail-brand { text-align: left; font-size: 17px !important; font-weight: 800 !important; letter-spacing: -.01em; line-height: 1.15; }
 .rail-brand small { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+/* ---------- what's new ---------- */
+.new-dot { position: absolute; top: 9px; right: 9px; width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 0 2px var(--pill); animation: dot-breathe 2.4s ease-in-out infinite; }
+[data-rail="wide"] .new-dot { position: static; order: 3; margin-left: auto; }
+#nav-new:hover svg { animation: ico-twinkle .7s ease-in-out; }
+@keyframes ico-twinkle { 0% { transform: none; } 30% { transform: rotate(-12deg) scale(1.15); } 60% { transform: rotate(10deg) scale(.95); } 100% { transform: none; } }
+.wn-wrap { position: fixed; inset: 0; z-index: 46; background: var(--overlay); display: grid; place-items: center; padding: 20px; opacity: 0; transition: opacity .2s; }
+.wn-wrap.open { opacity: 1; }
+.wn { position: relative; width: min(720px, 100%); max-height: min(86vh, 900px); display: flex; flex-direction: column; background: var(--card-solid); border-radius: 30px; box-shadow: 0 40px 100px rgba(9,35,72,.35); overflow: hidden;
+  transform: translateY(18px) scale(.98); transition: transform .35s cubic-bezier(.2,.9,.3,1.1); }
+.wn-wrap.open .wn { transform: none; }
+.wn-close { position: absolute; top: 14px; right: 14px; z-index: 2; }
+.wn-scroll { overflow: auto; padding: 0 28px 10px; }
+.wn-hero { display: flex; gap: 18px; align-items: center; margin: 0 -28px 18px; padding: 30px 28px 24px;
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%), radial-gradient(100% 120% at 100% 0%, color-mix(in srgb, var(--accent-2) 24%, transparent), transparent 55%), var(--card2); }
+.wn-face { width: 96px; height: 74px; flex: none; animation: relay-jump .8s cubic-bezier(.3,1.4,.5,1) .2s backwards; }
+.wn-hero-text { min-width: 0; }
+.wn-eyebrow { display: inline-block; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.wn-hero h2 { margin: 4px 0 6px; font-size: 26px; letter-spacing: -.02em; line-height: 1.15; }
+.wn-hero p { margin: 0 0 10px; color: var(--muted); font-size: 14.5px; }
+.wn-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.wn-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 8px; border-radius: 99px; font-size: 12px; font-weight: 700; background: var(--card-solid); box-shadow: 0 1px 3px rgba(9,35,72,.08); }
+.wn-chip svg { width: 13px; height: 13px; }
+.wn-chip.k-new svg { color: var(--green); } .wn-chip.k-improved svg { color: var(--accent); } .wn-chip.k-fixed svg { color: var(--violet); } .wn-chip.k-breaking svg { color: var(--red); }
+.wn-star { position: relative; margin-bottom: 18px; padding: 18px 20px; border-radius: 22px; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 14px 34px color-mix(in srgb, var(--accent) 30%, transparent); overflow: hidden; }
+.wn-star::after { content: ""; position: absolute; right: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%; background: rgba(255,255,255,.14); }
+.wn-star-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .9; }
+.wn-star-badge svg { width: 14px; height: 14px; }
+.wn-star h3 { margin: 6px 0 4px; font-size: 19px; }
+.wn-star p { margin: 0 0 12px; opacity: .95; font-size: 14px; line-height: 1.5; max-width: 560px; position: relative; z-index: 1; }
+.wn-star code { background: rgba(255,255,255,.22); border-radius: 5px; padding: 1px 5px; }
+.wn-star .wn-try { background: #fff; color: var(--accent); position: relative; z-index: 1; }
+.wn-ver { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 20px 0 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.wn-ver b { font-size: 16px; } .wn-ver span { color: var(--faint); font-size: 12.5px; } .wn-ver small { width: 100%; color: var(--muted); }
+.wn-group { margin-bottom: 16px; }
+.wn-group h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.wn-ic { width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; }
+.wn-ic svg { width: 14px; height: 14px; }
+.wn-ic.t-green, .rel-tl-kind.t-green { background: var(--green-soft); color: var(--green); }
+.wn-ic.t-blue, .rel-tl-kind.t-blue { background: var(--accent-soft); color: var(--accent); }
+.wn-ic.t-violet, .rel-tl-kind.t-violet { background: var(--violet-soft); color: var(--violet); }
+.wn-ic.t-red, .rel-tl-kind.t-red { background: var(--red-soft); color: var(--red); }
+.wn-ic.t-muted, .rel-tl-kind.t-muted { background: var(--card2); color: var(--faint); }
+.wn-n { font-size: 11px; color: var(--faint); background: var(--card2); border-radius: 99px; padding: 0 7px; letter-spacing: 0; }
+.wn-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.wn-item { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 14px; transition: background .15s; }
+.wn-item:hover { background: var(--card2); }
+.wn-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 13.5px; line-height: 1.5; }
+.wn-item-text b { font-size: 14px; }
+.wn-item-text span { color: var(--muted); }
+.wn-item-text code { background: var(--card2); border-radius: 5px; padding: 1px 5px; font-size: 12.5px; }
+.wn-try { flex: none; gap: 6px; }
+.wn-try span { transition: transform .15s; } .wn-try:hover span { transform: translateX(3px); }
+.wn-foot { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--line); }
+.wn-foot .grow { flex: 1; }
+/* ---------- Settings → Updates and About ---------- */
+.rel-hero { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(220px, 300px); gap: 18px; align-items: center; padding: 20px 22px; border-bottom: 1px solid var(--line);
+  background: radial-gradient(90% 140% at 0% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%); }
+.rel-face { width: 84px; height: 64px; }
+.rel-name { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rel-name b { font-size: 24px; letter-spacing: -.02em; }
+.rel-ver { font: 700 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--accent); background: var(--accent-soft); padding: 2px 10px; border-radius: 99px; }
+.rel-hero p { margin: 4px 0 12px; color: var(--muted); font-size: 13.5px; }
+.rel-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.rel-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; margin: 0; padding: 12px 14px; border-radius: 16px; background: var(--card2); font-size: 12.5px; }
+.rel-facts dt { color: var(--faint); } .rel-facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+@media (max-width: 1000px) { .rel-hero { grid-template-columns: auto minmax(0, 1fr); } .rel-facts { grid-column: 1 / -1; } }
+.rel-now { display: flex; align-items: center; gap: 18px; padding: 20px 22px; border-bottom: 1px solid var(--line);
+  background: radial-gradient(90% 160% at 100% 0%, color-mix(in srgb, var(--accent-2) 16%, transparent), transparent 60%), radial-gradient(70% 140% at 0% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%); }
+.rel-now-main { flex: 1; min-width: 0; }
+.rel-now-label { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.rel-now p { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; }
+.rel-card { padding: 16px 22px 18px; border-bottom: 1px solid var(--line); }
+.rel-card:last-child { border-bottom: 0; }
+.rel-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.rel-card-head .grow { flex: 1; }
+.rel-card-head b { font-size: 15px; }
+.rel-card-ic { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.rel-card-ic svg { width: 16px; height: 16px; }
+.rel-auto { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.rel-up-body { font-size: 13.5px; }
+.rel-up-state { display: flex; align-items: center; gap: 8px; }
+.rel-up-state svg { width: 18px; height: 18px; flex: none; }
+.rel-up-state.ok svg { color: var(--green); } .rel-up-state.new svg { color: var(--accent); } .rel-up-state.warn { color: var(--amber); }
+.rel-cmd { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-radius: 12px; background: var(--card2); width: fit-content; max-width: 100%; }
+.rel-cmd code { font-size: 13px; overflow-wrap: anywhere; }
+.rel-notes { margin-top: 10px; } .rel-notes summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.rel-privacy { margin: 10px 0 0; font-size: 12px; color: var(--faint); }
+.rel-tl { display: flex; flex-direction: column; border-radius: 16px; background: var(--card2); padding: 4px; }
+.rel-tl-head { display: grid; grid-template-columns: 14px auto auto auto minmax(0, 1fr) auto 18px; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 10px 12px; border-radius: 12px; cursor: pointer; text-align: left; color: var(--text); }
+.rel-tl-head:hover { background: var(--card-solid); }
+.rel-tl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--faint); }
+.rel-tl-dot.latest { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.rel-tl-dot.dev { background: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+.rel-tl-ver { font: 700 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.rel-tl-when { font-size: 12.5px; color: var(--faint); white-space: nowrap; }
+.rel-tl-sum { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel-tl-n { font-size: 12px; color: var(--faint); white-space: nowrap; }
+.rel-tl-head .caret { display: inline-flex; color: var(--faint); transition: transform .2s; transform: rotate(-90deg); }
+.rel-tl-head[aria-expanded="true"] .caret { transform: none; }
+.rel-tl-head .caret svg { width: 16px; height: 16px; }
+.rel-tl-body { padding: 4px 16px 14px 36px; display: flex; flex-direction: column; gap: 12px; }
+.rel-tl-group ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.55; }
+.rel-tl-group li { margin: 3px 0; } .rel-tl-group li span { color: var(--muted); }
+.rel-tl-kind { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 7px; border-radius: 99px; font-size: 11.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.rel-tl-kind svg { width: 13px; height: 13px; }
+.rel-health { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.rel-h { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--card2); min-width: 0; }
+.rel-h > div { min-width: 0; display: flex; flex-direction: column; }
+.rel-h b { font-size: 13.5px; } .rel-h small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel-h-ic { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.rel-h-ic svg { width: 14px; height: 14px; }
+.rel-h.ok .rel-h-ic { background: var(--green-soft); color: var(--green); }
+.rel-h.warn .rel-h-ic { background: var(--amber-soft); color: var(--amber); }
+.rel-h.bad .rel-h-ic { background: var(--red-soft); color: var(--red); }
+.rel-loading { padding: 20px; }
+@media (prefers-reduced-motion: reduce) { .wn-face, .new-dot, #nav-new svg { animation: none !important; } .wn, .wn-wrap { transition: none; } }
 /* ---------- the sidebar's icons: each moves like what it is ---------- */
 .rail-btn svg { transform-origin: center; transition: transform .45s cubic-bezier(.3,1.5,.5,1); }
 .rail-btn:active { transform: scale(.92); transition-duration: .08s; }
@@ -1325,6 +1443,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     <button class="rail-btn" id="nav-git" title="Git" aria-label="Git client"><span class="rail-label">Git</span></button>
     <button class="rail-btn" id="nav-activity" title="Notifications" aria-label="Notifications"><span class="badge hidden" id="note-badge"></span><span class="rail-label">Notifications</span></button>
     <div class="grow"></div>
+    <button class="rail-btn" id="nav-new" title="What's new" aria-label="What's new"><span class="new-dot hidden" id="new-dot" aria-hidden="true"></span><span class="rail-label">What's new</span></button>
     <button class="rail-btn" id="nav-settings" title="Settings" aria-label="Settings"><span class="rail-label">Settings</span></button>
     <div class="rail-grip" id="rail-grip" role="slider" tabindex="0" aria-label="Sidebar width: drag, or use the arrow keys" aria-valuemin="0" aria-valuemax="2" aria-valuenow="1" aria-valuetext="Regular" title="Drag to make the sidebar thinner or wider · double-click to switch"></div>
   </nav>
@@ -1406,6 +1525,10 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     more: '<circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/>',
     undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
     expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/>',
+    sparkle: '<path d="M11 3.5l1.9 5.1 5.1 1.9-5.1 1.9L11 17.5l-1.9-5.1L4 10.5l5.1-1.9z"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>',
+    copy: '<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/>',
+    warn: '<path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17v.01"/>',
+    rocket: '<path d="M5 15c-1.5 1.5-2 4.5-2 6 1.5 0 4.5-.5 6-2"/><path d="M14.5 4.5C17.5 3 20 3 21 3c0 1-.5 3.5-2 6.5L13 16l-5-5z"/><path d="M8 11 4.5 10l2-3.5H11M13 16l1 3.5 3.5-2V13"/><circle cx="15.5" cy="8.5" r="1.4"/>',
     shrink: '<path d="M4 14h6v6M20 10h-6V4M14 10l6.5-6.5M10 14l-6.5 6.5"/>',
     shield: '<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z"/><path d="m9 12 2 2 4-4"/>',
     ticket: '<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 5v12"/>',
@@ -1916,6 +2039,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     $("#nav-pairs").prepend(icon("home"));
     $("#nav-activity").prepend(icon("bell"));
     $("#nav-git").prepend(icon("branch"));
+    $("#nav-new").prepend(icon("sparkle"));
+    $("#nav-new").onclick = () => openWhatsNew();
     // the branch icon redraws itself on hover: one normalised length lets a single dash cover each line
     $("#nav-git svg").querySelectorAll("path, circle").forEach((p) => p.setAttribute("pathLength", "1"));
     const setMode = (m, tab) => {
@@ -1968,7 +2093,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   // ---------- settings ----------
   const SETTINGS = [
     ["appearance", "Appearance", "palette"], ["git", "Git", "branch"], ["notifications", "Notifications", "bell"],
-    ["connections", "Connections", "plug"], ["data", "Data", "db"], ["about", "About", "info"]];
+    ["connections", "Connections", "plug"], ["data", "Data", "db"], ["updates", "Updates", "sparkle"], ["about", "About", "info"]];
 
   async function renderSettings() {
     const ok = (id) => SETTINGS.some(([x]) => x === id);
@@ -1994,7 +2119,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       S.setShown = "";
       return render();
     }
-    ({ appearance: setAppearance, git: setGit, notifications: setNotifications, connections: setConnections, data: setData, about: setAbout })[sec](card);
+    ({ appearance: setAppearance, git: setGit, notifications: setNotifications, connections: setConnections, data: setData, updates: setUpdates, about: setAbout })[sec](card);
   }
 
   /** One settings row: what it is on the left, the control on the right. */
@@ -2147,14 +2272,253 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
         } }, "Reset to defaults")));
   }
 
+  // ---------- release notes and release info ----------
+  const REL_KIND = { new: ["New", "sparkle", "green"], improved: ["Improved", "rocket", "blue"], fixed: ["Fixed", "check", "violet"], breaking: ["Breaking", "warn", "red"], other: ["Other", "list", "muted"] };
+  const INSTALL_NAME = { source: "from source (bun)", scoop: "with Scoop", winget: "with winget", homebrew: "with Homebrew", binary: "as a downloaded binary" };
+  const PLATFORM_NAME = { win32: "Windows", darwin: "macOS", linux: "Linux" };
+  async function getRelease() {
+    if (!S.release) S.release = await api("GET", "/release");
+    return S.release;
+  }
+  /** Which release the user has seen: a version, plus how many changes an unreleased one had (so new ones show up). */
+  const relKey = (r) => r.version + (r.unreleased ? "+" + r.groups.reduce((n, g) => n + g.items.length, 0) : "");
+  const relCount = (r) => r.groups.reduce((n, g) => n + g.items.length, 0);
+  const relWhen = (r) => r.unreleased ? "In development" : r.date ? new Date(r.date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
+
+  /** A "Try it" place from the changelog, opened in the app. */
+  function tryPlace(place) {
+    const git = { "git-files": "files", "git-changes": "changes", "git-history": "history", "git-undo": "undo", "git-prs": "prs", "git-branches": "branches" }[place];
+    if (git) { S.gitTab = git; S.gshown = ""; $("#nav-git").click(); return; }
+    if (place === "pairs") { $("#nav-pairs").click(); return; }
+    if (place.startsWith("settings-")) { S.setSec = place.slice(9); localStorage.setItem("ferry-settings-sec", S.setSec); $("#nav-settings").click(); }
+  }
+
+  /** The sidebar's What's new dot: on until the newest release has been looked at. */
+  async function paintNewDot() {
+    try {
+      const rel = await getRelease();
+      const top = rel.releases[0];
+      if (!top) return;
+      const seen = localStorage.getItem("ferry-seen-release");
+      // a first visit isn't an update: start from here quietly
+      if (seen == null && window.ferryFirstVisit) localStorage.setItem("ferry-seen-release", relKey(top));
+      const unseen = (localStorage.getItem("ferry-seen-release") || "") !== relKey(top);
+      $("#new-dot").classList.toggle("hidden", !unseen);
+      return unseen;
+    } catch { return false; }
+  }
+
+  /**
+   * What's new: everything since the release you last looked at (or the
+   * newest one), with the headline change up top and a "Try it" for changes
+   * you can go and see. "Got it" marks it seen.
+   */
+  async function openWhatsNew(only) {
+    let rel;
+    try { rel = await getRelease(); } catch (e) { toast(e.message, true); return; }
+    const all = rel.releases;
+    if (!all.length) { toast("There are no release notes yet", true); return; }
+    const seen = localStorage.getItem("ferry-seen-release") || "";
+    const seenVersion = seen.split("+")[0];
+    let show = only ? all.filter((r) => r.version === only) : all.filter((r, i) => i === 0 || (seenVersion && cmpVersion(r.version, seenVersion) > 0));
+    if (!show.length) show = [all[0]];
+    const top = show[0];
+    const total = show.reduce((n, r) => n + relCount(r), 0);
+    const items = show.flatMap((r) => r.groups.flatMap((g) => g.items.map((it) => ({ ...it, kind: g.kind, version: r.version }))));
+    const star = items.find((it) => it.kind === "new") || items[0];
+
+    const prevFocus = document.activeElement;
+    const close = (markSeen) => {
+      if (markSeen) { localStorage.setItem("ferry-seen-release", relKey(all[0])); paintNewDot(); }
+      document.removeEventListener("keydown", onKey, true);
+      wrap.classList.remove("open");
+      setTimeout(() => wrap.remove(), 220);
+      prevFocus?.focus?.();
+    };
+    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(true); } };
+    const tryBtn = (it) => it.try ? h("button", { class: "btn small wn-try", onclick: () => { close(true); tryPlace(it.try); } }, "Try it", h("span", { "aria-hidden": "true" }, "→")) : null;
+
+    const hero = h("div", { class: "wn-hero" },
+      h("img", { class: "wn-face", src: face("party"), alt: "" }),
+      h("div", { class: "wn-hero-text" },
+        h("span", { class: "wn-eyebrow" }, top.unreleased ? "Coming in the next version" : show.length > 1 ? `Since you last looked · ${show.length} releases` : relWhen(top) || "New version"),
+        h("h2", {}, show.length > 1 ? `What's new in Ferry` : `What's new in Ferry ${top.version}`),
+        top.summary ? h("p", {}, top.summary) : null,
+        h("div", { class: "wn-chips" }, ...["new", "improved", "fixed", "breaking"].map((k) => {
+          const n = items.filter((it) => it.kind === k).length;
+          return n ? h("span", { class: "wn-chip k-" + k }, icon(REL_KIND[k][1]), `${n} ${REL_KIND[k][0].toLowerCase()}`) : null;
+        }))));
+    const featured = star ? h("div", { class: "wn-star" },
+      h("span", { class: "wn-star-badge" }, icon("sparkle"), "Headline"),
+      h("h3", {}, star.title), star.text ? h("p", {}, ...mdInline(star.text)) : null, tryBtn(star)) : null;
+    const groups = show.flatMap((r) => [
+      show.length > 1 ? h("div", { class: "wn-ver" }, h("b", {}, r.version), h("span", {}, relWhen(r)), r.summary ? h("small", {}, r.summary) : null) : null,
+      ...r.groups.map((g) => {
+        const list = g.items.filter((it) => it !== star && !(star && it.title === star.title && r.version === star.version));
+        if (!list.length) return null;
+        const [name, ic, tone] = REL_KIND[g.kind];
+        return h("section", { class: "wn-group k-" + g.kind },
+          h("h4", {}, h("span", { class: "wn-ic t-" + tone }, icon(ic)), name, h("span", { class: "wn-n" }, list.length)),
+          h("ul", {}, list.map((it) => h("li", { class: "wn-item" },
+            h("div", { class: "wn-item-text" }, h("b", {}, it.title), it.text ? h("span", {}, ...mdInline(it.text)) : null), tryBtn(it)))));
+      })]).filter(Boolean);
+    if (!total) groups.push(h("div", { class: "empty-row" }, top.summary || "No notes for this version yet."));
+
+    const wrap = h("div", { class: "wn-wrap", role: "dialog", "aria-modal": "true", "aria-label": "What's new" },
+      h("div", { class: "wn" },
+        h("button", { class: "btn icon ghost wn-close", "aria-label": "Close", onclick: () => close(true) }, icon("close")),
+        h("div", { class: "wn-scroll" }, hero, featured, ...groups),
+        h("div", { class: "wn-foot" },
+          h("button", { class: "btn small ghost", onclick: () => { close(true); tryPlace("settings-updates"); } }, "All releases"),
+          h("span", { class: "grow" }),
+          h("button", { class: "btn brand", onclick: () => close(true) }, "Got it"))));
+    wrap.addEventListener("click", (e) => { if (e.target === wrap) close(true); });
+    document.addEventListener("keydown", onKey, true);
+    document.body.append(wrap);
+    requestAnimationFrame(() => { wrap.classList.add("open"); wrap.querySelector(".wn-foot .btn.brand").focus(); });
+  }
+  const cmpVersion = (a, b) => {
+    const pa = String(a).split(/[.-]/), pb = String(b).split(/[.-]/);
+    for (let i = 0; i < 3; i++) { const d = (+pa[i] || 0) - (+pb[i] || 0); if (d) return d; }
+    return 0;
+  };
+
+  /** The update check, only when the user turned it on (or presses "Check now"). Remembers the answer for a day. */
+  async function checkForUpdate(force) {
+    if (!force) {
+      if (localStorage.getItem("ferry-update-check") !== "on") return null;
+      const last = JSON.parse(localStorage.getItem("ferry-update-last") || "null");
+      if (last && Date.now() - last.at < 86400e3) return last.r;
+    }
+    const r = await api("GET", "/release/latest");
+    localStorage.setItem("ferry-update-last", JSON.stringify({ at: Date.now(), r }));
+    return r;
+  }
+
   function setAbout(card) {
-    const v = S.info ? S.info.version : "";
-    card.append(
-      h("div", { class: "set-about" }, h("img", { class: "float", src: face("happy"), alt: "Relay" }),
-        h("div", {}, h("b", {}, "Ferry " + v), h("p", {}, "Relay, the sync spirit: a friendly, floating companion that keeps your files and projects in flow."))),
-      setRow("Version", null, h("code", {}, v || "unknown")),
-      setRow("Running on", null, h("span", {}, S.info ? `${S.info.platform}${S.info.dev ? " · dev mode (hot reload)" : ""}` : "")),
-      setRow("Source and issues", "Report a bug or suggest an idea", h("a", { class: "btn small", href: "https://github.com/anupam42/Ferry", target: "_blank", rel: "noopener noreferrer" }, "Open on GitHub")));
+    card.append(h("div", { class: "rel-loading" }, relayLoading("Looking at this copy of Ferry", { card: false })));
+    getRelease().then((rel) => paintRelease(card, rel, "about"), (e) => card.replaceChildren(card.firstChild, h("p", { class: "muted", style: { padding: "0 22px" } }, e.message)));
+  }
+  function setUpdates(card) {
+    card.append(h("div", { class: "rel-loading" }, relayLoading("Reading the release notes", { card: false })));
+    getRelease().then((rel) => paintRelease(card, rel, "updates"), (e) => card.replaceChildren(card.firstChild, h("p", { class: "muted", style: { padding: "0 22px" } }, e.message)));
+  }
+
+  /** Settings → About (this copy of Ferry, diagnostics, health) or Settings → Updates (the update check, what's new, every release). */
+  function paintRelease(card, rel, page) {
+    const top = rel.releases[0];
+    const ver = rel.version || "unknown";
+    const inDev = rel.dev || rel.commit === "dev";
+    const copyText = async (t, what) => { try { await navigator.clipboard.writeText(t); toast(`Copied ${what}`, false, "wink"); } catch { toast("Couldn't copy to the clipboard", true); } };
+
+    // this version
+    const facts = [
+      ["Version", ver + (inDev ? " (development)" : "")],
+      ["Build", rel.commit && rel.commit !== "dev" ? rel.commit.slice(0, 12) : "from your working copy"],
+      ["Built", rel.built ? new Date(rel.built).toLocaleString() : inDev ? "live, from source" : "unknown"],
+      ["Installed", INSTALL_NAME[rel.install.method] || rel.install.method],
+      ["Running on", `${PLATFORM_NAME[rel.platform] || rel.platform} · ${rel.arch} · Bun ${rel.bun}`],
+    ];
+    const diagnostics = async () => {
+      let hl = [];
+      try { hl = await api("GET", "/release/health"); } catch {}
+      return [`Ferry ${ver}${inDev ? " (development)" : ""}`, ...facts.slice(1).map(([k, v]) => `${k}: ${v}`), `Location: ${rel.install.where}`, "",
+        ...hl.map((x) => `${x.ok ? "ok  " : "miss"} ${x.name}: ${x.detail}`)].join("\n");
+    };
+    const hero = h("div", { class: "rel-hero" },
+      h("img", { class: "rel-face float", src: face("happy"), alt: "" }),
+      h("div", { class: "rel-hero-main" },
+        h("div", { class: "rel-name" }, h("b", {}, "Ferry"), h("span", { class: "rel-ver" }, ver), inDev ? h("span", { class: "pill amber refpill" }, "development build") : null),
+        h("p", {}, "Relay, the sync spirit: a friendly, floating companion that keeps your files and projects in flow."),
+        h("div", { class: "rel-actions" },
+          h("button", { class: "btn small brand", onclick: async () => copyText(await diagnostics(), "the diagnostics") }, icon("copy"), "Copy diagnostics"),
+          h("button", { class: "btn small", onclick: () => openWhatsNew() }, icon("sparkle"), "What's new"),
+          h("a", { class: "btn small ghost", href: "https://github.com/anupam42/Ferry/issues/new/choose", target: "_blank", rel: "noopener noreferrer" }, "Report a problem"))),
+      h("dl", { class: "rel-facts" }, facts.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])));
+
+    // updates: off until turned on; "Check now" always works
+    const upBody = h("div", { class: "rel-up-body" });
+    const howTo = () => rel.install.update
+      ? h("div", { class: "rel-cmd" }, h("code", {}, rel.install.update), h("button", { class: "btn small", onclick: () => copyText(rel.install.update, "the command") }, icon("copy"), "Copy"))
+      : h("a", { class: "btn small brand", href: "https://github.com/anupam42/Ferry/releases/latest", target: "_blank", rel: "noopener noreferrer" }, "Download the latest");
+    const paintUp = (state, r) => {
+      if (state === "idle") upBody.replaceChildren(h("span", { class: "muted" }, localStorage.getItem("ferry-update-check") === "on" ? "Checks once a day." : "Ferry doesn't look for updates on its own. Press Check now, or turn on the daily check."));
+      else if (state === "busy") upBody.replaceChildren(h("span", { class: "muted" }, "Asking GitHub…"));
+      else if (state === "error") upBody.replaceChildren(h("span", { class: "rel-up-state warn" }, icon("warn"), r));
+      else if (r.newer) upBody.replaceChildren(
+        h("div", { class: "rel-up-state new" }, icon("sparkle"), h("span", {}, h("b", {}, `Ferry ${r.version} is out`), r.date ? ` · ${new Date(r.date + "T12:00:00").toLocaleDateString()}` : "", ` · you have ${r.current}`)),
+        h("p", { class: "muted", style: { margin: "6px 0 10px" } }, rel.install.update ? `You installed Ferry ${INSTALL_NAME[rel.install.method]}, so this updates it:` : "Download the new version and replace this one:"),
+        howTo(),
+        r.notes ? h("details", { class: "rel-notes" }, h("summary", {}, "Release notes on GitHub"), mdRender(r.notes)) : null,
+        h("a", { class: "btn small ghost", href: r.url, target: "_blank", rel: "noopener noreferrer", style: { marginTop: "8px" } }, "Open the release"));
+      else upBody.replaceChildren(h("div", { class: "rel-up-state ok" }, icon("check"), h("span", {}, h("b", {}, "You're up to date"), ` · ${r.version ? "latest is " + r.version : "nothing newer"}`)));
+    };
+    const check = async (force) => {
+      paintUp("busy");
+      try { const r = await checkForUpdate(force); r ? paintUp("done", r) : paintUp("idle"); }
+      catch (e) { paintUp("error", e.message); }
+    };
+    const updates = h("section", { class: "rel-card" },
+      h("div", { class: "rel-card-head" }, h("span", { class: "rel-card-ic" }, icon("down")), h("b", {}, "Check for updates"), h("span", { class: "grow" }),
+        h("label", { class: "rel-auto" }, setSwitch(localStorage.getItem("ferry-update-check") === "on", (on) => { localStorage.setItem("ferry-update-check", on ? "on" : "off"); if (on) check(false); else paintUp("idle"); }, "Check for updates once a day"), h("span", {}, "Check daily")),
+        h("button", { class: "btn small", onclick: () => check(true) }, icon("sync"), "Check now")),
+      upBody,
+      h("p", { class: "rel-privacy" }, "Checking asks GitHub for the newest release. Nothing about you or your files is sent."));
+    const last = JSON.parse(localStorage.getItem("ferry-update-last") || "null");
+    if (last && localStorage.getItem("ferry-update-check") === "on") paintUp("done", last.r); else paintUp("idle");
+
+    // every release, newest first
+    const timeline = h("div", { class: "rel-tl" }, rel.releases.map((r, i) => {
+      const n = relCount(r);
+      const body = h("div", { class: "rel-tl-body" + (i === 0 ? "" : " hidden") },
+        ...r.groups.map((g) => h("div", { class: "rel-tl-group" },
+          h("span", { class: "rel-tl-kind t-" + REL_KIND[g.kind][2] }, icon(REL_KIND[g.kind][1]), REL_KIND[g.kind][0]),
+          h("ul", {}, g.items.map((it) => h("li", {}, h("b", {}, it.title), it.text ? h("span", {}, " — ", ...mdInline(it.text)) : null))))),
+        n ? null : h("p", { class: "muted" }, "No notes here yet."));
+      const toggle = h("button", { type: "button", class: "rel-tl-head", "aria-expanded": i === 0 ? "true" : "false", onclick: () => {
+        const open = body.classList.toggle("hidden") === false;
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      } },
+        h("span", { class: "rel-tl-dot" + (r.unreleased ? " dev" : i === 0 ? " latest" : "") }),
+        h("span", { class: "rel-tl-ver" }, r.version),
+        h("span", { class: "rel-tl-when" }, relWhen(r)),
+        // always a slot here, so the columns after it stay put
+        h("span", {}, r.version === ver ? h("span", { class: "pill blue refpill" }, "you're on this") : null),
+        h("span", { class: "rel-tl-sum" }, r.summary),
+        n ? h("span", { class: "rel-tl-n" }, plural(n, "change")) : null,
+        h("span", { class: "caret" }, icon("caret")));
+      return h("div", { class: "rel-tl-row" }, toggle, body);
+    }));
+
+    const releases = h("section", { class: "rel-card" }, h("div", { class: "rel-card-head" }, h("span", { class: "rel-card-ic" }, icon("list")), h("b", {}, "All releases"), h("span", { class: "grow" }),
+      h("a", { class: "btn small ghost", href: "https://github.com/anupam42/Ferry/blob/main/CHANGELOG.md", target: "_blank", rel: "noopener noreferrer" }, "CHANGELOG.md")), timeline);
+
+    if (page === "updates") {
+      // what you're on, and what's newest in the notes
+      const now = h("div", { class: "rel-now" },
+        h("div", { class: "rel-now-main" },
+          h("span", { class: "rel-now-label" }, "You're on"),
+          h("div", { class: "rel-name" }, h("b", {}, "Ferry"), h("span", { class: "rel-ver" }, ver), inDev ? h("span", { class: "pill amber refpill" }, "development build") : null),
+          top ? h("p", {}, top.unreleased ? `Next up: ${top.version}. ${top.summary}` : top.summary) : null),
+        h("button", { class: "btn brand", onclick: () => openWhatsNew() }, icon("sparkle"), "What's new"));
+      card.replaceChildren(card.firstChild, now, updates, releases);
+      return;
+    }
+
+    // health: the tools Ferry needs
+    const healthBox = h("div", { class: "rel-health" }, h("span", { class: "muted" }, "Checking…"));
+    api("GET", "/release/health").then((list) => healthBox.replaceChildren(...list.map((x) =>
+      h("div", { class: "rel-h " + (x.ok ? "ok" : x.needed ? "bad" : "warn") }, h("span", { class: "rel-h-ic" }, icon(x.ok ? "check" : "warn")),
+        h("div", {}, h("b", {}, x.name), h("small", { title: x.detail }, x.detail))))), () => healthBox.replaceChildren(h("span", { class: "muted" }, "Couldn't check")));
+
+    card.replaceChildren(card.firstChild, hero,
+      h("section", { class: "rel-card" }, h("div", { class: "rel-card-head" }, h("span", { class: "rel-card-ic" }, icon("shield")), h("b", {}, "Health"), h("span", { class: "grow" }),
+        h("span", { class: "muted", style: { fontSize: "12.5px" } }, "What Ferry uses on this computer")), healthBox),
+      h("section", { class: "rel-card" }, h("div", { class: "rel-card-head" }, h("span", { class: "rel-card-ic" }, icon("info")), h("b", {}, "Source and issues")),
+        h("p", { class: "muted", style: { margin: "0 0 10px", fontSize: "13.5px" } }, "Ferry is open source. Report a bug or suggest an idea, and include the diagnostics."),
+        h("div", { class: "rel-actions" },
+          h("a", { class: "btn small", href: "https://github.com/anupam42/Ferry", target: "_blank", rel: "noopener noreferrer" }, "Open on GitHub"),
+          h("button", { class: "btn small ghost", onclick: () => tryPlace("settings-updates") }, icon("sparkle"), "Updates and release notes"))));
   }
 
   // ---------- rendering ----------
@@ -5654,6 +6018,9 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     paintBadge();
     connectEvents();
     setInterval(refresh, 3000);
+    // after an update: show what's new once (not on a dev hot reload); then the daily update check, if it's turned on
+    paintNewDot().then((unseen) => { if (unseen && !(devState && devState.scroll)) setTimeout(() => openWhatsNew(), 900); });
+    checkForUpdate(false).then((r) => { if (r && r.newer) toast(`Ferry ${r.version} is available: see Settings → Updates`, false, "excited"); }).catch(() => {});
   })();
 })();
 </script>

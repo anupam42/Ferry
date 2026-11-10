@@ -124,6 +124,19 @@ export async function supervise(args: string[], log: (msg: string) => void): Pro
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void restart(f), 150);
   });
+  // the changelog is bundled into the server (What's new, Settings → Updates), but lives next to src/
+  const changelog = path.join(path.dirname(src), "CHANGELOG.md");
+  let changelogTime = 0;
+  try { changelogTime = fs.statSync(changelog).mtimeMs; } catch {}
+  const notesWatcher = fs.watch(path.dirname(src), (_ev, name) => {
+    if (String(name ?? "") !== "CHANGELOG.md") return;
+    let mtime = 0;
+    try { mtime = fs.statSync(changelog).mtimeMs; } catch {}
+    if (mtime === changelogTime) return;
+    changelogTime = mtime;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => void restart("CHANGELOG.md"), 150);
+  });
 
   start();
   await new Promise<void>((resolve) => {
@@ -131,6 +144,7 @@ export async function supervise(args: string[], log: (msg: string) => void): Pro
       if (stopping) return;
       stopping = true;
       watcher.close();
+      notesWatcher.close();
       const c = child;
       c?.kill("SIGTERM");
       await c?.exited;

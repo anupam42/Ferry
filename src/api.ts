@@ -40,6 +40,8 @@ import { GitApi, type RepoManager } from "./gitapi.ts";
 import * as conn from "./integrations.ts";
 import { readSettings, saveGit, SettingsError } from "./settingsapi.ts";
 import { errMsg, parseWhen } from "./util.ts";
+import { COMMIT, DATE as BUILD_DATE, VERSION } from "./cli/common.ts";
+import * as release from "./release.ts";
 import webPage from "./web/index.html" with { type: "text" };
 import logoSVG from "../assets/logo/icon.svg" with { type: "text" };
 import mascot_relay from "../assets/mascot/relay.svg" with { type: "text" };
@@ -193,6 +195,24 @@ export class ApiServer {
       });
     }
     if (req.method === "GET" && url.pathname === "/fs") return this.listDir(url);
+    // release notes and release info (Settings → Updates and About, "What's new")
+    if (req.method === "GET" && url.pathname === "/release") {
+      return json({
+        version: this.opts.version || VERSION, commit: COMMIT, built: BUILD_DATE, dev: !!this.opts.dev, install: release.installMethod(),
+        platform: process.platform, arch: process.arch, bun: Bun.version, releases: release.releases(),
+      });
+    }
+    if (req.method === "GET" && url.pathname === "/release/health") return json(await release.health());
+    if (req.method === "GET" && url.pathname === "/release/latest") {
+      // the update check: a request to GitHub, made only when the user asks for it
+      try {
+        const latest = await release.latestRelease();
+        const current = this.opts.version || VERSION;
+        return json({ ...latest, current, newer: !!latest.version && release.compareVersions(latest.version, current) > 0 });
+      } catch (err) {
+        return text(errMsg(err), 502);
+      }
+    }
     if (parts[0] === "git" && parts.length >= 2) return this.git.handle(req, url, parts);
     if (parts[0] === "connections") return this.connections(req, parts);
     if (parts[0] === "settings") return this.settings(req, parts);
