@@ -8,6 +8,7 @@
   import Data from "./Data.svelte";
   import Git from "./Git.svelte";
   import Notifications from "./Notifications.svelte";
+  import Updates from "./Updates.svelte";
 
   const SECTIONS = [
     { id: "appearance", name: "Appearance", icon: "palette", view: Appearance, needs: false },
@@ -15,6 +16,7 @@
     { id: "notifications", name: "Notifications", icon: "bell", view: Notifications, needs: false },
     { id: "connections", name: "Connections", icon: "plug", view: Connections, needs: false },
     { id: "data", name: "Data", icon: "db", view: Data, needs: true },
+    { id: "updates", name: "Updates", icon: "sparkle", view: Updates, needs: false },
     { id: "about", name: "About", icon: "info", view: About, needs: false },
   ];
   const current = $derived(SECTIONS.find((s) => s.id === app.section) ?? SECTIONS[0]!);

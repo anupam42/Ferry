@@ -3,6 +3,8 @@
   import { app } from "../lib/app.svelte.ts";
   import { look } from "../lib/look.svelte.ts";
   import { git, repoMood } from "../lib/git.svelte.ts";
+  import { notes } from "../lib/notes.svelte.ts";
+  import { releases } from "../lib/releases.svelte.ts";
   import { sync } from "../lib/sync.svelte.ts";
   import type { Mode } from "../lib/types.ts";
   import Icon from "./Icon.svelte";
@@ -99,6 +101,13 @@
     </button>
   {/each}
   <div class="grow"></div>
+  <button class="btn-rail" class:on={!!releases.whatsNew} onclick={() => releases.openWhatsNew()} title="What's new" aria-label={releases.unseen ? "What's new: a new version" : "What's new"} disabled={!releases.info?.releases.length}>
+    <Icon name="sparkle" size={22} /><span class="label">What's new</span>{#if releases.unseen}<span class="new-dot" aria-hidden="true"></span>{/if}
+  </button>
+  <button class="btn-rail" class:on={notes.open} onclick={() => notes.toggle()} title={notes.unread ? `Notifications: ${notes.unread} new` : "Notifications"}
+    aria-label={notes.unread ? `Notifications: ${notes.unread} new` : "Notifications"} aria-expanded={notes.open}>
+    <Icon name="bell" size={22} /><span class="label">Notifications</span>{#if notes.unread}<span class="badge" aria-hidden="true">{notes.unread > 99 ? "99+" : notes.unread}</span>{/if}
+  </button>
   <button class="btn-rail" class:on={app.mode === "settings"} onclick={() => app.go("settings")} title="Settings" aria-label="Settings" aria-current={app.mode === "settings" ? "page" : undefined}>
     <Icon name="gear" size={22} /><span class="label">Settings</span>
   </button>
@@ -139,7 +148,14 @@
     @include motion { transition: transform $duration-fast; }
     &:hover { transform: translateY(-2px); }
     &.on { @include brand-gradient; color: #fff; }
+    &:disabled { opacity: .5; cursor: default; transform: none; }
   }
+  // unread notifications, and a new version not looked at yet
+  .badge { position: absolute; top: 2px; right: 0; min-width: 20px; height: 20px; padding: 0 5px; border-radius: $radius-pill; background: #E5484D; color: #fff;
+    font-size: 11.5px; font-weight: $weight-heavy; display: grid; place-items: center; border: 2px solid var(--rail); }
+  .new-dot { position: absolute; top: 7px; right: 7px; width: 10px; height: 10px; border-radius: 50%; @include brand-gradient; box-shadow: 0 0 0 2px var(--pill);
+    @include motion { animation: breathe 2.4s ease-in-out infinite; } }
+  @keyframes breathe { 0%, 100% { box-shadow: 0 0 0 2px var(--pill), 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 50% { box-shadow: 0 0 0 2px var(--pill), 0 0 0 6px transparent; } }
 
   .grip {
     position: absolute; top: 50%; right: 0; width: 14px; height: 64px; margin-top: -32px; z-index: 6;
@@ -171,6 +187,7 @@
     }
     .home { width: auto; height: 64px; border-radius: $radius-lg + 2; display: flex; align-items: center; gap: space(2) + 2; padding: 0 space(3) 0 space(2); margin-bottom: space(1) + 2; }
     .dot { left: 48px; right: auto; top: 8px; }
+    .badge, .new-dot { position: static; margin-left: auto; }
     .brand { font-size: fs(lg); font-weight: $weight-heavy; text-align: left; small { display: block; font-size: fs(xs); color: var(--muted); font-weight: $weight-semibold; } }
   }
   // across the top

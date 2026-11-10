@@ -2,7 +2,8 @@
 import { api, enc, token } from "./api.ts";
 import type { Info } from "./types.ts";
 
-export interface FerryEvent { kind: string; pair?: string; path?: string; to?: string; message?: string; time?: string; [k: string]: unknown }
+import type { FerryEvent } from "./types.ts";
+export type { FerryEvent } from "./types.ts";
 
 const KINDS = ["info", "add", "update", "delete", "rename", "conflict", "resolved", "skip", "warn", "error", "synced", "paused", "resumed", "git", "commit", "kept"];
 

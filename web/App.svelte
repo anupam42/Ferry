@@ -7,6 +7,11 @@
   import Git from "./git/Git.svelte";
   import Sync from "./sync/Sync.svelte";
   import { app } from "./lib/app.svelte.ts";
+  import { notes } from "./lib/notes.svelte.ts";
+  import { releases } from "./lib/releases.svelte.ts";
+  import NotificationsDrawer from "./notes/NotificationsDrawer.svelte";
+  import ReleaseNotice from "./updates/ReleaseNotice.svelte";
+  import WhatsNew from "./updates/WhatsNew.svelte";
 </script>
 
 <div class="app">
@@ -23,6 +28,9 @@
 </div>
 
 {#if app.connectionsOpen}<ConnectionsDrawer />{/if}
+{#if notes.open}<NotificationsDrawer />{/if}
+{#if releases.notice}{#key releases.notice.kind + releases.notice.version}<ReleaseNotice n={releases.notice} />{/key}{/if}
+{#if releases.whatsNew && releases.info}<WhatsNew />{/if}
 <RelayAsk />
 <Toasts />
 

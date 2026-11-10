@@ -111,3 +111,21 @@ svg.chart {
     &.dot { border-radius: 50%; background: color-mix(in srgb, var(--chart-bar) 45%, transparent); } &.dot.top { background: var(--chart-bar); }
     &.commit { border-radius: 50%; width: 9px; height: 9px; background: var(--text); } }
 }
+
+// ---------- Relay's moves, shared ----------
+@keyframes relay-idle {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  18% { transform: translateY(-2px) rotate(-3deg); }
+  36% { transform: translateY(0) rotate(0); }
+  54% { transform: translateY(-2px) rotate(3deg); }
+  70% { transform: translateY(0) rotate(0); }
+  76% { transform: translateY(-6px) scale(1.04, .96); }
+  80% { transform: translateY(0) scale(.96, 1.04); }
+  84% { transform: translateY(0) scale(1); }
+}
+@keyframes relay-wiggle { from { transform: rotate(-7deg) translateY(-1px); } to { transform: rotate(7deg) translateY(-3px); } }
+@keyframes relay-jump {
+  0% { transform: scale(1); } 15% { transform: scale(1.18, .78) translateY(3px); }
+  45% { transform: scale(.92, 1.1) translateY(-12px) rotate(-6deg); }
+  70% { transform: scale(1.06, .94) translateY(0); } 100% { transform: scale(1); }
+}
