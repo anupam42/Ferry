@@ -6,6 +6,7 @@
 // Everything else on the page (theme, accent, notifications…) lives in the browser.
 import { dataDir } from "./config.ts";
 import { exec } from "./proc.ts";
+import type { GitSettings, SettingsResponse } from "./shared/settings.ts";
 
 const env = () => ({ ...process.env, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" });
 
@@ -24,16 +25,9 @@ async function setGlobal(key: string, value: string | null): Promise<void> {
 
 export class SettingsError extends Error {}
 
-export interface GitSettings {
-  name: string;
-  email: string;
-  default_branch: string;
-  /** "merge" | "rebase" | "" (git's default) */
-  pull: string;
-  sign: boolean;
-}
+export type { GitSettings } from "./shared/settings.ts";
 
-export async function readSettings(configFile: string): Promise<{ git: GitSettings; ai: { configured: boolean }; data_dir: string; config_file: string }> {
+export async function readSettings(configFile: string): Promise<SettingsResponse> {
   const [name, email, branch, rebase, sign] = await Promise.all(["user.name", "user.email", "init.defaultBranch", "pull.rebase", "commit.gpgsign"].map(getGlobal));
   return {
     git: { name: name!, email: email!, default_branch: branch!, pull: rebase === "true" ? "rebase" : rebase === "false" ? "merge" : "", sign: sign === "true" },

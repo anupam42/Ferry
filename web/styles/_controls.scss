@@ -1,0 +1,71 @@
+// Buttons, pills, fields, segmented controls and switches: shared by every screen.
+@use "tokens" as *;
+@use "mixins" as *;
+
+.btn {
+  display: inline-flex; align-items: center; gap: space(2);
+  padding: space(2) + 1 space(4);
+  border: 0; border-radius: $radius-pill;
+  background: var(--pill); color: var(--pill-text);
+  font-weight: $weight-semibold; cursor: pointer; text-decoration: none; white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(9, 35, 72, .06);
+  transition: transform $duration-fast, background $duration-fast;
+  &:hover:not(:disabled) { transform: translateY(-1px); }
+  &:disabled { opacity: .55; cursor: default; }
+  svg { width: 16px; height: 16px; }
+
+  &.brand { @include brand-gradient; color: #fff; }
+  &.primary { background: var(--text); color: var(--card-solid); }
+  &.ghost { background: transparent; box-shadow: none; }
+  &.danger { color: var(--red); }
+  &.small { padding: space(1) + 1 space(3); font-size: fs(sm); }
+}
+
+.pill {
+  display: inline-flex; align-items: center; gap: space(1);
+  padding: 2px space(2) + 2; border-radius: $radius-pill;
+  font-size: fs(sm); font-weight: $weight-bold;
+  background: var(--card2); color: var(--muted);
+  @each $tone in ("green", "red", "amber", "violet") {
+    &.#{$tone} { background: var(--#{$tone}-soft); color: var(--#{$tone}); }
+  }
+  &.blue { background: var(--accent-soft); color: var(--accent); }
+}
+
+input[type=text], input[type=password], input[type=search], input[type=email], select, textarea {
+  width: 100%;
+  border: 1px solid var(--line); border-radius: $radius-md + 2;
+  background: var(--card-solid);
+  padding: space(2) + 2 space(3) + 2;
+}
+.field {
+  display: block; margin-bottom: space(3);
+  .label { display: block; font-weight: $weight-semibold; margin-bottom: space(1) + 2; }
+  small { display: block; color: var(--muted); font-size: fs(sm); margin-top: space(1); }
+}
+
+.seg {
+  display: inline-flex; padding: 3px; border-radius: $radius-pill; background: var(--card2);
+  button {
+    border: 0; background: none; border-radius: $radius-pill; padding: space(1) + 1 space(3) + 2;
+    font-weight: $weight-semibold; color: var(--muted); cursor: pointer;
+    &.on { background: var(--card-solid); color: var(--text); box-shadow: 0 1px 4px rgba(9, 35, 72, .1); }
+  }
+}
+
+.switch {
+  position: relative; display: inline-block; width: 44px; height: 26px; cursor: pointer; flex: none;
+  input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  span {
+    position: absolute; inset: 0; border-radius: $radius-pill; background: color-mix(in srgb, var(--muted) 35%, transparent);
+    transition: background $duration-fast;
+    &::after {
+      content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform $duration-fast;
+    }
+  }
+  input:checked + span { background: var(--accent); &::after { transform: translateX(18px); } }
+  input:focus-visible + span { @include focus-ring; }
+}
+
+.card { @include card(0); }

@@ -1748,7 +1748,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     for (const k of ["info", "add", "update", "delete", "rename", "conflict", "resolved", "skip", "warn", "error", "synced", "paused", "resumed", "git", "commit", "kept"]) es.addEventListener(k, onEv);
     if (S.info && S.info.dev) {
       // the page was saved: styles swap in place, anything else reloads where you were
-      es.addEventListener("dev", (m) => { let d = {}; try { d = JSON.parse(m.data); } catch {} d.kind === "css" ? devSwapStyles() : devReload(); });
+      es.addEventListener("dev", (m) => { let d = {}; try { d = JSON.parse(m.data); } catch {} if (d.app === "next") return; d.kind === "css" ? devSwapStyles() : devReload(); });
       // ferry restarted (its code changed): reload once it answers again
       es.onopen = async () => {
         const info = await api("GET", "/info").catch(() => null);
@@ -2400,7 +2400,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       new: ["See what's new", () => openWhatsNew()],
     }[n.kind];
     const tagLine = { available: "Update", countdown: "", due: "Out now?", soon: "Soon", new: "New" }[n.kind];
-    const mood = { available: "excited", countdown: "excited", due: "surprised", soon: "focused", new: "party" }[n.kind];
+    const mood = { available: "excited", countdown: "excited", due: "surprised", soon: "excited", new: "party" }[n.kind];
 
     const count = n.kind === "countdown" ? h("span", { class: "rn-count", role: "timer", "aria-label": "Time left" }) : null;
     const tagSmall = h("small", {}, tagLine);

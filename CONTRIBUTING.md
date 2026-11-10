@@ -34,6 +34,7 @@ bun install
 bun src/main.ts --help        # run from source
 bun src/main.ts ui            # the web app
 bun run dev                   # the web app with hot reload, for working on it
+bun run build:web             # build the new web app (web/) on its own
 ```
 
 Before you open a pull request, run the same checks as CI:
@@ -58,6 +59,10 @@ The [Development section of the README](README.md#development) maps the source t
 - `src/engine/engine.ts` is the sync loop. Each pair has a serial task queue: timers, the watcher, the dashboard and the HTTP API queue work with `do()` / `schedule()` rather than changing state directly. Keep it that way.
 - `src/config.ts` holds every pair option. A new option goes in the `Pair` type, `defaults()`, the `FIELDS` table (its YAML key), `normalize()` (validation), and usually a flag in `src/cli/runflags.ts`.
 - `src/cli/` contains the commands, `src/tui/` the terminal dashboard, `src/web/index.html` the web app (one self-contained file, no build step), and `src/api.ts` the HTTP API both use. While you work on the web app, `bun run dev` (`ferry ui --dev`) keeps the browser up to date: saving `src/web/index.html` swaps in new styles without a reload, or reloads the page on the same tab and scroll position for any other change, and saving a `.ts` file restarts Ferry on the same port, after which the page reloads by itself.
+- `web/` is the new web app, being moved over from `src/web/index.html` one part at a time (Settings and Folder pairs so far). It's Svelte 5 with TypeScript and SCSS, built by Bun (`scripts/build-web.ts`) into `src/web/next/`, which Ferry serves at `/next` and embeds in the binary; `bun src/main.ts ui` builds it when it's out of date, and `ferry ui --next` opens it.
+  - `web/styles/_tokens.scss` holds the design tokens: the palette, spacing (`space(n)`, 4 px steps), radii, type, motion, and per-theme semantic colours. `_themes.scss` turns them into CSS custom properties and generates the accents, backgrounds and sizes. Components use the custom properties for colour (`var(--accent)`) and the SCSS scales for sizes (`@use "tokens" as *;`).
+  - `web/lib/` has the API client, live updates and shared state (Svelte runes in `*.svelte.ts`), plus plain logic like the change story (`diff.ts`, unit-tested); `web/components/` the shared pieces; one folder per area (`web/settings/`, `web/sync/`).
+  - Types the server sends live in `src/shared/` with no imports of their own, so the server and the web app use the same definitions. `bun run typecheck` checks both.
 - `test/` uses `bun:test`. `setup()` in `test/helpers.ts` gives you a fresh source, target and `FERRY_HOME` for each test.
 
 ## Making a change

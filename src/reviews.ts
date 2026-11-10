@@ -12,56 +12,13 @@ import path from "node:path";
 import { GitClientError } from "./gitclient.ts";
 import * as conn from "./integrations.ts";
 import { exec, which } from "./proc.ts";
+import type { Conversation, Review, ReviewComment, ReviewThread, SnippetLine } from "./shared/git.ts";
+export type { Conversation, Review, ReviewComment, ReviewThread, SnippetLine } from "./shared/git.ts";
 
-export interface ReviewComment {
-  id: string;
-  author: string;
-  body: string; // markdown
-  date: string;
-  mine: boolean;
-}
 
-export interface SnippetLine {
-  op: " " | "+" | "-";
-  no: number | null; // line number in the new file (old file for removed lines)
-  text: string;
-  target: boolean; // the line the comment is on
-}
 
-export interface ReviewThread {
-  id: string;
-  path: string;
-  line: number | null;
-  resolved: boolean;
-  outdated: boolean; // the code it pointed at has changed since
-  canResolve: boolean;
-  snippet: SnippetLine[];
-  comments: ReviewComment[];
-}
 
-export interface Review {
-  author: string;
-  state: string; // APPROVED | CHANGES_REQUESTED | COMMENTED | …
-  body: string;
-  date: string;
-}
 
-export interface Conversation {
-  provider: "GitHub" | "GitLab" | "Azure DevOps";
-  number: number;
-  title: string;
-  url: string;
-  body: string;
-  author: string;
-  state: string;
-  branch: string;
-  base: string;
-  subjectId: string; // what a new general comment attaches to
-  me: string;
-  comments: ReviewComment[]; // the general conversation, oldest first
-  reviews: Review[];
-  threads: ReviewThread[];
-}
 
 const num = (v: unknown) => {
   const n = Number(v);

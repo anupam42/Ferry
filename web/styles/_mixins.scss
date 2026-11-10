@@ -1,0 +1,46 @@
+// Shared patterns for component styles: @use "mixins" as *;
+@use "sass:map";
+@use "tokens" as *;
+
+/// Styles for screens up to a breakpoint from the tokens (phone, tablet, laptop).
+@mixin below($bp) {
+  @media (max-width: map.get($breakpoints, $bp)) { @content; }
+}
+
+/// Animation and movement only when the system allows it (Settings → Motion → Reduce
+/// is handled globally in _base.scss, which switches every animation off).
+@mixin motion {
+  @media (prefers-reduced-motion: no-preference) { @content; }
+}
+
+@mixin focus-ring($offset: 2px) {
+  outline: 2.5px solid var(--accent);
+  outline-offset: $offset;
+}
+
+@mixin card($pad: space(4)) {
+  background: var(--card);
+  border-radius: $radius-xl;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  padding: $pad;
+}
+
+@mixin brand-gradient { background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+
+/// A border in the brand gradient (padding-box/border-box trick); $fill is what's inside.
+@mixin gradient-border($width: 2px, $fill: var(--card-solid)) {
+  border: $width solid transparent;
+  background: linear-gradient($fill, $fill) padding-box, linear-gradient(135deg, var(--accent), var(--accent-2)) border-box;
+}
+
+@mixin ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@mixin hide-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+@mixin visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0;
+}

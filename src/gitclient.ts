@@ -11,6 +11,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { diff as lineDiff, type Line } from "./difftext.ts";
+import type { Insights, PullRequest, Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
+export type { Insights, PullRequest, Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
 import { scanSecretContent, secretNameHit } from "./engine/secrets.ts";
 import { moveToTrash } from "./engine/trash.ts";
 import { exec, which } from "./proc.ts";
@@ -119,32 +121,7 @@ function expandHome(p: string): string {
 
 // ---------- state ----------
 
-export interface FileChange {
-  path: string;
-  from?: string; // rename source
-  x: string; // index status (porcelain X)
-  y: string; // work tree status (porcelain Y)
-  staged: boolean;
-  unstaged: boolean;
-  untracked: boolean;
-  conflicted: boolean;
-}
 
-export interface RepoState {
-  root: string;
-  branch: string; // "" when detached
-  head: string; // short commit id, "" before the first commit
-  detached: boolean;
-  upstream: string;
-  ahead: number;
-  behind: number;
-  operation: "" | "merge" | "rebase" | "cherry-pick" | "revert";
-  operationBranch: string; // what is being merged, when known
-  files: FileChange[];
-  stashes: number;
-  remotes: string[];
-  lastCommit: { subject: string; hash: string; pushed: boolean } | null;
-}
 
 const CONFLICT = new Set(["DD", "AU", "UD", "UA", "DU", "AA", "UU"]);
 
@@ -456,20 +433,6 @@ export async function stashDrop(root: string, ref: unknown): Promise<void> {
 
 // ---------- history ----------
 
-export interface Commit {
-  hash: string;
-  short: string;
-  parents: string[];
-  author: string;
-  email: string;
-  date: string;
-  subject: string;
-  refs: string[];
-  /** the first line of the message body (a merged pull request's title, say) */
-  note?: string;
-  /** true for the commit HEAD points at */
-  head?: boolean;
-}
 
 /**
  * Commits, newest first, in date order: a commit never comes before its
@@ -501,10 +464,6 @@ function parseCommits(out: string): Commit[] {
   });
 }
 
-export interface CommitDetail extends Commit {
-  body: string;
-  files: { path: string; from?: string; status: string; added: number; removed: number }[];
-}
 
 export async function commitDetail(root: string, hash: unknown): Promise<CommitDetail> {
   const h = commitId(hash);
@@ -545,16 +504,6 @@ export async function commitFileDiff(root: string, hash: unknown, file: unknown)
 
 // ---------- branches ----------
 
-export interface Branch {
-  name: string;
-  current: boolean;
-  upstream: string;
-  ahead: number;
-  behind: number;
-  gone: boolean;
-  date: string;
-  subject: string;
-}
 
 export async function branches(root: string): Promise<{ local: Branch[]; remote: { name: string; date: string; subject: string }[] }> {
   const fmt = "%(refname:short)%1f%(HEAD)%1f%(upstream:short)%1f%(upstream:track)%1f%(committerdate:iso-strict)%1f%(contents:subject)";
@@ -645,24 +594,7 @@ export async function pull(root: string, strategy: unknown): Promise<{ clashed: 
   }
 }
 
-export interface IncomingCommit {
-  hash: string;
-  short: string;
-  subject: string;
-  author: string;
-  date: string;
-  files: string[];
-}
 
-export interface RemoteCheck {
-  upstream: string; // "" when the branch doesn't track anything
-  fetched: boolean; // this call talked to the remote
-  error: string; // why the fetch failed (offline, no access…), "" if it worked
-  ahead: number;
-  behind: number;
-  incoming: IncomingCommit[]; // newest first, at most 30
-  overlap: string[]; // files changed both by incoming commits and by you (uncommitted or unpushed)
-}
 
 /**
  * What the remote has that you don't, and whether it touches what you're
@@ -726,24 +658,7 @@ export async function push(root: string, force: boolean): Promise<string> {
 
 // ---------- the safety net: every place HEAD has been, and branches you deleted ----------
 
-export interface ReflogEntry {
-  hash: string;
-  short: string;
-  selector: string; // HEAD@{n}
-  date: string;
-  action: string; // "commit", "rebase (finish)", "reset", "checkout", "merge feature", …
-  detail: string; // the rest of git's note, e.g. "moving from main to feature"
-  subject: string; // the commit's own message
-  current: boolean;
-}
 
-export interface LostBranch {
-  name: string;
-  hash: string;
-  short: string;
-  subject: string;
-  date: string; // when you last left it
-}
 
 /**
  * The reflog of HEAD, newest first: every commit, checkout, reset, rebase,
@@ -812,14 +727,6 @@ export async function branchAt(root: string, name: unknown, hash: unknown): Prom
 
 // ---------- checks before a push ----------
 
-export interface PushIssue {
-  level: "block" | "warn";
-  kind: "secret" | "env-file" | "conflict-marker" | "large-file" | "debug";
-  file: string;
-  line: number; // 0 when it's about the whole file
-  text: string; // what was found, short
-  commit: string; // short id of the commit that added it
-}
 
 const LARGE_WARN = 5 * 1024 * 1024, LARGE_BLOCK = 50 * 1024 * 1024;
 const DEBUG_RES: [RegExp, RegExp, string][] = [
@@ -894,16 +801,6 @@ export async function prePushCheck(root: string): Promise<{ commits: number; iss
 
 // ---------- understanding code: blame, a file's history, searching history ----------
 
-export interface BlameChunk {
-  start: number; // first line, 1-based
-  lines: string[];
-  hash: string;
-  short: string;
-  author: string;
-  date: string;
-  subject: string;
-  uncommitted: boolean;
-}
 
 /** Who last changed each line of a file, grouped into runs of lines from the same commit. */
 export async function blame(root: string, file: unknown): Promise<{ path: string; chunks: BlameChunk[]; truncated: boolean }> {
@@ -936,17 +833,6 @@ export async function blame(root: string, file: unknown): Promise<{ path: string
   return { path: p, chunks, truncated };
 }
 
-export interface FileVersion {
-  hash: string;
-  short: string;
-  author: string;
-  date: string;
-  subject: string;
-  path: string; // the file's name at that commit (it may have been renamed since)
-  status: string; // A, M, D, R…
-  added: number;
-  removed: number;
-}
 
 /** Every commit that changed a file, newest first, following it through renames. */
 export async function fileHistory(root: string, file: unknown, limit = 100): Promise<FileVersion[]> {
@@ -1169,18 +1055,6 @@ export async function removeWorktree(root: string, dir: unknown, force: boolean)
 
 // ---------- pull requests (GitHub through gh, GitLab through glab) ----------
 
-export interface PullRequest {
-  number: number;
-  title: string;
-  branch: string;
-  base: string;
-  author: string;
-  draft: boolean;
-  url: string;
-  updated: string;
-  review: string; // APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | ""
-  checks: { passed: number; failed: number; pending: number; items: { name: string; state: string; url: string }[] };
-}
 
 async function host(root: string): Promise<"github" | "gitlab" | ""> {
   const url = (await git(root, ["remote", "get-url", "origin"]).catch(() => "")).trim();
@@ -1259,13 +1133,6 @@ export async function trackedFiles(root: string): Promise<string[]> {
   return out.split("\0").filter(Boolean);
 }
 
-export interface FolderEntry {
-  name: string;
-  path: string;
-  dir: boolean;
-  size: number | null; // files only, from the working tree
-  commit: { hash: string; short: string; subject: string; author: string; date: string } | null; // last commit that touched it
-}
 
 /** Most entries one folder listing looks up commits for; the rest are listed without. */
 const FOLDER_COMMIT_LIMIT = 200;
@@ -1311,13 +1178,6 @@ export async function folderEntries(root: string, dir: unknown): Promise<{ dir: 
   return { dir: d, entries };
 }
 
-export interface FileContent {
-  path: string;
-  size: number;
-  text: string;
-  binary: boolean;
-  tooBig: boolean;
-}
 
 /** The most file text sent to the browser (1 MB); past that the Files tab says so instead. */
 const MAX_READ_BYTES = 1024 * 1024;
@@ -1363,34 +1223,6 @@ export async function rawImage(root: string, file: unknown): Promise<{ type: str
 
 // ---------- insights: heatmaps of commits and files ----------
 
-export interface Insights {
-  /** the day the year ends on (today, in this computer's time zone), YYYY-MM-DD */
-  today: string;
-  /** commits per author-local day, YYYY-MM-DD → count */
-  days: Record<string, number>;
-  /** a few commits per day, newest first, for "what happened that day" */
-  dayCommits: Record<string, { hash: string; short: string; subject: string; author: string }[]>;
-  /** commits by weekday (0 = Monday) and hour (0–23, in the author's own time zone) */
-  hours: number[][];
-  /** the last 12 months, oldest first, YYYY-MM */
-  months: string[];
-  /** the files changed in the most commits, with commits per month (same order as months) */
-  files: { path: string; commits: number; added: number; removed: number; months: number[] }[];
-  authors: { name: string; email: string; commits: number }[];
-  /** files by how often they change against how big they are now (lines), for the hotspot chart */
-  hotspots: { path: string; commits: number; lines: number; authors: number }[];
-  /** pairs of files that keep landing in the same commits */
-  together: { a: string; b: string; count: number; share: number }[];
-  me: string;
-  total: number;
-  added: number;
-  removed: number;
-  activeDays: number;
-  streak: number;
-  longestStreak: number;
-  /** true when the year had more commits than were read */
-  partial: boolean;
-}
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const MAX_INSIGHT_COMMITS = 20_000;

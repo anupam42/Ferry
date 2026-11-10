@@ -1,0 +1,109 @@
+// Design tokens. Two layers:
+//
+//   1. primitives: the raw palette, spacing, radii, type and motion scales
+//   2. semantic: what things are for (surface, text, accent, success…), per theme
+//
+// Components use the semantic layer as CSS custom properties (var(--card)) so
+// they follow the theme, and the scales as SCSS (space(3), $radius-lg) so sizes
+// stay consistent. _themes.scss turns the maps below into the custom properties.
+// Keys that are also CSS colour names ("red", "lavender") are quoted, so Sass
+// reads them as names, not colours.
+@use "sass:map";
+@use "sass:math";
+
+// ---------- 1. primitives ----------
+
+// brand: navy #092348, blue #2586E6, mint #66E4C0
+$palette: (
+  navy-900: #061127, navy-800: #071430, navy-700: #0B2147, navy-600: #13213F, navy-500: #1B2B4F,
+  blue-500: #2586E6, blue-400: #4C9DF5, teal-500: #3CCBB0, teal-400: #4FD8BD, mint-400: #66E4C0,
+  slate-600: #5E6C86, slate-400: #94A0B6, slate-300: #A2AECA, slate-500: #6E7A96,
+  green-700: #12805A, green-400: #4ADE9B, red-600: #C8343F, red-400: #FF7B86,
+  amber-700: #A3620A, amber-400: #F7BE55, violet-600: #6D4BD8, violet-300: #B79CFF,
+  white: #FFFFFF, ink-50: #E8EEF9,
+);
+@function color($name) {
+  @if not map.has-key($palette, $name) { @error "unknown colour token: #{$name}"; }
+  @return map.get($palette, $name);
+}
+
+// a 4 px spacing scale: space(1) = 4px … space(8) = 32px
+$space-unit: 4px;
+@function space($n) { @return $n * $space-unit; }
+
+$radius-sm: 8px;
+$radius-md: 12px;
+$radius-lg: 18px;
+$radius-xl: 24px;
+$radius-pill: 999px;
+
+$font-sans: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+$font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+$font-size: (xs: 11.5px, sm: 12.5px, md: 14.5px, lg: 17px, xl: 22px, xxl: 30px);
+@function fs($k) { @return map.get($font-size, $k); }
+$weight-medium: 500;
+$weight-semibold: 600;
+$weight-bold: 700;
+$weight-heavy: 800;
+
+$duration-fast: 120ms;
+$duration-base: 200ms;
+$duration-slow: 280ms;
+$ease-out: cubic-bezier(.3, 1, .4, 1);
+
+$z: (rail: 5, sticky: 10, drawer: 40, ask: 60, toast: 80);
+@function z($k) { @return map.get($z, $k); }
+
+$breakpoints: (phone: 700px, tablet: 1000px, laptop: 1100px);
+
+// ---------- 2. semantic, per theme ----------
+
+$theme-light: (
+  bg: linear-gradient(135deg, #DDF6EE 0%, #E4EEFF 48%, #ECE6FF 100%),
+  rail: rgba(255, 255, 255, .62), card: rgba(255, 255, 255, .78), card-solid: color(white), card2: rgba(240, 245, 252, .9),
+  line: rgba(9, 35, 72, .09), text: color(navy-700), muted: color(slate-600), faint: color(slate-400),
+  accent: color(blue-500), accent-2: color(teal-500), accent-text: color(white), accent-soft: rgba(37, 134, 230, .12),
+  pill: color(white), pill-text: color(navy-700),
+  "green": color(green-700), green-soft: #DDF7EC, "red": color(red-600), red-soft: #FDE7E9, amber: color(amber-700), amber-soft: #FFF1D6,
+  "violet": color(violet-600), violet-soft: #ECE6FF,
+  ins: #CFF5E3, ins-text: #0B5D3E, del: #FFD9DD, del-text: #8E1D29,
+  // charts: one blue ramp, light to dark, for heatmaps; bars use its middle step
+  heat-0: rgba(9, 35, 72, .07), heat-1: #B7D3F6, heat-2: #6DA7EC, heat-3: #2A78D6, heat-4: #184F95, chart-bar: #2A78D6,
+  shadow: (0 10px 30px rgba(9, 35, 72, .08), 0 2px 6px rgba(9, 35, 72, .05)),
+  overlay: rgba(9, 35, 72, .28),
+);
+$theme-dark: (
+  bg: linear-gradient(135deg, #071430 0%, #0D1E40 50%, #1A1844 100%),
+  rail: rgba(14, 25, 50, .7), card: rgba(17, 29, 56, .82), card-solid: color(navy-600), card2: rgba(26, 40, 72, .9),
+  line: rgba(226, 236, 255, .09), text: color(ink-50), muted: color(slate-300), faint: color(slate-500),
+  accent: color(blue-400), accent-2: color(teal-400), accent-text: color(navy-900), accent-soft: rgba(76, 157, 245, .16),
+  pill: color(navy-500), pill-text: color(ink-50),
+  "green": color(green-400), green-soft: rgba(74, 222, 155, .13), "red": color(red-400), red-soft: rgba(255, 123, 134, .13),
+  amber: color(amber-400), amber-soft: rgba(247, 190, 85, .13), "violet": color(violet-300), violet-soft: rgba(183, 156, 255, .14),
+  ins: rgba(74, 222, 155, .2), ins-text: #8FF0C3, del: rgba(255, 123, 134, .2), del-text: #FFB3BA,
+  heat-0: rgba(255, 255, 255, .07), heat-1: #184F95, heat-2: #2A78D6, heat-3: #5598E7, heat-4: #9EC5F4, chart-bar: #5598E7,
+  shadow: 0 12px 34px rgba(0, 0, 0, .35),
+  overlay: rgba(2, 8, 22, .55),
+);
+
+// accent pairs (Settings → Appearance): light and dark versions of each
+$accents: (
+  ocean: (light: (#0E7CC2, #2BB3D9), dark: (#3FA9F5, #5FD3F0)),
+  forest: (light: (#1E8C5A, #6DB85C), dark: (#3CCB7F, #9BE07E)),
+  sunset: (light: (#D9531F, #EFA233), dark: (#FF7A45, #FFC15C)),
+  grape: (light: (#7C4DDB, #C94FBE), dark: (#A47CFF, #F07FE3)),
+  graphite: (light: (#3D4A63, #7A8AA8), dark: (#9AA8C7, #C9D3E8)),
+);
+
+// backgrounds (Settings → Appearance): light and dark versions of each
+$backgrounds: (
+  relay: (light: map.get($theme-light, bg), dark: map.get($theme-dark, bg)),
+  plain: (light: #F3F5FA, dark: #0B1328),
+  sky: (light: linear-gradient(160deg, #DCEBFF 0%, #EEF5FF 55%, #F7FAFF 100%), dark: linear-gradient(160deg, #061A36 0%, #0A2546 55%, #0C2C52 100%)),
+  mint: (light: linear-gradient(160deg, #D9F5EA 0%, #EAF9F3 55%, #F5FCF9 100%), dark: linear-gradient(160deg, #04201B 0%, #082B26 55%, #0B332E 100%)),
+  "lavender": (light: linear-gradient(160deg, #E9E2FF 0%, #F2EEFF 55%, #F9F7FF 100%), dark: linear-gradient(160deg, #130E31 0%, #1C1542 55%, #221A4E 100%)),
+  sand: (light: linear-gradient(160deg, #F8EBDA 0%, #FCF4EA 55%, #FFFAF4 100%), dark: linear-gradient(160deg, #1C140C 0%, #261B11 55%, #2D2115 100%)),
+);
+
+// interface sizes (Settings → Appearance), applied as zoom
+$sizes: (small: .9, large: 1.1);

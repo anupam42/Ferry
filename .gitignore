@@ -7,3 +7,6 @@ node_modules/
 
 # rendered videos and GIFs for social posts (regenerate rather than commit)
 exports/
+
+# the new web app's build output (bun run build:web makes it)
+/src/web/next/

@@ -6,26 +6,8 @@ import { cmp, parseTime } from "../util.ts";
 import { backupDir, backupFile, copyFile, fromSlash, removeEmptyParents, removeWithRetry, replaceFile, stat } from "./fsops.ts";
 
 /** One file operation in a sync batch. */
-export interface JournalEntry {
-  op: string; // add | update | delete | rename
-  side: string; // the side that was written: source | target
-  path: string;
-  to?: string; // rename destination
-  backup?: string; // copy of the version that was replaced or deleted
-}
-
-/** One apply pass. */
-export interface Batch {
-  id: string;
-  time: string; // RFC 3339
-  pair: string;
-  pair_id: string;
-  source: string;
-  target: string;
-  remote?: string;
-  entries: JournalEntry[];
-  undone?: boolean;
-}
+export type { Batch, JournalEntry } from "../shared/pairs.ts";
+import type { Batch } from "../shared/pairs.ts";
 
 export function batchTime(b: Batch): number {
   return parseTime(b.time);
@@ -210,23 +192,8 @@ export function restoreTo(
 }
 
 /** What happened in a pair's history, for "ferry stats". */
-export interface Stats {
-  pair: string;
-  batches: number;
-  undone: number;
-  added: number;
-  updated: number;
-  deleted: number;
-  renamed: number;
-  toTarget: number; // files written in the target
-  toSource: number; // files written in the source (two-way)
-  first: string; // RFC 3339, "" if no batches
-  last: string;
-  busiestDay: string; // YYYY-MM-DD
-  busiestDayFiles: number;
-  topFiles: { path: string; changes: number }[];
-  perDay: { day: string; files: number }[]; // oldest first
-}
+export type { Stats } from "../shared/pairs.ts";
+import type { Stats } from "../shared/pairs.ts";
 
 /** Totals over the batches recorded since `since` (ms; 0 = all history). */
 export function stats(pair: string, batches: Batch[], since: number, topN = 10): Stats {

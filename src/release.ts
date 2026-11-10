@@ -9,20 +9,8 @@ import changelogText from "../CHANGELOG.md" with { type: "text" };
 import { dataDir } from "./config.ts";
 import { exec, which } from "./proc.ts";
 
-export interface ChangeItem {
-  title: string;
-  text: string; // markdown, may be ""
-  try: string; // a place in the app ("git-undo"…), or ""
-}
-
-export interface Release {
-  version: string;
-  date: string; // YYYY-MM-DD, or "" (unreleased or not known)
-  unreleased: boolean;
-  planned: string; // "YYYY-MM-DDTHH:MM" (the reader's local time) when a release is scheduled, else ""
-  summary: string;
-  groups: { kind: "new" | "improved" | "fixed" | "breaking" | "other"; items: ChangeItem[] }[];
-}
+import type { ChangeItem, Health, InstallMethod, Release } from "./shared/release.ts";
+export type { ChangeItem, Health, Release } from "./shared/release.ts";
 
 const KINDS: Record<string, Release["groups"][number]["kind"]> = { new: "new", added: "new", improved: "improved", changed: "improved", fixed: "fixed", breaking: "breaking", removed: "breaking" };
 
@@ -73,7 +61,7 @@ export function parseChangelog(md: string): Release[] {
 }
 
 /** How this copy of Ferry was installed, which decides how to update it. */
-export function installMethod(): { method: "source" | "scoop" | "winget" | "homebrew" | "binary"; update: string; where: string } {
+export function installMethod(): { method: InstallMethod; update: string; where: string } {
   const main = Bun.main;
   const compiled = main.startsWith("/$bunfs/") || /^[A-Za-z]:[\\/]~BUN[\\/]/.test(main) || main.includes("$bunfs");
   const exe = (() => { try { return fs.realpathSync(process.execPath); } catch { return process.execPath; } })();
@@ -84,8 +72,6 @@ export function installMethod(): { method: "source" | "scoop" | "winget" | "home
   if (p.includes("/cellar/") || p.includes("/homebrew/") || p.includes("/linuxbrew/")) return { method: "homebrew", update: "brew upgrade ferry", where: exe };
   return { method: "binary", update: "", where: exe };
 }
-
-export interface Health { name: string; ok: boolean; detail: string; needed: boolean }
 
 /** The tools Ferry relies on, and whether its data folder can be written. Never fails. */
 export async function health(): Promise<Health[]> {

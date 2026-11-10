@@ -11,6 +11,8 @@ import path from "node:path";
 
 import { dataDir } from "./config.ts";
 import type { PullRequest } from "./gitclient.ts";
+import type { Issue } from "./shared/git.ts";
+export type { Issue } from "./shared/git.ts";
 
 export class IntegrationError extends Error {
   constructor(message: string, public code = "") {
@@ -300,16 +302,6 @@ export async function azurePullRequests(r: Extract<Remote, { kind: "azure" }>): 
 
 // ---------- Jira ----------
 
-export interface Issue {
-  key: string;
-  summary: string;
-  status: string;
-  category: string; // "new" | "indeterminate" | "done"
-  type: string;
-  priority: string;
-  updated: string;
-  url: string;
-}
 
 /** Issues assigned to you that aren't done, newest first. */
 export async function jiraMyIssues(): Promise<{ site: string; issues: Issue[] }> {

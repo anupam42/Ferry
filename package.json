@@ -12,8 +12,9 @@
     "start": "bun src/main.ts",
     "dev": "bun src/main.ts ui --dev",
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "build": "bun build src/main.ts --compile --minify --sourcemap --outfile dist/ferry"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "build": "bun scripts/build-web.ts && bun build src/main.ts --compile --minify --sourcemap --outfile dist/ferry",
+    "build:web": "bun scripts/build-web.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
@@ -21,6 +22,8 @@
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",
+    "sass": "^1.108.1",
+    "svelte": "^5.57.3",
     "typescript": "^7.0.2"
   }
 }
