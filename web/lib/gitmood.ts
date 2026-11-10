@@ -35,3 +35,30 @@ export const whoPushed = (commits: { author: string }[]) => {
 };
 export const fileList = (files: string[], max = 3) => files.slice(0, max).map((p) => p.split("/").pop()).join(", ") + (files.length > max ? ` and ${files.length - max} more` : "");
 
+
+/** What a reflog entry means, in words: [icon, words, tone]. */
+export function reflogWords(e: { action: string; detail: string }): [string, string, "green" | "violet" | "blue" | "amber" | "muted"] {
+  const a = e.action, d = e.detail;
+  if (/^commit \(initial\)/.test(a)) return ["commit", "First commit", "green"];
+  if (/^commit \(amend\)/.test(a)) return ["commit", "Amended the last commit", "violet"];
+  if (/^commit \(merge\)/.test(a) || /^merge /.test(a)) return ["branch", a.startsWith("merge ") ? `Merged ${a.slice(6)}` : "Finished a merge", "violet"];
+  if (/^commit/.test(a)) return ["commit", "Committed", "blue"];
+  if (a === "checkout") { const m = /^moving from (\S+) to (\S+)/.exec(d); return ["branch", m ? `Switched from ${m[1]} to ${m[2]}` : "Switched branch", "muted"]; }
+  if (/^reset/.test(a)) return ["undo", "Moved the branch (reset)", "amber"];
+  if (/^rebase.*\(finish\)/.test(a)) return ["sync", "Finished a rebase", "violet"];
+  if (/^rebase/.test(a)) return ["sync", "Rebase step", "muted"];
+  if (/^pull/.test(a)) return ["down", /rebase/.test(a) ? "Pulled (rebased your commits)" : "Pulled", "blue"];
+  if (/^cherry-pick/.test(a)) return ["commit", "Cherry-picked a commit", "violet"];
+  if (/^revert/.test(a)) return ["undo", "Reverted a commit", "amber"];
+  if (/^branch/.test(a)) return ["branch", "Created a branch", "muted"];
+  return ["clock", a || "Moved", "muted"];
+}
+
+/** "Today", "Yesterday", or the day's name, for grouping a timeline. */
+export function dayLabel(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "Earlier";
+  if (d.toDateString() === now.toDateString()) return "Today";
+  if (d.toDateString() === new Date(now.getTime() - 86400e3).toDateString()) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" });
+}

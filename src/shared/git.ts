@@ -112,3 +112,68 @@ export interface Stash { ref: string; message: string; when: string; branch: str
 export interface Tag { name: string; commit: string; date: string; message: string }
 /** GET /git/{id}/worktrees */
 export interface Worktree { path: string; branch: string; head: string; main: boolean; locked: boolean; detached: boolean }
+
+export interface ReflogEntry {
+  hash: string;
+  short: string;
+  selector: string; // HEAD@{n}
+  date: string;
+  action: string; // "commit", "rebase (finish)", "reset", "checkout", "merge feature", …
+  detail: string; // the rest of git's note, e.g. "moving from main to feature"
+  subject: string; // the commit's own message
+  current: boolean;
+}
+
+export interface LostBranch {
+  name: string;
+  hash: string;
+  short: string;
+  subject: string;
+  date: string; // when you last left it
+}
+
+export interface BlameChunk {
+  start: number; // first line, 1-based
+  lines: string[];
+  hash: string;
+  short: string;
+  author: string;
+  date: string;
+  subject: string;
+  uncommitted: boolean;
+}
+
+export interface FileVersion {
+  hash: string;
+  short: string;
+  author: string;
+  date: string;
+  subject: string;
+  path: string; // the file's name at that commit (it may have been renamed since)
+  status: string; // A, M, D, R…
+  added: number;
+  removed: number;
+}
+
+export interface FolderEntry {
+  name: string;
+  path: string;
+  dir: boolean;
+  size: number | null; // files only, from the working tree
+  commit: { hash: string; short: string; subject: string; author: string; date: string } | null; // last commit that touched it
+}
+
+export interface FileContent {
+  path: string;
+  size: number;
+  text: string;
+  binary: boolean;
+  tooBig: boolean;
+}
+
+/** GET /git/{id}/folder */
+export interface FolderListing { dir: string; entries: FolderEntry[] }
+/** GET /git/{id}/blame */
+export interface Blame { path: string; chunks: BlameChunk[]; truncated: boolean }
+/** GET /git/{id}/undo-timeline */
+export interface UndoTimeline { entries: ReflogEntry[]; lost: LostBranch[]; branch: string }

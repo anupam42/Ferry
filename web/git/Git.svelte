@@ -6,6 +6,7 @@
   import AddRepo from "./AddRepo.svelte";
   import CommitDrawer from "./CommitDrawer.svelte";
   import ConflictDrawer from "./ConflictDrawer.svelte";
+  import FileDrawer from "./FileDrawer.svelte";
   import RepoList from "./RepoList.svelte";
   import RepoView from "./RepoView.svelte";
   import ReviewDrawer from "./ReviewDrawer.svelte";
@@ -35,6 +36,7 @@
 {#if git.adding}<AddRepo />{/if}
 {#if git.review}<ReviewDrawer />{/if}
 {#if git.conflict}<ConflictDrawer />{/if}
+{#if git.file}<FileDrawer />{/if}
 {#if git.commit}<CommitDrawer />{/if}
 
 <style lang="scss">

@@ -11,8 +11,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { diff as lineDiff, type Line } from "./difftext.ts";
-import type { Branch, Commit, CommitDetail, FileChange, IncomingCommit, PushIssue, RemoteCheck, RepoState } from "./shared/git.ts";
-export type { Branch, Commit, CommitDetail, FileChange, IncomingCommit, PushIssue, RemoteCheck, RepoState } from "./shared/git.ts";
+import type { Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
+export type { Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
 import { scanSecretContent, secretNameHit } from "./engine/secrets.ts";
 import { moveToTrash } from "./engine/trash.ts";
 import { exec, which } from "./proc.ts";
@@ -658,24 +658,7 @@ export async function push(root: string, force: boolean): Promise<string> {
 
 // ---------- the safety net: every place HEAD has been, and branches you deleted ----------
 
-export interface ReflogEntry {
-  hash: string;
-  short: string;
-  selector: string; // HEAD@{n}
-  date: string;
-  action: string; // "commit", "rebase (finish)", "reset", "checkout", "merge feature", …
-  detail: string; // the rest of git's note, e.g. "moving from main to feature"
-  subject: string; // the commit's own message
-  current: boolean;
-}
 
-export interface LostBranch {
-  name: string;
-  hash: string;
-  short: string;
-  subject: string;
-  date: string; // when you last left it
-}
 
 /**
  * The reflog of HEAD, newest first: every commit, checkout, reset, rebase,
@@ -818,16 +801,6 @@ export async function prePushCheck(root: string): Promise<{ commits: number; iss
 
 // ---------- understanding code: blame, a file's history, searching history ----------
 
-export interface BlameChunk {
-  start: number; // first line, 1-based
-  lines: string[];
-  hash: string;
-  short: string;
-  author: string;
-  date: string;
-  subject: string;
-  uncommitted: boolean;
-}
 
 /** Who last changed each line of a file, grouped into runs of lines from the same commit. */
 export async function blame(root: string, file: unknown): Promise<{ path: string; chunks: BlameChunk[]; truncated: boolean }> {
@@ -860,17 +833,6 @@ export async function blame(root: string, file: unknown): Promise<{ path: string
   return { path: p, chunks, truncated };
 }
 
-export interface FileVersion {
-  hash: string;
-  short: string;
-  author: string;
-  date: string;
-  subject: string;
-  path: string; // the file's name at that commit (it may have been renamed since)
-  status: string; // A, M, D, R…
-  added: number;
-  removed: number;
-}
 
 /** Every commit that changed a file, newest first, following it through renames. */
 export async function fileHistory(root: string, file: unknown, limit = 100): Promise<FileVersion[]> {
@@ -1183,13 +1145,6 @@ export async function trackedFiles(root: string): Promise<string[]> {
   return out.split("\0").filter(Boolean);
 }
 
-export interface FolderEntry {
-  name: string;
-  path: string;
-  dir: boolean;
-  size: number | null; // files only, from the working tree
-  commit: { hash: string; short: string; subject: string; author: string; date: string } | null; // last commit that touched it
-}
 
 /** Most entries one folder listing looks up commits for; the rest are listed without. */
 const FOLDER_COMMIT_LIMIT = 200;
@@ -1235,13 +1190,6 @@ export async function folderEntries(root: string, dir: unknown): Promise<{ dir: 
   return { dir: d, entries };
 }
 
-export interface FileContent {
-  path: string;
-  size: number;
-  text: string;
-  binary: boolean;
-  tooBig: boolean;
-}
 
 /** The most file text sent to the browser (1 MB); past that the Files tab says so instead. */
 const MAX_READ_BYTES = 1024 * 1024;

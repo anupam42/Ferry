@@ -11,9 +11,11 @@
   import type { RepoEntry } from "../lib/types.ts";
   import BranchesView from "./BranchesView.svelte";
   import ChangesView from "./ChangesView.svelte";
+  import FilesView from "./FilesView.svelte";
   import HistoryView from "./HistoryView.svelte";
   import StashesView from "./StashesView.svelte";
   import TagsView from "./TagsView.svelte";
+  import UndoView from "./UndoView.svelte";
   import WorktreesView from "./WorktreesView.svelte";
   import Elsewhere from "./Elsewhere.svelte";
   import OperationCard from "./OperationCard.svelte";
@@ -80,6 +82,8 @@
       {#if !st}
         {#if git.error}<div class="card empty-row">{git.error}</div>
         {:else}<RelayLoading say="Opening the repository" sub="Looking at branches and changes." />{/if}
+      {:else if git.view === "files"}
+        <FilesView {st} />
       {:else if git.view === "changes"}
         <ChangesView {st} />
       {:else if git.view === "history"}
@@ -92,6 +96,8 @@
         <TagsView {st} />
       {:else if git.view === "worktrees"}
         <WorktreesView {st} />
+      {:else if git.view === "undo"}
+        <UndoView {st} />
       {:else}
         <Elsewhere name={viewName} />
       {/if}

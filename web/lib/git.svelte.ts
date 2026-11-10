@@ -28,6 +28,10 @@ class Git {
   conflict = $state<string | null>(null);
   /** the commit open in the commit drawer */
   commit = $state<string | null>(null);
+  /** the file open in the file drawer */
+  file = $state<string | null>(null);
+  /** the folder the Files view shows, per repository */
+  folder = $state<Record<string, string>>({});
 
   current = $derived(this.repos.find((r) => r.id === this.selected) ?? null);
   url = (action: string) => `/git/${this.selected}/${action}`;
