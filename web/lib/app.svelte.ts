@@ -80,12 +80,27 @@ export interface AskOptions {
   primary?: "yes" | "no";
   /** the risky "yes" has to be pressed and held for a second */
   hold?: boolean;
+  /** things found (the push check), listed under the text */
+  items?: { label: string; where: string; text: string; level: "block" | "warn" }[];
+  /** more items than listed */
+  more?: number;
 }
-export const asking = $state<{ current: (AskOptions & { resolve: (v: boolean) => void }) | null }>({ current: null });
+export interface AskField { name: string; label: string; value?: string | boolean; placeholder?: string; hint?: string; type?: "text" | "check" }
+
+type Pending = AskOptions & { fields?: AskField[]; resolve: (v: boolean, values?: Record<string, string | boolean>) => void };
+export const asking = $state<{ current: Pending | null }>({ current: null });
 
 export function ask(o: AskOptions): Promise<boolean> {
   asking.current?.resolve(false);
   return new Promise((resolve) => {
     asking.current = { ...o, resolve: (v) => { asking.current = null; resolve(v); } };
+  });
+}
+
+/** Relay asks with a few fields to fill in; resolves to their values, or null for "no". */
+export function askFields(o: AskOptions & { fields: AskField[] }): Promise<Record<string, string | boolean> | null> {
+  asking.current?.resolve(false);
+  return new Promise((resolve) => {
+    asking.current = { ...o, resolve: (v, values) => { asking.current = null; resolve(v ? values ?? {} : null); } };
   });
 }

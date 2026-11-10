@@ -1,5 +1,16 @@
 <script lang="ts" module>
   export interface DockItem { id: string; name: string; icon: string; count?: number; alert?: boolean }
+  /** A button in the dock's second group (Fetch, Pull, Push): it acts rather than switches the view. */
+  export interface DockAction {
+    id: string; name: string; icon: string; tip?: string; count?: number;
+    /** draws the eye: something to pull or push */
+    hot?: boolean;
+    /** "incoming" (amber, to pull), "outgoing" (blue, to push) */
+    tone?: "" | "incoming" | "outgoing";
+    state?: "" | "working" | "done";
+    disabled?: boolean;
+    onclick: () => void;
+  }
   // expanded or collapsed is one setting for every dock, remembered (shared with the current page)
   const dockState = $state({ wide: localStorage.getItem("ferry-dock") === "wide" });
   function setWide(on: boolean) {
@@ -16,7 +27,9 @@
    * (or a bar across the top, Settings → Appearance → Toolbar). The highlight
    * slides to the current view; "[" expands or collapses it.
    */
-  let { label, items, current, onpick }: { label: string; items: DockItem[]; current: string; onpick: (id: string) => void } = $props();
+  let { label, items, current, onpick, actions = [], actionsLabel = "Remote" }: {
+    label: string; items: DockItem[]; current: string; onpick: (id: string) => void; actions?: DockAction[]; actionsLabel?: string;
+  } = $props();
 
   let group: HTMLElement;
   let glow = $state({ y: 0, x: 0, w: 0, h: 0, on: false });
@@ -60,6 +73,20 @@
       </button>
     {/each}
   </div>
+  {#if actions.length}
+    <span class="sep" aria-hidden="true"></span>
+    <span class="head" aria-hidden="true">{actionsLabel}</span>
+    <div class="group" role="group" aria-label={actionsLabel}>
+      {#each actions as a (a.id)}
+        <button type="button" class="btn-dock act {a.tone ?? ''} {a.state ?? ''}" class:hot={a.hot} disabled={a.disabled}
+          aria-label={a.name + (a.count ? ` (${a.count})` : "")} aria-busy={a.state === "working"} onclick={a.onclick}>
+          <Icon name={a.state === "done" ? "check" : a.icon} size={20} /><span class="label" aria-hidden="true">{a.name}</span>
+          {#if a.count}<span class="n" aria-hidden="true">{a.count > 99 ? "99+" : a.count}</span>{/if}
+          <span class="tip" aria-hidden="true">{a.tip || a.name}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
 </nav>
 
 <style lang="scss">
@@ -86,6 +113,17 @@
     :global(svg) { flex: none; }
     &:hover .tip, &:focus-visible .tip { opacity: 1; transform: translate(0, -50%); }
   }
+  .sep { width: 22px; height: 1px; background: var(--line); margin: space(1) 0; flex: none; }
+  .act {
+    &.hot { color: var(--accent); }
+    &.incoming { color: var(--amber); .n { background: var(--amber); } }
+    &.outgoing { color: var(--accent); }
+    &.working { color: var(--accent); background: var(--accent-soft); cursor: progress; opacity: 1;
+      :global(svg) { @include motion { animation: breathe 1s ease-in-out infinite; } } }
+    &.done { color: var(--green); background: var(--green-soft); }
+    &:disabled:not(.working) { opacity: .45; cursor: progress; }
+  }
+  @keyframes breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
   .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; font-weight: $weight-semibold; opacity: 0; max-width: 0; min-width: 0; }
   .n {
     position: absolute; top: 3px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: $radius-pill;
@@ -113,6 +151,7 @@
     .on .n { background: rgba(255, 255, 255, .25); color: #fff; }
     .tip { display: none; }
     .head { height: 22px; opacity: 1; padding-top: space(1) + 2; }
+    .sep { width: auto; align-self: stretch; margin: space(1) + 2 space(2) 2px; }
     .toggle :global(svg) { transform: rotate(-90deg); }
   }
   // Settings → Appearance → Toolbar: horizontal, a bar across the top
@@ -120,6 +159,7 @@
     .dock { flex-direction: row; flex-wrap: wrap; align-items: center; width: 100%; padding: space(1) + 2 space(2); border-radius: $radius-xl - 2; }
     .group { flex-direction: row; }
     .head, .toggle { display: none; }
+    .sep { width: 1px; height: 24px; margin: 0 space(1) + 2 0 auto; align-self: center; }
     .wide .btn-dock { width: auto; padding: 0 space(3) + 2 0 space(3); }
     .tip { right: auto; left: 50%; top: calc(100% + 10px); transform: translate(-50%, -4px); }
     .btn-dock:hover .tip { transform: translate(-50%, 0); }
@@ -129,6 +169,7 @@
     .dock { position: fixed; top: auto; bottom: space(2) + 2; left: space(2) + 2; right: space(2) + 2; flex-direction: row; overflow-x: auto; @include hide-scrollbar; }
     .group { flex-direction: row; }
     .glow, .tip, .head { display: none; }
+    .sep { width: 1px; height: 22px; margin: 0 space(1); align-self: center; }
     .btn-dock.on { @include brand-gradient; }
   }
 </style>

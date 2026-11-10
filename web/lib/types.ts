@@ -29,3 +29,4 @@ export interface Release {
 }
 
 export type Mode = "sync" | "git" | "settings";
+export type { FileChange, IncomingCommit, PushIssue, RemoteCheckResponse, RepoEntry, RepoStateResponse } from "../../src/shared/git.ts";

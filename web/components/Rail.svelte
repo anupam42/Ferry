@@ -2,6 +2,7 @@
   import { face } from "../lib/api.ts";
   import { app } from "../lib/app.svelte.ts";
   import { look } from "../lib/look.svelte.ts";
+  import { git, repoMood } from "../lib/git.svelte.ts";
   import { sync } from "../lib/sync.svelte.ts";
   import type { Mode } from "../lib/types.ts";
   import Icon from "./Icon.svelte";
@@ -19,6 +20,7 @@
   // Relay on the rail shows how the folder pair you're looking at is doing
   const railFace = $derived.by(() => {
     if (!app.online) return "sad";
+    if (app.mode === "git") return git.state ? repoMood(git.state).face : "happy";
     const p = app.mode === "sync" ? sync.current : null;
     if (!p) return "happy";
     const m = sync.moodOf(p);

@@ -15,12 +15,21 @@
   let holding = $state(false);
   const mood = $derived(last ? last.mood : !q ? "thinking" : holding ? "worried" : hover === "yes" ? q.yesMood || "sad" : hover === "no" ? q.noMood || "happy" : q.mood || "thinking");
 
+  // the fields' values, filled from their defaults each time a new question opens
+  let values = $state<Record<string, string | boolean>>({});
+  let seen: unknown = null;
+  $effect(() => {
+    if (q && q !== seen) { seen = q; values = Object.fromEntries((q.fields ?? []).map((f) => [f.name, f.value ?? (f.type === "check" ? false : "")])); }
+  });
+  const trimmed = () => Object.fromEntries(Object.entries(values).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]));
+
   let started = 0, frame = 0;
   function finish(v: boolean, after?: { mood: string; say: string; text?: string }) {
     const cur = q;
     if (!cur) return;
-    if (after) { last = after; setTimeout(() => { last = null; progress = 0; cur.resolve(v); }, 950); }
-    else { progress = 0; cur.resolve(v); }
+    const out = v && cur.fields ? trimmed() : undefined;
+    if (after) { last = after; setTimeout(() => { last = null; progress = 0; cur.resolve(v, out); }, 950); }
+    else { progress = 0; cur.resolve(v, out); }
   }
   function tick() {
     progress = Math.min(1, (performance.now() - started) / 1100);
@@ -56,6 +65,28 @@
       <img class="face" src={face(mood)} alt="Relay" />
       <h3>{last ? last.say : holding ? "Are you sure? Keep holding…" : q.title}</h3>
       {#if last ? last.text : q.text}<p>{last ? last.text : q.text}</p>{/if}
+      {#if !last && q.items?.length}
+        <div class="items">
+          {#each q.items as it, i (i)}
+            <div class="item {it.level}"><span class="kind">{it.label}</span><span class="where mono"><bdi>{it.where}</bdi></span><span class="what">{it.text}</span></div>
+          {/each}
+          {#if q.more}<div class="more">and {q.more} more</div>{/if}
+        </div>
+      {/if}
+      {#if !last && q.fields?.length}
+        <div class="fields">
+          {#each q.fields as f (f.name)}
+            {#if f.type === "check"}
+              <label class="check"><input type="checkbox" bind:checked={values[f.name] as boolean} /><span>{f.label}</span></label>
+            {:else}
+              <label class="field"><span class="label">{f.label}</span>
+                <input type="text" placeholder={f.placeholder ?? ""} bind:value={values[f.name] as string}
+                  onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (!q.hold) finish(true); } }} />
+                {#if f.hint}<small>{f.hint}</small>{/if}</label>
+            {/if}
+          {/each}
+        </div>
+      {/if}
       <div class="row">
         <!-- svelte-ignore a11y_autofocus -->
         <button class="btn" class:brand={!yesFirst} class:ghost={yesFirst} autofocus={!yesFirst} disabled={!!last}
@@ -92,5 +123,16 @@
     .prog { display: block; position: absolute; inset: 0; background: var(--red-soft); transform-origin: left; transform: scaleX(var(--p, 0)); }
     span { position: relative; } }
   .note { margin-top: space(3); color: var(--muted); font-size: fs(sm); }
+  .fields { text-align: left; margin: 0 0 space(4); }
+  .items { text-align: left; margin: 0 0 space(4); border: 1px solid var(--line); border-radius: $radius-md; overflow: hidden; max-height: 40vh; overflow-y: auto; }
+  .item {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px space(2); padding: space(2) space(3); border-top: 1px solid var(--line); font-size: fs(sm);
+    &:first-child { border-top: 0; }
+    &.block .kind { color: var(--red); } &.warn .kind { color: var(--amber); }
+  }
+  .kind { font-weight: $weight-bold; }
+  .where { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .what { grid-column: 1 / -1; color: var(--muted); }
+  .more { padding: space(2) space(3); color: var(--muted); font-size: fs(sm); border-top: 1px solid var(--line); }
   @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 </style>

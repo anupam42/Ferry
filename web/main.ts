@@ -5,6 +5,7 @@ import App from "./App.svelte";
 import { api } from "./lib/api.ts";
 import { app } from "./lib/app.svelte.ts";
 import { connectEvents } from "./lib/events.ts";
+import { git } from "./lib/git.svelte.ts";
 import { sync } from "./lib/sync.svelte.ts";
 import "./lib/look.svelte.ts"; // keeps theme and look applied
 import type { Info } from "./lib/types.ts";
@@ -18,6 +19,7 @@ async function start() {
   void app.loadConnections();
   void app.loadSettings();
   sync.start();
+  git.start();
   mount(App, { target: document.getElementById("app")! });
   connectEvents({ info: app.info, onEvent: (ev) => sync.onEvent(ev), onOnline: (up) => { if (up) sync.soon(); } });
 }

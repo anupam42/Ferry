@@ -77,3 +77,30 @@ describe("Relay's mood for a pair", () => {
     expect(mood({ ...base, last_sync: new Date().toISOString() }).face).toBe("party");
   });
 });
+
+describe("Relay's mood for a repository", () => {
+  const { repoMood, whoPushed, fileList } = require("../web/lib/gitmood.ts") as typeof import("../web/lib/gitmood.ts");
+  const st = {
+    root: "/r", branch: "main", head: "abc1234", detached: false, upstream: "origin/main", ahead: 0, behind: 0, operation: "" as const, operationBranch: "",
+    files: [], stashes: 0, remotes: ["origin"], lastCommit: null, name: "r", pairs: [], standalone: true,
+  };
+  const file = (p: string, more = {}) => ({ path: p, x: ".", y: "M", staged: false, unstaged: true, untracked: false, conflicted: false, ...more });
+  test("says the most important thing first", () => {
+    expect(repoMood(null, "no such folder")).toMatchObject({ face: "sad", hint: "no such folder" });
+    expect(repoMood(st)).toMatchObject({ face: "happy", tone: "green" });
+    expect(repoMood({ ...st, upstream: "" }).hint).toContain("push to publish");
+    expect(repoMood({ ...st, head: "" }).face).toBe("excited");
+    expect(repoMood({ ...st, ahead: 2 }).say).toBe("2 commits ready to push.");
+    expect(repoMood({ ...st, behind: 1, files: [file("a")] }).say).toBe("There is 1 new commit on origin/main.");
+    expect(repoMood({ ...st, files: [file("a", { staged: true }), file("b")] }).say).toBe("2 files changed, 1 ready to commit.");
+    const merging = { ...st, operation: "merge" as const, operationBranch: "feature", files: [file("a", { conflicted: true })] };
+    expect(repoMood(merging)).toMatchObject({ face: "worried", tone: "red", say: "Merging feature into main: 1 file needs you." });
+    expect(repoMood({ ...merging, files: [] }).tone).toBe("amber");
+  });
+  test("names who pushed and which files, briefly", () => {
+    expect(whoPushed([])).toBe("Someone");
+    expect(whoPushed([{ author: "Sam" }, { author: "Sam" }, { author: "Ana" }])).toBe("Sam and Ana");
+    expect(whoPushed([{ author: "A" }, { author: "B" }, { author: "C" }, { author: "D" }])).toBe("A, B and 2 more");
+    expect(fileList(["src/a.ts", "b.ts", "c/d.ts", "e.ts"])).toBe("a.ts, b.ts, d.ts and 1 more");
+  });
+});

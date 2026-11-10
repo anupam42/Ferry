@@ -4,7 +4,7 @@
   import Toasts from "./components/Toasts.svelte";
   import ConnectionsDrawer from "./settings/ConnectionsDrawer.svelte";
   import Settings from "./settings/Settings.svelte";
-  import Moving from "./Moving.svelte";
+  import Git from "./git/Git.svelte";
   import Sync from "./sync/Sync.svelte";
   import { app } from "./lib/app.svelte.ts";
 </script>
@@ -17,7 +17,7 @@
     {:else if app.mode === "sync"}
       <Sync />
     {:else}
-      <Moving mode={app.mode} />
+      <Git />
     {/if}
   </main>
 </div>

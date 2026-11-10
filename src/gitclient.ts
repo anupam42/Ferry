@@ -11,6 +11,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { diff as lineDiff, type Line } from "./difftext.ts";
+import type { FileChange, IncomingCommit, PushIssue, RemoteCheck, RepoState } from "./shared/git.ts";
+export type { FileChange, IncomingCommit, PushIssue, RemoteCheck, RepoState } from "./shared/git.ts";
 import { scanSecretContent, secretNameHit } from "./engine/secrets.ts";
 import { moveToTrash } from "./engine/trash.ts";
 import { exec, which } from "./proc.ts";
@@ -119,32 +121,7 @@ function expandHome(p: string): string {
 
 // ---------- state ----------
 
-export interface FileChange {
-  path: string;
-  from?: string; // rename source
-  x: string; // index status (porcelain X)
-  y: string; // work tree status (porcelain Y)
-  staged: boolean;
-  unstaged: boolean;
-  untracked: boolean;
-  conflicted: boolean;
-}
 
-export interface RepoState {
-  root: string;
-  branch: string; // "" when detached
-  head: string; // short commit id, "" before the first commit
-  detached: boolean;
-  upstream: string;
-  ahead: number;
-  behind: number;
-  operation: "" | "merge" | "rebase" | "cherry-pick" | "revert";
-  operationBranch: string; // what is being merged, when known
-  files: FileChange[];
-  stashes: number;
-  remotes: string[];
-  lastCommit: { subject: string; hash: string; pushed: boolean } | null;
-}
 
 const CONFLICT = new Set(["DD", "AU", "UD", "UA", "DU", "AA", "UU"]);
 
@@ -645,24 +622,7 @@ export async function pull(root: string, strategy: unknown): Promise<{ clashed: 
   }
 }
 
-export interface IncomingCommit {
-  hash: string;
-  short: string;
-  subject: string;
-  author: string;
-  date: string;
-  files: string[];
-}
 
-export interface RemoteCheck {
-  upstream: string; // "" when the branch doesn't track anything
-  fetched: boolean; // this call talked to the remote
-  error: string; // why the fetch failed (offline, no access…), "" if it worked
-  ahead: number;
-  behind: number;
-  incoming: IncomingCommit[]; // newest first, at most 30
-  overlap: string[]; // files changed both by incoming commits and by you (uncommitted or unpushed)
-}
 
 /**
  * What the remote has that you don't, and whether it touches what you're
@@ -812,14 +772,6 @@ export async function branchAt(root: string, name: unknown, hash: unknown): Prom
 
 // ---------- checks before a push ----------
 
-export interface PushIssue {
-  level: "block" | "warn";
-  kind: "secret" | "env-file" | "conflict-marker" | "large-file" | "debug";
-  file: string;
-  line: number; // 0 when it's about the whole file
-  text: string; // what was found, short
-  commit: string; // short id of the commit that added it
-}
 
 const LARGE_WARN = 5 * 1024 * 1024, LARGE_BLOCK = 50 * 1024 * 1024;
 const DEBUG_RES: [RegExp, RegExp, string][] = [
