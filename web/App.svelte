@@ -1,5 +1,6 @@
 <script lang="ts">
   import Rail from "./components/Rail.svelte";
+  import PullToRefresh from "./components/PullToRefresh.svelte";
   import RelayAsk from "./components/RelayAsk.svelte";
   import Toasts from "./components/Toasts.svelte";
   import ConnectionsDrawer from "./settings/ConnectionsDrawer.svelte";
@@ -33,6 +34,7 @@
 {#if releases.whatsNew && releases.info}<WhatsNew />{/if}
 <RelayAsk />
 <Toasts />
+<PullToRefresh />
 
 <style lang="scss">
   @use "tokens" as *;
@@ -47,7 +49,8 @@
     min-height: calc(100vh / var(--zoom));
     @include motion { transition: grid-template-columns $duration-slow $ease-out; }
   }
-  :global(.rail-dragging) .app { transition: none; }
+  // resizing the rail: the page slides with a transform; its far edge is clipped rather than widening the document
+  :global(.rail-dragging) .app { transition: none; overflow-x: clip; }
   .content { min-width: 0; }
   :global([data-railpos="top"]) .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
   @include below(phone) {
