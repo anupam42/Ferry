@@ -15,7 +15,7 @@
     // accent colour, interface size and motion from Settings → Appearance
     let look = {};
     try { look = JSON.parse(localStorage.getItem("ferry-look") || "{}"); } catch {}
-    for (const k of ["accent", "bg", "size", "motion", "rail"]) if (look[k]) root.dataset[k] = look[k];
+    for (const k of ["accent", "bg", "size", "motion", "rail", "dock", "railpos"]) if (look[k]) root.dataset[k] = look[k];
   })();
 </script>
 <style>
@@ -112,6 +112,37 @@ body { zoom: var(--zoom); }
 [data-rail="wide"] .rail .avatar .dot { left: 48px; right: auto; top: 8px; }
 .rail-brand { text-align: left; font-size: 17px !important; font-weight: 800 !important; letter-spacing: -.01em; line-height: 1.15; }
 .rail-brand small { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+/* ---------- the sidebar's icons: each moves like what it is ---------- */
+.rail-btn svg { transform-origin: center; transition: transform .45s cubic-bezier(.3,1.5,.5,1); }
+.rail-btn:active { transform: scale(.92); transition-duration: .08s; }
+/* picking a page: its icon pops once */
+.rail-btn.on svg { animation: ico-pop .45s cubic-bezier(.3,1.7,.5,1); }
+@keyframes ico-pop { 0% { transform: scale(.6); } 100% { transform: scale(1); } }
+/* home: a squash and a hop */
+#nav-pairs:hover svg { animation: ico-hop .6s cubic-bezier(.3,1.4,.5,1); transform-origin: 50% 90%; }
+@keyframes ico-hop { 0% { transform: none; } 25% { transform: scale(1.12, .86); } 55% { transform: translateY(-4px) scale(.94, 1.08); } 80% { transform: translateY(0) scale(1.04, .96); } 100% { transform: none; } }
+/* git: the branch draws itself, lines then dots */
+#nav-git:hover svg path { stroke-dasharray: 1; animation: ico-draw .55s ease-out backwards; }
+#nav-git:hover svg circle { transform-box: fill-box; transform-origin: center; animation: ico-dot .4s cubic-bezier(.3,1.8,.5,1) backwards; }
+#nav-git:hover svg circle:nth-of-type(1) { animation-delay: .05s; } #nav-git:hover svg circle:nth-of-type(2) { animation-delay: .3s; } #nav-git:hover svg circle:nth-of-type(3) { animation-delay: .4s; }
+@keyframes ico-draw { from { stroke-dashoffset: 1; } }
+@keyframes ico-dot { from { transform: scale(0); } }
+/* notifications: the bell swings on hover, and rings now and then while something is unread */
+#nav-activity svg { transform-origin: 50% 12%; }
+#nav-activity:hover svg { animation: ico-ring .9s ease-in-out; }
+#nav-activity:has(.badge:not(.hidden)):not(:hover) svg { animation: ico-ring-idle 5s ease-in-out infinite; }
+@keyframes ico-ring { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(16deg); } 30% { transform: rotate(-14deg); } 45% { transform: rotate(10deg); } 60% { transform: rotate(-7deg); } 75% { transform: rotate(3deg); } }
+@keyframes ico-ring-idle { 0%, 20%, 100% { transform: rotate(0); } 3% { transform: rotate(14deg); } 6% { transform: rotate(-12deg); } 9% { transform: rotate(8deg); } 12% { transform: rotate(-5deg); } 15% { transform: rotate(2deg); } }
+/* settings: the gear turns a quarter on hover, and keeps turning slowly while Settings is open */
+#nav-settings:hover svg { transform: rotate(90deg); }
+#nav-settings.on svg { animation: ico-pop .45s cubic-bezier(.3,1.7,.5,1), ico-turn 14s linear .45s infinite; }
+#nav-settings.on:hover svg { animation: ico-turn 3s linear infinite; }
+@keyframes ico-turn { to { transform: rotate(360deg); } }
+/* wide: the name follows the icon */
+.rail-label { transition: transform .2s; }
+[data-rail="wide"] .rail-btn:hover .rail-label { transform: translateX(3px); }
+@media (prefers-reduced-motion: reduce) { .rail-btn svg, .rail-btn svg * { animation: none !important; transition: none !important; } .rail-btn:active { transform: none; } }
+[data-motion="reduce"] .rail-btn svg, [data-motion="reduce"] .rail-btn svg * { animation: none !important; transition: none !important; }
 /* ---------- pull to refresh: Relay drops in from the top ---------- */
 .ptr { --pull: 0px; --k: 0; position: fixed; left: 50%; top: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none;
   /* Relay's top is 70px above the screen at rest and 16px below it at the trigger point; the label rides below */
@@ -359,6 +390,26 @@ a.btn { text-decoration: none; }
   .gdock.wide .gdock-toggle svg { transform: rotate(-90deg); }
 }
 @media (max-width: 1100px) { .gdock-toggle { display: none; } }
+/* the toolbar as a horizontal bar above the content (Settings → Appearance → Toolbar); phones keep their bottom bar */
+@media (min-width: 701px) {
+  .repo-layout.dock-h { grid-template-columns: minmax(0, 1fr); }
+  /* a full-width bar at the top of the content: views on the left, remote actions on the right */
+  .dock-h .gdock { position: sticky; top: 12px; z-index: 6; flex-direction: row; flex-wrap: wrap; align-self: stretch; align-items: center; gap: 4px; padding: 6px 8px; border-radius: 22px; width: 100%; }
+  .dock-h .gdock-group { flex-direction: row; flex-wrap: nowrap; }
+  .dock-h .gdock-head { display: none; }
+  .dock-h .gdock-sep, .dock-h .gdock.wide .gdock-sep { width: 1px; height: 24px; margin: 0 6px 0 auto; align-self: center; }
+  .dock-h .gdock-toggle, .dock-h .gdock.wide .gdock-toggle { width: 34px; height: 44px; padding: 0 8px; }
+  .dock-h .gdock-toggle .gdock-label { display: none; }
+  .dock-h .gdock-toggle svg { transform: rotate(-90deg); } /* points right: expand adds names */
+  .dock-h .gdock.wide .gdock-toggle svg { transform: rotate(90deg); }
+  /* expanded: each button as wide as its name */
+  .dock-h .gdock.wide .gdock-btn { width: auto; padding: 0 14px 0 12px; }
+  .dock-h .gdock.wide .gdock-label { max-width: 160px; }
+  /* tooltips open below */
+  .dock-h .gdock-tip { right: auto; left: 50%; top: calc(100% + 10px); transform: translate(-50%, -4px); }
+  .dock-h .gdock-btn:hover .gdock-tip, .dock-h .gdock-btn:focus-visible .gdock-tip { transform: translate(-50%, 0); }
+  .dock-h .gdock-tip::after { left: 50%; top: auto; bottom: 100%; margin: 0 0 0 -5px; border-left-color: transparent; border-bottom-color: var(--text); }
+}
 /* remote activity: pull breathes amber when commits are waiting, push breathes blue when you have some to share */
 .gdock-btn.incoming { color: var(--amber); animation: gd-ring-amber 2.4s ease-out infinite; }
 .gdock-btn.incoming svg { animation: gd-drop 1.8s ease-in-out infinite; }
@@ -1228,6 +1279,29 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
   .theme-picks { flex-wrap: wrap; } .theme-pick { width: calc((100% - 24px) / 3); min-width: 96px; }
   .pairs-col, .main, .app.settings-mode .main { grid-column: 1; grid-row: auto; }
 }
+/* the sidebar as a bar across the top of the app (Settings → Appearance → Sidebar position); phones already have their own top bar */
+@media (min-width: 701px) {
+  [data-railpos="top"] .app { grid-template-columns: 320px minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  [data-railpos="top"] .rail { grid-column: 1 / -1; grid-row: 1; flex-direction: row; align-items: center; height: auto; position: relative; top: auto; padding: 10px 16px; gap: 12px; border-radius: 26px; overflow: visible; }
+  [data-railpos="top"] .rail .grow { flex: 1; }
+  [data-railpos="top"] .rail-grip { display: none; }
+  [data-railpos="top"] .pairs-col { grid-column: 1; grid-row: 2; }
+  [data-railpos="top"] .main { grid-column: 2; grid-row: 2; }
+  [data-railpos="top"] .app.settings-mode { grid-template-columns: minmax(0, 1fr); }
+  [data-railpos="top"] .app.settings-mode .main { grid-column: 1; grid-row: 2; }
+  /* wide: names beside the icons, in a row */
+  [data-railpos="top"][data-rail="wide"] .rail { align-items: center; padding: 10px 16px; gap: 6px; }
+  [data-railpos="top"][data-rail="wide"] .rail .avatar.rail-home { margin: 0 10px 0 0; height: 56px; }
+  [data-railpos="top"][data-rail="thin"] .rail { padding: 6px 12px; gap: 8px; }
+}
+@media (min-width: 701px) and (max-width: 1100px) {
+  /* narrower windows: bar, then the list, then the page */
+  [data-railpos="top"] .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; }
+  [data-railpos="top"] .rail { grid-column: 1; grid-row: 1; }
+  [data-railpos="top"] .pairs-col { grid-column: 1; grid-row: 2; }
+  [data-railpos="top"] .main { grid-column: 1; grid-row: 3; }
+  [data-railpos="top"] .app.settings-mode .main { grid-row: 2; }
+}
 /* phones: the repository dock becomes a bar along the bottom */
 @media (max-width: 700px) {
   .repo-layout { grid-template-columns: minmax(0, 1fr); padding-bottom: 78px; }
@@ -1842,6 +1916,8 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     $("#nav-pairs").prepend(icon("home"));
     $("#nav-activity").prepend(icon("bell"));
     $("#nav-git").prepend(icon("branch"));
+    // the branch icon redraws itself on hover: one normalised length lets a single dash cover each line
+    $("#nav-git svg").querySelectorAll("path, circle").forEach((p) => p.setAttribute("pathLength", "1"));
     const setMode = (m, tab) => {
       S.mode = m;
       localStorage.setItem("ferry-mode", m);
@@ -1993,7 +2069,11 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       setRow("Accent colour", "Buttons, highlights and Relay's glow. Charts keep their own colours so they read the same", accents),
       setRow("Background", "Behind everything. Each one has a light and a dark version that follows the theme", backgrounds, "tall"),
       setRow("Interface size", "Makes everything smaller or bigger, text included", setSeg([["small", "Small"], ["", "Default"], ["large", "Large"]], look.size || "", (v) => setLook("size", v), "Interface size")),
-      setRow("Sidebar", "Thin keeps just small icons, wide adds names. You can also drag the sidebar's edge", setSeg(RAIL_SIZES, look.rail || "", (v) => setRail(v), "Sidebar width")),
+      setRow("Sidebar position", "Down the left, or as a bar across the top of the app", setSeg([["", "Vertical"], ["top", "Horizontal"]], look.railpos || "",
+        (v) => { setLook("railpos", v); toast(v ? "Sidebar across the top" : "Sidebar down the left", false, "wink"); }, "Sidebar position")),
+      setRow("Sidebar size", "Thin keeps just small icons, wide adds names. With the sidebar down the left you can also drag its edge", setSeg(RAIL_SIZES, look.rail || "", (v) => setRail(v), "Sidebar size")),
+      setRow("Toolbar", "The views and actions of a folder pair or repository: a rail down the right, or a bar across the top", setSeg([["", "Vertical"], ["horizontal", "Horizontal"]], look.dock || "",
+        (v) => { setLook("dock", v); toast(v ? "Toolbar across the top" : "Toolbar down the right", false, "wink"); }, "Toolbar position")),
       setRow("Motion", "Relay's animations, drawers sliding in, and other movement", setSelect([["", "Follow my system"], ["reduce", "Reduce motion"]], look.motion || "", (v) => setLook("motion", v), "Motion")),
       setRow("Times", "How the app shows when things happened", setSelect([["relative", "Relative (5 min ago)"], ["exact", "Exact (9 Nov, 2:05 PM)"]], localStorage.getItem("ferry-time") || "relative",
         (v) => { localStorage.setItem("ferry-time", v); toast(v === "exact" ? "Showing exact times" : "Showing relative times", false, "wink"); }, "Times")),
@@ -2168,10 +2248,23 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       toggle.setAttribute("aria-label", on ? "Collapse the toolbar" : "Expand the toolbar");
       toggle.title = (on ? "Collapse" : "Expand") + " ( [ )";
       localStorage.setItem("ferry-dock", on ? "wide" : "narrow");
+      // the buttons change size: follow them with the highlight once they've settled
+      const g = dock.querySelector(".gdock-glow");
+      if (g) { moveGlow(g.parentElement, g); setTimeout(() => moveGlow(g.parentElement, g), 320); }
     };
     toggle.onclick = () => setWide(!dock.classList.contains("wide"));
     dock.setWide = setWide;
     return dock;
+  }
+
+  /**
+   * Where the dock goes (Settings → Appearance → Toolbar): vertical, a rail
+   * beside the content; horizontal, a full-width bar across the top of it.
+   */
+  function placeDock(content, dock) {
+    const horizontal = document.documentElement.dataset.dock === "horizontal";
+    if (horizontal) content.prepend(dock);
+    return h("div", { class: "repo-layout" + (horizontal ? " dock-h" : "") }, content, horizontal ? null : dock);
   }
 
   /** An icon button in a dock; the label shows as a tooltip (or beside the icon when expanded) and names it for screen readers. */
@@ -2194,16 +2287,21 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
       b.setAttribute("data-tab", id);
       return b;
     }));
-    const sel = el.querySelector(".gdock-btn.on");
-    if (sel) {
-      const horizontal = getComputedStyle(el).flexDirection === "row";
-      const to = horizontal ? `translateX(${sel.offsetLeft}px)` : `translateY(${sel.offsetTop}px)`;
-      if (!glow.dataset.set) glow.style.transition = "none";
-      glow.style.transform = to;
-      glow.style.opacity = "1";
-      if (!glow.dataset.set) { glow.getBoundingClientRect(); glow.style.transition = ""; glow.dataset.set = "1"; }
-    } else glow.style.opacity = "0";
+    moveGlow(el, glow);
     if (focused) { const b = el.querySelector(`[data-tab="${focused}"]`); if (b) b.focus(); }
+  }
+
+  /** Slides the highlight under the selected view; in a horizontal bar it also takes that button's width (names differ in length). */
+  function moveGlow(el, glow) {
+    const sel = el.querySelector(".gdock-btn.on");
+    if (!sel) { glow.style.opacity = "0"; return; }
+    const horizontal = getComputedStyle(el).flexDirection === "row";
+    const bar = !!el.closest(".dock-h");
+    if (!glow.dataset.set) glow.style.transition = "none";
+    glow.style.transform = horizontal ? `translateX(${sel.offsetLeft}px)` : `translateY(${sel.offsetTop}px)`;
+    glow.style.width = bar ? sel.offsetWidth + "px" : "";
+    glow.style.opacity = "1";
+    if (!glow.dataset.set) { glow.getBoundingClientRect(); glow.style.transition = ""; glow.dataset.set = "1"; }
   }
 
   function buildMain(p) {
@@ -2227,7 +2325,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     // the views live in the dock on the right, like a repository's
     ui.dock = makeDock("Folder pair", [{ head: "Views", el: ui.tabs }]);
     const content = h("div", { class: "repo-content" }, ui.crumbs, h("div", { class: "title-row" }, ui.h1, h("div", { class: "grow" }), ui.searchBox, ui.actions), ui.paths, ui.hero, ui.body);
-    $("#main").replaceChildren(h("div", { class: "repo-layout" }, content, ui.dock));
+    $("#main").replaceChildren(placeDock(content, ui.dock));
     S.ui = ui;
     S.shown = "";
   }
@@ -3345,7 +3443,7 @@ del.w { background: var(--del); color: var(--del-text); border-radius: 4px; padd
     ui.dock = dock;
     const content = h("div", { class: "repo-content" }, ui.crumbs, h("div", { class: "title-row" }, ui.h1, ui.branch, ui.sync), ui.paths,
       h("div", { class: "card hero" }, ui.face, h("div", { class: "bubble", role: "status" }, ui.say, ui.hint)), ui.op, ui.remote, ui.body);
-    $("#main").replaceChildren(h("div", { class: "repo-layout" }, content, dock));
+    $("#main").replaceChildren(placeDock(content, dock));
     S.gui = ui;
     S.gshown = "";
     setTimeout(() => checkRemote(false), 0); // see what the remote has as soon as the repository opens
