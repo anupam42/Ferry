@@ -27,7 +27,7 @@
   const left = $derived("at" in n ? n.at - releases.now : 0);
   const when = $derived("at" in n ? new Date(n.at) : null);
 
-  const MOOD = { available: "excited", countdown: "excited", due: "surprised", soon: "focused", new: "party" } as const;
+  const MOOD = { available: "excited", countdown: "excited", due: "surprised", soon: "excited", new: "party" } as const;
   const TAG = { available: "Update", countdown: "", due: "Out now?", soon: "Soon", new: "New" } as const;
   const action = $derived.by((): [string, () => void] => {
     switch (n.kind) {
@@ -80,7 +80,8 @@
 <style lang="scss">
   @use "tokens" as *;
   @use "mixins" as *;
-  .rn { --hang: 16px; position: fixed; top: 0; left: 50%; z-index: z(drawer) - 1; // under drawers and dialogs, over the page transform: translateX(-50%); padding-top: var(--hang); pointer-events: none; max-width: calc(100vw - 24px);
+  // under drawers and dialogs, over the page
+  .rn { --hang: 16px; position: fixed; top: 0; left: 50%; z-index: z(drawer) - 1; transform: translateX(-50%); padding-top: var(--hang); pointer-events: none; max-width: calc(100vw - 24px);
     > * { pointer-events: auto; } }
   .pin { position: absolute; top: 0; width: 2px; height: calc(var(--hang) + 6px); background: linear-gradient(var(--faint), color-mix(in srgb, var(--faint) 60%, transparent)); border-radius: 2px;
     @include motion { transition: left .35s cubic-bezier(.3, 1.3, .5, 1), right .35s cubic-bezier(.3, 1.3, .5, 1), height .35s; }
