@@ -52,6 +52,8 @@
   });
   const crumbs = $derived(dir ? dir.split("/") : []);
   const rawURL = (p: string) => git.url("file") + "?path=" + enc(p) + "&raw=1";
+  /** A folder opens in place; a file opens in the file drawer. */
+  const go = (e: { path: string; dir: boolean }) => { if (e.dir) open(e.path); else git.file = e.path; };
 </script>
 
 {#if !paths || !tree || !node}
@@ -102,7 +104,7 @@
           {/if}
           {#each entries as e (e.path)}
             {@const i = byPath?.get(e.path)}
-            <tr class="row" class:is-dir={e.dir} tabindex="0" onclick={() => (e.dir ? open(e.path) : (git.file = e.path))} onkeydown={(ev) => { if (ev.key === "Enter") (e.dir ? open(e.path) : (git.file = e.path)); }}>
+            <tr class="row" class:is-dir={e.dir} tabindex="0" onclick={() => go(e)} onkeydown={(ev) => { if (ev.key === "Enter") go(e); }}>
               <td class="name"><FileIcon name={e.name} dir={e.dir} /><span class="label">{e.name}</span>{#if e.dir}<span class="n">{countUnder(e.path)}</span>{/if}</td>
               <td class="msg">
                 {#if !byPath}<span class="skel"></span>

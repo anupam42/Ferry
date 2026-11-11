@@ -16,7 +16,7 @@ function detectDepth(): ColorDepth {
   return "16";
 }
 
-let depth: ColorDepth = detectDepth();
+const depth: ColorDepth = detectDepth();
 let dark = true;
 
 export function setDarkBackground(d: boolean): void {
@@ -100,7 +100,9 @@ export class Style {
 
 // ---------- text measurement ----------
 
-const ANSI = /\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/y;
+// escape sequences start with the ESC control character (and OSC ones end with BEL): matching them is the point
+// eslint-disable-next-line no-control-regex
+const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/y;
 const segmenter = new Intl.Segmenter();
 
 export function width(s: string): number {
@@ -302,6 +304,7 @@ export function queryDarkBackground(timeoutMs = 150): Promise<boolean | null> {
     };
     const onData = (d: Buffer) => {
       acc += d.toString("latin1");
+      // eslint-disable-next-line no-control-regex -- the terminal's reply starts with ESC
       const m = /\x1b\]11;rgb:([0-9a-f]+)\/([0-9a-f]+)\/([0-9a-f]+)/i.exec(acc);
       if (m) {
         const v = (h: string) => parseInt(h.slice(0, 2), 16);

@@ -307,7 +307,7 @@ export function loadFile(
       }
     }
   } catch (e) {
-    throw new Error(`${file}: ${(e as Error).message}`);
+    throw new Error(`${file}: ${(e as Error).message}`, { cause: e });
   }
   for (const w of settings.webhooks) {
     if (!w.url) throw new Error(`${file}: every webhook needs a url`);
@@ -317,7 +317,7 @@ export function loadFile(
     try {
       dec.pair(defaultsNode, base);
     } catch (e) {
-      throw new Error(`${file} defaults: ${(e as Error).message}`);
+      throw new Error(`${file} defaults: ${(e as Error).message}`, { cause: e });
     }
   }
   if (pairNodes.length === 0 && !opts.allowEmpty) throw new Error(`${file}: no pairs defined`);
@@ -331,7 +331,7 @@ export function loadFile(
     try {
       dec.pair(n, p);
     } catch (e) {
-      throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`);
+      throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`, { cause: e });
     }
     p.ignore = [...base.ignore, ...p.ignore];
     const resolve = (t: string) =>
@@ -342,7 +342,7 @@ export function loadFile(
     try {
       for (const q of expandTargets(p)) pairs.push(...expandMap(q));
     } catch (e) {
-      throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`);
+      throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`, { cause: e });
     }
   });
   for (const p of pairs) normalize(p);
@@ -403,7 +403,7 @@ export function expandTargets(p: Pair): Pair[] {
 }
 
 function targetLabel(t: string): string {
-  const s = t.replace(/[\/]+$/, "");
+  const s = t.replace(/[/]+$/, "");
   if (cloud.isSpec(s)) {
     const c = cloud.parse(s);
     return c.prefix ? c.bucket + "/" + path.posix.basename(c.prefix) : c.bucket;
@@ -718,10 +718,9 @@ export function pairFromJSON(raw: unknown): Pair | null {
         enabled: !!a.Enabled, interval: Number(a.Interval ?? 0) / 1e6,
         message: String(a.Message ?? DEFAULT_COMMIT_MESSAGE), push: !!a.Push,
       };
-    } else if (durs.has(field)) {
-      (p as any)[field] = Number(v) / 1e6;
     } else {
-      (p as any)[field] = v;
+      // the old JSON format: field names map one to one, durations were in nanoseconds
+      (p as unknown as Record<string, unknown>)[field] = durs.has(field) ? Number(v) / 1e6 : v;
     }
   }
   return p;
@@ -827,7 +826,7 @@ export function pairsFromObject(obj: Record<string, unknown>): Pair[] {
   try {
     new Decoder(lc).pair(doc.contents, p);
   } catch (e) {
-    throw new Error((e as Error).message.replace(/^line \d+: /, ""));
+    throw new Error((e as Error).message.replace(/^line \d+: /, ""), { cause: e });
   }
   const out = expandTargets(p).flatMap(expandMap);
   for (const q of out) normalize(q);

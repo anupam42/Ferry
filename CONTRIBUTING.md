@@ -40,9 +40,11 @@ bun run build:web             # build the new web app (web/) on its own
 Before you open a pull request, run the same checks as CI:
 
 ```bash
-bun run typecheck
+bun run check                 # types (including .svelte components), ESLint and Prettier
 bun test                      # needs git on PATH, with user.name and user.email set
 ```
+
+`bun run format` fixes formatting and `bun run lint:fix` fixes what ESLint can fix by itself. Prettier formats `.ts`, `.js` and `.svelte` files (settings in `.prettierrc.json`); ESLint's settings are in `eslint.config.js`. If a rule is wrong for one line, disable it for that line with a comment saying why (`// eslint-disable-next-line rule -- why`) rather than for the file.
 
 CI also runs these on Ubuntu, macOS and Windows and smoke-tests a compiled binary, so your change must work on all three.
 
@@ -59,7 +61,7 @@ The [Development section of the README](README.md#development) maps the source t
 - `src/engine/engine.ts` is the sync loop. Each pair has a serial task queue: timers, the watcher, the dashboard and the HTTP API queue work with `do()` / `schedule()` rather than changing state directly. Keep it that way.
 - `src/config.ts` holds every pair option. A new option goes in the `Pair` type, `defaults()`, the `FIELDS` table (its YAML key), `normalize()` (validation), and usually a flag in `src/cli/runflags.ts`.
 - `src/cli/` contains the commands, `src/tui/` the terminal dashboard, `web/` the web app, and `src/api.ts` the HTTP API both use.
-- `web/` is Svelte 5 with TypeScript and SCSS built by Bun (`scripts/build-web.ts`, or `bun run build:web`) into `src/web/app/`, which Ferry serves at `/` and embeds in the binary. `bun src/main.ts ui` builds it when it's out of date, and `bun scripts/build.ts` builds it before compiling. Logic that doesn't need the browser lives in plain `web/lib/*.ts` modules with tests in `test/web*.test.ts`; types the server and the app share live in `src/shared/`. `bun run typecheck` checks both. While you work on it, `bun run dev` (`ferry ui --dev`) keeps the browser up to date: saving a file in `web/` rebuilds the app, swaps in new styles without a reload or reloads the page where you were (same view and scroll) for anything else, and saving a `.ts` file under `src/` restarts Ferry on the same port, after which the page reloads by itself.
+- `web/` is Svelte 5 with TypeScript and SCSS built by Bun (`scripts/build-web.ts`, or `bun run build:web`) into `src/web/app/`, which Ferry serves at `/` and embeds in the binary. `bun src/main.ts ui` builds it when it's out of date, and `bun scripts/build.ts` builds it before compiling. Logic that doesn't need the browser lives in plain `web/lib/*.ts` modules with tests in `test/web*.test.ts`; types the server and the app share live in `src/shared/`. `bun run typecheck` checks both, including the `.svelte` components (svelte-check). While you work on it, `bun run dev` (`ferry ui --dev`) keeps the browser up to date: saving a file in `web/` rebuilds the app, swaps in new styles without a reload or reloads the page where you were (same view and scroll) for anything else, and saving a `.ts` file under `src/` restarts Ferry on the same port, after which the page reloads by itself.
   - `web/styles/_tokens.scss` holds the design tokens: the palette, spacing (`space(n)`, 4 px steps), radii, type, motion, and per-theme semantic colours. `_themes.scss` turns them into CSS custom properties and generates the accents, backgrounds and sizes. Components use the custom properties for colour (`var(--accent)`) and the SCSS scales for sizes (`@use "tokens" as *;`).
   - `web/lib/` has the API client, live updates and shared state (Svelte runes in `*.svelte.ts`), plus plain logic like the change story (`diff.ts`, unit-tested); `web/components/` the shared pieces; one folder per area (`web/settings/`, `web/sync/`).
   - Types the server sends live in `src/shared/` with no imports of their own, so the server and the web app use the same definitions. `bun run typecheck` checks both.
@@ -75,7 +77,7 @@ The [Development section of the README](README.md#development) maps the source t
    - `src/cli/usage.ts` and the flag help text;
    - `src/cli/completion.ts` for new commands, flags or values;
    - `ferry.example.yaml` and the `SAMPLE` config in `src/config.ts` for new config keys.
-5. Run `bun run typecheck` and `bun test`, then open the PR and fill in the template.
+5. Run `bun run check` and `bun test`, then open the PR and fill in the template.
 
 ### Code guidelines
 

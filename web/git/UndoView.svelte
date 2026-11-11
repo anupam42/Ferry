@@ -15,6 +15,7 @@
   $effect(() => { void git.bump; act(null, () => api<UndoTimeline>("GET", git.url("undo-timeline"))).then((r) => { if (r) t = r; }); });
   const busy = $derived(!!st.operation);
   const days = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- built and read inside this derived value, never stored
     const groups = new Map<string, ReflogEntry[]>();
     for (const e of t?.entries ?? []) {
       const k = dayLabel(e.date);

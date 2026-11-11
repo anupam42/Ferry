@@ -12,7 +12,12 @@
     "start": "bun src/main.ts",
     "dev": "bun src/main.ts ui --dev",
     "test": "bun test",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web && svelte-check --workspace web --tsconfig ./tsconfig.json --fail-on-warnings --output machine",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,js,svelte}\"",
+    "format:check": "prettier --check \"**/*.{ts,js,svelte}\"",
+    "check": "bun run typecheck && bun run lint && bun run format:check",
     "build": "bun scripts/build-web.ts && bun build src/main.ts --compile --minify --sourcemap --outfile dist/ferry",
     "build:web": "bun scripts/build-web.ts"
   },
@@ -21,9 +26,19 @@
     "yaml": "^2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bun": "^1.4.4",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^3.24.1",
+    "globals": "^17.14.0",
+    "prettier": "^3.9.10",
+    "prettier-plugin-svelte": "^4.1.1",
     "sass": "^1.108.1",
     "svelte": "^5.57.3",
-    "typescript": "^7.0.2"
+    "svelte-check": "^4.7.8",
+    "svelte-eslint-parser": "^1.10.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.2"
   }
 }

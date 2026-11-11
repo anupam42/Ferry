@@ -38,7 +38,7 @@ export async function install(cfg: string): Promise<string> {
   try {
     loadFile(cfg);
   } catch (e) {
-    throw new Error(`config check failed: ${(e as Error).message}`);
+    throw new Error(`config check failed: ${(e as Error).message}`, { cause: e });
   }
   fs.mkdirSync(dataDir(), { recursive: true });
   const args = runArgs(cfg);

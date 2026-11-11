@@ -11,7 +11,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { diff as lineDiff, type Line } from "./difftext.ts";
-import type { Insights, PullRequest, Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
+import type { GhPullRequest, GlMergeRequest } from "./apitypes.ts";
+import type { Insights, PullRequest, Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
 export type { Insights, PullRequest, Branch, BlameChunk, Commit, CommitDetail, FileChange, FileContent, FileVersion, FolderEntry, IncomingCommit, LostBranch, PushIssue, ReflogEntry, RemoteCheck, RepoState } from "./shared/git.ts";
 import { scanSecretContent, secretNameHit } from "./engine/secrets.ts";
 import { moveToTrash } from "./engine/trash.ts";
@@ -247,7 +248,6 @@ function capped(d: FileDiff): FileDiff {
 /** A working-tree file's changes: not yet staged, or already staged. */
 export async function fileDiff(root: string, file: unknown, staged: boolean): Promise<FileDiff> {
   const p = repoPath(root, file);
-  let text = "";
   if (!staged && !(await gitOk(root, ["ls-files", "--error-unmatch", "--", p]))) {
     // untracked: everything is new
     let data: Buffer = Buffer.alloc(0);
@@ -256,7 +256,7 @@ export async function fileDiff(root: string, file: unknown, staged: boolean): Pr
     } catch {}
     return capped({ lines: lineDiff(Buffer.alloc(0), data, 3), before: "Not in git yet", after: "In your folder" });
   }
-  text = await git(root, staged ? ["diff", "--cached", "--no-color", "-U3", "--", p] : ["diff", "--no-color", "-U3", "--", p]);
+  const text = await git(root, staged ? ["diff", "--cached", "--no-color", "-U3", "--", p] : ["diff", "--no-color", "-U3", "--", p]);
   return capped({ lines: parseUnified(text), before: staged ? "Last commit" : "Staged or last commit", after: staged ? "Staged for the next commit" : "In your folder" });
 }
 
@@ -1070,7 +1070,7 @@ export async function pullRequests(root: string): Promise<{ provider: string; it
     if (!which("glab")) throw new GitClientError("install the GitLab CLI (glab) and run `glab auth login` to see merge requests here", "no-cli");
     const r = await exec(["glab", "mr", "list", "--output", "json"], { cwd: root, timeoutMs: 60_000 });
     if (r.code !== 0) throw new GitClientError(cleanMessage(r.stderr || r.error || "glab failed"), "cli-failed");
-    const raw = JSON.parse(r.stdout || "[]") as Record<string, any>[];
+    const raw = JSON.parse(r.stdout || "[]") as GlMergeRequest[];
     return {
       provider: "GitLab", items: raw.map((m) => ({
         number: m.iid, title: m.title, branch: m.source_branch, base: m.target_branch, author: m.author?.username ?? "", draft: !!m.draft,
@@ -1081,10 +1081,10 @@ export async function pullRequests(root: string): Promise<{ provider: string; it
   if (!which("gh")) throw new GitClientError("install the GitHub CLI (gh) and run `gh auth login` to see pull requests here", "no-cli");
   const r = await exec(["gh", "pr", "list", "--limit", "50", "--json", "number,title,headRefName,baseRefName,author,isDraft,url,updatedAt,reviewDecision,statusCheckRollup"], { cwd: root, timeoutMs: 60_000 });
   if (r.code !== 0) throw new GitClientError(cleanMessage(r.stderr || r.error || "gh failed"), "cli-failed");
-  const raw = JSON.parse(r.stdout || "[]") as Record<string, any>[];
+  const raw = JSON.parse(r.stdout || "[]") as GhPullRequest[];
   return {
     provider: "GitHub", items: raw.map((p) => {
-      const items = (p.statusCheckRollup ?? []).map((c: Record<string, any>) => {
+      const items = (p.statusCheckRollup ?? []).map((c) => {
         const s = String(c.conclusion || c.state || c.status || "").toUpperCase();
         const state = ["SUCCESS", "NEUTRAL", "SKIPPED"].includes(s) ? "passed" : ["FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"].includes(s) ? "failed" : "pending";
         return { name: c.name || c.context || "check", state, url: c.detailsUrl || c.targetUrl || "" };
@@ -1093,9 +1093,9 @@ export async function pullRequests(root: string): Promise<{ provider: string; it
         number: p.number, title: p.title, branch: p.headRefName, base: p.baseRefName, author: p.author?.login ?? "", draft: !!p.isDraft,
         url: p.url, updated: p.updatedAt, review: p.reviewDecision ?? "",
         checks: {
-          passed: items.filter((c: { state: string }) => c.state === "passed").length,
-          failed: items.filter((c: { state: string }) => c.state === "failed").length,
-          pending: items.filter((c: { state: string }) => c.state === "pending").length,
+          passed: items.filter((c) => c.state === "passed").length,
+          failed: items.filter((c) => c.state === "failed").length,
+          pending: items.filter((c) => c.state === "pending").length,
           items,
         },
       };

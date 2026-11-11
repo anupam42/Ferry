@@ -16,14 +16,13 @@ import type { BunPlugin } from "bun";
 import * as sass from "sass";
 import { compile, compileModule, preprocess } from "svelte/compiler";
 
+import svelteConfig from "../web/svelte.config.js";
+
 const ROOT = path.resolve(import.meta.dir, "..");
 export const WEB_SRC = path.join(ROOT, "web");
 export const WEB_OUT = path.join(ROOT, "src", "web", "app");
 const STYLES = path.join(WEB_SRC, "styles");
 
-function scss(source: string, file: string): string {
-  return sass.compileString(source, { loadPaths: [STYLES, path.dirname(file)], style: "expanded", syntax: "scss", url: new URL("file://" + file) }).css;
-}
 
 /** Compiles .svelte and .svelte.ts; each component's scoped CSS goes into styles (file → css), for app.css. */
 function sveltePlugin(dev: boolean, styles: Map<string, string>): BunPlugin {
@@ -32,9 +31,7 @@ function sveltePlugin(dev: boolean, styles: Map<string, string>): BunPlugin {
     setup(build) {
       build.onLoad({ filter: /\.svelte$/ }, async ({ path: file }) => {
         const source = await Bun.file(file).text();
-        const pre = await preprocess(source, {
-          style: ({ content, attributes }) => (attributes.lang === "scss" ? { code: scss(content, file) } : undefined),
-        }, { filename: file });
+        const pre = await preprocess(source, svelteConfig.preprocess, { filename: file });
         const out = compile(pre.code, { filename: file, generate: "client", css: "external", dev, runes: true });
         for (const w of out.warnings) console.warn(`${path.relative(ROOT, file)}: ${w.message}`);
         if (out.css?.code) styles.set(file, out.css.code); else styles.delete(file);

@@ -184,7 +184,7 @@ export async function cmdUI(args: string[]): Promise<void> {
       api.listen(`${host.includes(":") ? `[${host}]` : host}:${port}`);
       break;
     } catch (e) {
-      if (tries >= 20 || f.wasSet("port")) throw new Error(`can't listen on port ${port}: ${(e as Error).message}`);
+      if (tries >= 20 || f.wasSet("port")) throw new Error(`can't listen on port ${port}: ${(e as Error).message}`, { cause: e });
       port++;
     }
   }
@@ -285,10 +285,10 @@ function watchWebApp(changed: (kind: "css" | "page") => void): void {
   const dir = path.join(import.meta.dir, "..", "..", "web");
   if (!fs.existsSync(dir)) return;
   // kept in a module variable: an unreferenced watcher can be collected and go quiet
-  webWatcher = fs.watch(dir, { recursive: true }, () => {
+  _webWatcher = fs.watch(dir, { recursive: true }, () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void run(), 80);
   });
   println(paint("90", "dev: watching web/"));
 }
-let webWatcher: fs.FSWatcher | null = null;
+let _webWatcher: fs.FSWatcher | null = null;

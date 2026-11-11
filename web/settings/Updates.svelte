@@ -89,7 +89,7 @@
               {#each r.groups as g (g.kind)}
                 {@const [name, ic, tone] = REL_KIND[g.kind]}
                 <div><span class="kind t-{tone}"><Icon name={ic} size={13} />{name}</span>
-                  <ul>{#each g.items as it (it.title)}<li><b>{it.title}</b>{#if it.text}<span>{" — "}<InlineMd text={it.text} /></span>{/if}</li>{/each}</ul></div>
+                  <ul>{#each g.items as it (it.title)}<li><b>{it.title}</b>{#if it.text}<span>&nbsp;— <InlineMd text={it.text} /></span>{/if}</li>{/each}</ul></div>
               {/each}
               {#if !n}<p class="muted">No notes here yet.</p>{/if}
             </div>

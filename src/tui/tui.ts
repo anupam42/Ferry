@@ -502,7 +502,7 @@ export class Dashboard {
       this.suspended = true;
       this.screen.leave();
       process.stdin.setRawMode?.(false);
-      let code = 0;
+      let code: number;
       try {
         code = await execInteractive([...parts, p]);
       } catch (err) {

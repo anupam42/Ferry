@@ -29,7 +29,7 @@
   {#if it.try}<button class="btn small try" onclick={() => releases.go(it.try)}>Try it<span aria-hidden="true">→</span></button>{/if}
 {/snippet}
 
-<!-- svelte-ignore a11y_click_events_have_key_events (Escape closes it, see the window handler) -->
+<!-- a click outside the dialog closes it; Escape does too (see the window handler) -->
 <div class="wrap" role="presentation" transition:fade={{ duration: ms(200) }} onclick={(e) => { if (e.target === e.currentTarget) close(); }}>
   <div class="wn" role="dialog" aria-modal="true" aria-label="What's new" transition:fly={{ y: 18, duration: ms(350) }}>
     <button class="btn icon ghost x" aria-label="Close" onclick={close}><Icon name="close" size={18} /></button>

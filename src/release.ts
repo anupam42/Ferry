@@ -9,7 +9,7 @@ import changelogText from "../CHANGELOG.md" with { type: "text" };
 import { dataDir } from "./config.ts";
 import { exec, which } from "./proc.ts";
 
-import type { ChangeItem, Health, InstallMethod, Release } from "./shared/release.ts";
+import type { Health, InstallMethod, Release } from "./shared/release.ts";
 export type { ChangeItem, Health, Release } from "./shared/release.ts";
 
 const KINDS: Record<string, Release["groups"][number]["kind"]> = { new: "new", added: "new", improved: "improved", changed: "improved", fixed: "fixed", breaking: "breaking", removed: "breaking" };
@@ -110,7 +110,7 @@ export async function latestRelease(): Promise<{ version: string; name: string; 
   try {
     res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json", "User-Agent": "ferry-update-check" }, signal: AbortSignal.timeout(10_000) });
   } catch (e) {
-    throw new Error(`couldn't reach GitHub: ${(e as Error).message}`);
+    throw new Error(`couldn't reach GitHub: ${(e as Error).message}`, { cause: e });
   }
   if (res.status === 404) throw new Error("no releases are published yet");
   if (!res.ok) throw new Error(`GitHub answered ${res.status}`);

@@ -52,6 +52,7 @@
   const threads = $derived([...shown].sort((a, b) => (a.path || "￿").localeCompare(b.path || "￿") || (a.line || 0) - (b.line || 0)));
   // where each reviewer landed: their latest verdict
   const verdicts = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- built and read inside this derived value, never stored
     const v = new Map<string, string>();
     for (const r of conv?.reviews ?? []) if (r.state === "APPROVED" || r.state === "CHANGES_REQUESTED") v.set(r.author, r.state);
     return { approved: [...v].filter(([, s]) => s === "APPROVED").map(([a]) => a), changes: [...v].filter(([, s]) => s === "CHANGES_REQUESTED").map(([a]) => a) };

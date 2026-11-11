@@ -5,6 +5,18 @@ on:
   pull_request:
 
 jobs:
+  # ESLint and Prettier, once (Windows checkouts can have CRLF line endings, which Prettier would flag)
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run format:check
+
   test:
     strategy:
       fail-fast: false

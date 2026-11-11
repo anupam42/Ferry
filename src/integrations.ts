@@ -6,6 +6,7 @@
 //   Azure DevOps: AZURE_DEVOPS_PAT, AZURE_DEVOPS_ORG
 //   Jira:         JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN
 // Tokens never leave this process: the web app only learns who is connected.
+import type { AzList, AzPullRequest, AzStatus, GlApprovals, GlMergeRequest, GlPipeline, JiraIssue } from "./apitypes.ts";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -249,11 +250,11 @@ export async function gitlabMergeRequests(r: Extract<Remote, { kind: "gitlab" }>
   const c = creds().gitlab;
   if (!c) throw new IntegrationError("connect GitLab first (Connections, on the left)", "not-connected");
   const id = encodeURIComponent(r.project);
-  const list = await gitlabGet<Record<string, any>[]>(c, `/projects/${id}/merge_requests?state=opened&per_page=30&order_by=updated_at`);
+  const list = await gitlabGet<GlMergeRequest[]>(c, `/projects/${id}/merge_requests?state=opened&per_page=30&order_by=updated_at`);
   return Promise.all(list.map(async (m) => {
     const [pipes, approvals] = await Promise.all([
-      gitlabGet<Record<string, any>[]>(c, `/projects/${id}/merge_requests/${m.iid}/pipelines?per_page=1`).catch(() => []),
-      gitlabGet<Record<string, any>>(c, `/projects/${id}/merge_requests/${m.iid}/approvals`).catch(() => null),
+      gitlabGet<GlPipeline[]>(c, `/projects/${id}/merge_requests/${m.iid}/pipelines?per_page=1`).catch(() => []),
+      gitlabGet<GlApprovals>(c, `/projects/${id}/merge_requests/${m.iid}/approvals`).catch(() => null),
     ]);
     const p = pipes[0];
     const state = !p ? "" : p.status === "success" ? "passed" : ["failed", "canceled"].includes(p.status) ? "failed" : "pending";
@@ -273,20 +274,20 @@ export async function azurePullRequests(r: Extract<Remote, { kind: "azure" }>): 
   if (!c) throw new IntegrationError("connect Azure DevOps first (Connections, on the left)", "not-connected");
   if (c.org.toLowerCase() !== r.org.toLowerCase()) throw new IntegrationError(`this repository is in the ${r.org} organization, but Ferry is connected to ${c.org}`, "not-connected");
   const base = `https://dev.azure.com/${encodeURIComponent(r.org)}/${encodeURIComponent(r.project)}/_apis/git/repositories/${encodeURIComponent(r.repo)}`;
-  const list = await azureGet<{ value: Record<string, any>[] }>(c, `${base}/pullrequests?searchCriteria.status=active&$top=30`);
+  const list = await azureGet<AzList<AzPullRequest>>(c, `${base}/pullrequests?searchCriteria.status=active&$top=30`);
   const strip = (ref: string) => String(ref ?? "").replace(/^refs\/heads\//, "");
   return Promise.all(list.value.map(async (p) => {
-    const statuses = await azureGet<{ value: Record<string, any>[] }>(c, `${base}/pullrequests/${p.pullRequestId}/statuses`).catch(() => ({ value: [] }));
+    const statuses = await azureGet<AzList<AzStatus>>(c, `${base}/pullrequests/${p.pullRequestId}/statuses`).catch((): AzList<AzStatus> => ({ value: [] }));
     // only the newest status per check counts
-    const latest = new Map<string, Record<string, any>>();
+    const latest = new Map<string, AzStatus>();
     for (const st of statuses.value) latest.set(`${st.context?.genre ?? ""}/${st.context?.name ?? ""}`, st);
     const items = [...latest.values()].map((st) => ({
       name: st.description || st.context?.name || "check",
       state: st.state === "succeeded" ? "passed" : ["failed", "error"].includes(st.state) ? "failed" : "pending",
       url: st.targetUrl ?? "",
     }));
-    const votes = (p.reviewers ?? []).map((v: { vote: number }) => v.vote);
-    const review = votes.some((v: number) => v === -10) ? "CHANGES_REQUESTED" : votes.some((v: number) => v >= 5) ? "APPROVED" : votes.length ? "REVIEW_REQUIRED" : "";
+    const votes = (p.reviewers ?? []).map((v) => v.vote);
+    const review = votes.some((v) => v === -10) ? "CHANGES_REQUESTED" : votes.some((v) => v >= 5) ? "APPROVED" : votes.length ? "REVIEW_REQUIRED" : "";
     return {
       number: p.pullRequestId, title: p.title, branch: strip(p.sourceRefName), base: strip(p.targetRefName), author: p.createdBy?.displayName ?? "",
       draft: !!p.isDraft, updated: p.creationDate,
@@ -310,8 +311,8 @@ export async function jiraMyIssues(): Promise<{ site: string; issues: Issue[] }>
   const jql = encodeURIComponent("assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC");
   const fields = "summary,status,issuetype,priority,updated";
   // Jira Cloud moved search to /search/jql; Jira Server and Data Center still use /search
-  const res = await jiraGet<{ issues: Record<string, any>[] }>(c, `/rest/api/3/search/jql?jql=${jql}&fields=${fields}&maxResults=50`)
-    .catch((e) => (e instanceof IntegrationError && e.code === "404" ? jiraGet<{ issues: Record<string, any>[] }>(c, `/rest/api/2/search?jql=${jql}&fields=${fields}&maxResults=50`) : Promise.reject(e)));
+  const res = await jiraGet<{ issues?: JiraIssue[] }>(c, `/rest/api/3/search/jql?jql=${jql}&fields=${fields}&maxResults=50`)
+    .catch((e) => (e instanceof IntegrationError && e.code === "404" ? jiraGet<{ issues?: JiraIssue[] }>(c, `/rest/api/2/search?jql=${jql}&fields=${fields}&maxResults=50`) : Promise.reject(e)));
   return {
     site: c.url,
     issues: (res.issues ?? []).map((i) => ({

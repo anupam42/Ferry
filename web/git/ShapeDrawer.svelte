@@ -48,7 +48,9 @@
   const dayAndClock = (iso: string) => { const d = new Date(iso); return (d.toDateString() === new Date().toDateString() ? "" : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + ", ") + hhmm(iso); };
   const msgOf = (g: (typeof groups)[number]) => messages[g.key] ?? g.suggested;
 
+  // cuts is replaced, never changed in place, so a plain Set is enough
   function split(i: number) { cuts = new Set([...cuts, i]); }
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a copy, changed before it replaces cuts
   function join(next: number) { const c = new Set(cuts); c.delete(next); cuts = c; }
 
   async function aiWrite(g: (typeof groups)[number]) {

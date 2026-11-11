@@ -1701,7 +1701,7 @@ export class Engine {
         gone++;
       });
     } catch (e) {
-      throw new Error(`upload to ${this.cfg.cloud} failed: ${firstLine(errMsg(e))}`);
+      throw new Error(`upload to ${this.cfg.cloud} failed: ${firstLine(errMsg(e))}`, { cause: e });
     } finally {
       if (up + gone > 0) this.emit({ kind: "info", msg: `uploaded ${up} file(s) and removed ${gone} on ${this.cfg.cloud}` });
     }

@@ -6,6 +6,7 @@
 // connected token (or `glab api` when only the CLI is set up), Azure DevOps
 // through the connected token. Comment text is always passed as data
 // (stdin / JSON / a raw -f field), never through a shell.
+import type { AzComment, AzList, AzPullRequest, AzThread, GhConversation, GhGraphQLResult, GhUser, GlDiscussion, GlMergeRequest, GlNote, GlUser } from "./apitypes.ts";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -117,21 +118,21 @@ function hunkSnippet(hunk: string, keep = 8): SnippetLine[] {
 
 async function githubConversation(root: string, url: string, n: number): Promise<Conversation> {
   const { owner, name } = ghRepo(url);
-  const r = await gh<any>(root, ["api", "graphql", "-f", "query=" + GH_QUERY, "-f", "owner=" + owner, "-f", "name=" + name, "-F", "num=" + n]);
+  const r = await gh<GhConversation>(root, ["api", "graphql", "-f", "query=" + GH_QUERY, "-f", "owner=" + owner, "-f", "name=" + name, "-F", "num=" + n]);
   const pr = r?.data?.repository?.pullRequest;
   if (!pr) throw new GitClientError(`there's no pull request #${n} here`);
-  const me = r.data.viewer?.login ?? "";
-  const who = (a: any) => a?.login ?? "ghost";
+  const me = r?.data?.viewer?.login ?? "";
+  const who = (a: GhUser | null | undefined) => a?.login ?? "ghost";
   return {
     provider: "GitHub", number: n, title: pr.title, url: pr.url, body: pr.body ?? "", author: who(pr.author), state: pr.state,
     branch: pr.headRefName, base: pr.baseRefName, subjectId: pr.id, me,
-    comments: pr.comments.nodes.map((c: any) => ({ id: c.id, author: who(c.author), body: c.body, date: c.createdAt, mine: who(c.author) === me })),
-    reviews: pr.reviews.nodes.filter((v: any) => v.state !== "PENDING").map((v: any) => ({ author: who(v.author), state: v.state, body: v.body ?? "", date: v.submittedAt ?? "" })),
-    threads: pr.reviewThreads.nodes.map((t: any) => ({
+    comments: pr.comments.nodes.map((c) => ({ id: c.id, author: who(c.author), body: c.body, date: c.createdAt, mine: who(c.author) === me })),
+    reviews: pr.reviews.nodes.filter((v) => v.state !== "PENDING").map((v) => ({ author: who(v.author), state: v.state, body: v.body ?? "", date: v.submittedAt ?? "" })),
+    threads: pr.reviewThreads.nodes.map((t) => ({
       id: t.id, path: t.path, line: t.line ?? t.originalLine ?? null, resolved: t.isResolved, outdated: t.isOutdated,
       canResolve: t.isResolved ? !!t.viewerCanUnresolve : !!t.viewerCanResolve,
       snippet: t.comments.nodes[0]?.diffHunk ? hunkSnippet(t.comments.nodes[0].diffHunk) : [],
-      comments: t.comments.nodes.map((c: any) => ({ id: c.id, author: who(c.author), body: c.body, date: c.createdAt, mine: who(c.author) === me })),
+      comments: t.comments.nodes.map((c) => ({ id: c.id, author: who(c.author), body: c.body, date: c.createdAt, mine: who(c.author) === me })),
     })),
   };
 }
@@ -139,8 +140,8 @@ async function githubConversation(root: string, url: string, n: number): Promise
 async function githubMutate(root: string, mutation: string, vars: Record<string, string>): Promise<void> {
   const args = ["api", "graphql", "-f", "query=" + mutation];
   for (const [k, v] of Object.entries(vars)) args.push("-f", `${k}=${v}`);
-  const r = await gh<any>(root, args);
-  if (r?.errors?.length) throw new GitClientError(r.errors[0].message ?? "GitHub refused that");
+  const r = await gh<GhGraphQLResult | null>(root, args);
+  if (r?.errors?.length) throw new GitClientError(r.errors[0]!.message ?? "GitHub refused that");
 }
 
 // ---------- GitLab (token, or glab) ----------
@@ -158,22 +159,23 @@ async function gl<T>(root: string, method: "GET" | "POST" | "PUT", p: string, bo
 async function gitlabConversation(root: string, project: string, n: number): Promise<Conversation> {
   const id = encodeURIComponent(project);
   const [mr, discussions, me] = await Promise.all([
-    gl<any>(root, "GET", `/projects/${id}/merge_requests/${n}`),
-    gl<any[]>(root, "GET", `/projects/${id}/merge_requests/${n}/discussions?per_page=100`),
-    gl<any>(root, "GET", "/user").catch(() => null),
+    gl<GlMergeRequest>(root, "GET", `/projects/${id}/merge_requests/${n}`),
+    gl<GlDiscussion[]>(root, "GET", `/projects/${id}/merge_requests/${n}/discussions?per_page=100`),
+    gl<GlUser>(root, "GET", "/user").catch(() => null),
   ]);
-  const mine = (a: any) => !!me && a?.username === me.username;
+  const mine = (a: GlUser | null | undefined) => !!me && a?.username === me.username;
   const comments: ReviewComment[] = [], threads: ReviewThread[] = [];
   for (const d of discussions) {
-    const notes = (d.notes ?? []).filter((x: any) => !x.system);
+    const notes = (d.notes ?? []).filter((x) => !x.system);
     if (!notes.length) continue;
-    const toC = (x: any): ReviewComment => ({ id: String(x.id), author: x.author?.name || x.author?.username || "", body: x.body ?? "", date: x.created_at, mine: mine(x.author) });
+    const toC = (x: GlNote): ReviewComment => ({ id: String(x.id), author: x.author?.name || x.author?.username || "", body: x.body ?? "", date: x.created_at, mine: mine(x.author) });
     const pos = notes[0].position;
-    if (pos && (pos.new_path || pos.old_path)) {
+    const file = pos?.new_path || pos?.old_path;
+    if (pos && file) {
       const line = pos.new_line ?? pos.old_line ?? null;
       threads.push({
-        id: String(d.id), path: pos.new_path || pos.old_path, line, resolved: !!notes[0].resolved, outdated: false, canResolve: !!notes[0].resolvable,
-        snippet: await snippetAround(root, mr.source_branch, pos.new_path || pos.old_path, line), comments: notes.map(toC),
+        id: String(d.id), path: file, line, resolved: !!notes[0].resolved, outdated: false, canResolve: !!notes[0].resolvable,
+        snippet: await snippetAround(root, mr.source_branch, file, line), comments: notes.map(toC),
       });
     } else if (notes.length > 1 || notes[0].resolvable) {
       threads.push({ id: String(d.id), path: "", line: null, resolved: !!notes[0].resolved, outdated: false, canResolve: !!notes[0].resolvable, snippet: [], comments: notes.map(toC) });
@@ -201,21 +203,21 @@ async function azureConversation(root: string, r: Extract<conn.Remote, { kind: "
   azureCheck(r);
   const base = azureBase(r);
   const [pr, th] = await Promise.all([
-    conn.azureApi<any>("GET", `${base}/pullrequests/${n}`),
-    conn.azureApi<{ value: any[] }>("GET", `${base}/pullRequests/${n}/threads`),
+    conn.azureApi<AzPullRequest>("GET", `${base}/pullrequests/${n}`),
+    conn.azureApi<AzList<AzThread>>("GET", `${base}/pullRequests/${n}/threads`),
   ]);
   const strip = (ref: string) => String(ref ?? "").replace(/^refs\/heads\//, "");
   const comments: ReviewComment[] = [], threads: ReviewThread[] = [];
-  const reviews: Review[] = (pr.reviewers ?? []).filter((v: any) => v.vote).map((v: any) => ({
+  const reviews: Review[] = (pr.reviewers ?? []).filter((v) => v.vote).map((v) => ({
     author: v.displayName, state: v.vote >= 10 ? "APPROVED" : v.vote === 5 ? "APPROVED" : v.vote === -10 ? "CHANGES_REQUESTED" : "COMMENTED", body: "", date: "",
   }));
   for (const t of th.value) {
     if (t.isDeleted) continue;
-    const cs = (t.comments ?? []).filter((c: any) => c.commentType !== "system" && !c.isDeleted);
+    const cs = (t.comments ?? []).filter((c) => c.commentType !== "system" && !c.isDeleted);
     if (!cs.length) continue;
-    const toC = (c: any): ReviewComment => ({ id: String(c.id), author: c.author?.displayName ?? "", body: c.content ?? "", date: c.publishedDate, mine: false });
+    const toC = (c: AzComment): ReviewComment => ({ id: String(c.id), author: c.author?.displayName ?? "", body: c.content ?? "", date: c.publishedDate, mine: false });
     const ctx = t.threadContext;
-    const resolved = ["fixed", "closed", "byDesign", "wontFix"].includes(t.status);
+    const resolved = ["fixed", "closed", "byDesign", "wontFix"].includes(t.status ?? "");
     if (ctx?.filePath) {
       const file = String(ctx.filePath).replace(/^\//, "");
       const line = ctx.rightFileStart?.line ?? ctx.leftFileStart?.line ?? null;

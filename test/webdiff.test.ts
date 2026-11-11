@@ -2,6 +2,8 @@
 import { describe, expect, test } from "bun:test";
 
 import { mapLayout, parseDiff, splitRows, story, wordDiff } from "../web/lib/diff.ts";
+import { fileList, repoMood, whoPushed } from "../web/lib/gitmood.ts";
+import { avatar, edgePath, graphLayout } from "../web/lib/graph.ts";
 import { mood } from "../web/lib/mood.ts";
 import type { Line, PairStatus } from "../web/lib/types.ts";
 
@@ -79,7 +81,6 @@ describe("Relay's mood for a pair", () => {
 });
 
 describe("Relay's mood for a repository", () => {
-  const { repoMood, whoPushed, fileList } = require("../web/lib/gitmood.ts") as typeof import("../web/lib/gitmood.ts");
   const st = {
     root: "/r", branch: "main", head: "abc1234", detached: false, upstream: "origin/main", ahead: 0, behind: 0, operation: "" as const, operationBranch: "",
     files: [], stashes: 0, remotes: ["origin"], lastCommit: null, name: "r", pairs: [], standalone: true,
@@ -106,7 +107,6 @@ describe("Relay's mood for a repository", () => {
 });
 
 describe("the history graph", () => {
-  const { graphLayout, edgePath, avatar } = require("../web/lib/graph.ts") as typeof import("../web/lib/graph.ts");
   // newest first: a merge (m) of a branch (b) back into main (a)
   //   m ─┬─ a2 ── a1
   //      └─ b1 ───┘

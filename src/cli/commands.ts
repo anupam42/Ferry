@@ -205,7 +205,7 @@ export async function cmdPlan(args: string[]): Promise<void> {
     try {
       changes = e.plan();
     } catch (err) {
-      throw new Error(`${p.name}: ${(err as Error).message}`);
+      throw new Error(`${p.name}: ${(err as Error).message}`, { cause: err });
     }
     const pp: PairPlan = {
       pair: p.name,
@@ -461,12 +461,12 @@ function backupsPrune(pos: string[], olderThan: string, maxSize: string): void {
   try {
     age = parseDuration(olderThan);
   } catch (e) {
-    throw new Error(`--older-than: ${(e as Error).message}`);
+    throw new Error(`--older-than: ${(e as Error).message}`, { cause: e });
   }
   try {
     size = parseSize(maxSize);
   } catch (e) {
-    throw new Error(`--max-size: ${(e as Error).message}`);
+    throw new Error(`--max-size: ${(e as Error).message}`, { cause: e });
   }
   if (age <= 0 && size <= 0)
     throw new Error(

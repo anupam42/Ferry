@@ -254,8 +254,8 @@ export function removeWithRetry(p: string): void {
     try {
       fs.unlinkSync(p);
       return;
-    } catch (e: any) {
-      if (e?.code === "ENOENT") return;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException | null)?.code === "ENOENT") return;
       err = e;
     }
     Bun.sleepSync(50 * (i + 1));
