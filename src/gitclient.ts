@@ -15,6 +15,7 @@ import type { GhPullRequest, GlMergeRequest } from "./apitypes.ts";
 import type {
   BisectMark,
   BisectState,
+  BranchList,
   CommitFile,
   Comparison,
   ConflictParts,
@@ -23,7 +24,6 @@ import type {
   RewriteStep,
   Insights,
   PullRequest,
-  Branch,
   BlameChunk,
   Commit,
   CommitDetail,
@@ -958,9 +958,7 @@ export async function compareFileDiff(root: string, base: unknown, head: unknown
 
 // ---------- branches ----------
 
-export async function branches(
-  root: string,
-): Promise<{ local: Branch[]; remote: { name: string; date: string; subject: string }[] }> {
+export async function branches(root: string): Promise<BranchList> {
   const fmt =
     "%(refname:short)%1f%(HEAD)%1f%(upstream:short)%1f%(upstream:track)%1f%(committerdate:iso-strict)%1f%(contents:subject)";
   const [l, r] = await Promise.all([
@@ -997,7 +995,19 @@ export async function branches(
       return { name: name!, date: date ?? "", subject: subject ?? "" };
     })
     .filter((b) => !b.name.endsWith("/HEAD") && b.name.includes("/") && !tracked.has(b.name));
-  return { local, remote };
+  // what each has that the current branch doesn't, so deleting it can say what would be lost
+  const hasHead = await gitOk(root, ["rev-parse", "--verify", "--quiet", "HEAD"]);
+  const counts = await Promise.all(
+    remote.map((b) =>
+      hasHead
+        ? git(root, ["rev-list", "--count", "HEAD.." + b.name, "--"]).then(
+            (n) => Number(n.trim()) || 0,
+            () => 0,
+          )
+        : Promise.resolve(0),
+    ),
+  );
+  return { local, remote: remote.map((b, i) => ({ ...b, unmerged: counts[i]! })) };
 }
 
 export async function createBranch(root: string, name: unknown, from: unknown, checkout: boolean): Promise<string> {
@@ -1035,6 +1045,36 @@ export async function deleteBranch(root: string, name: unknown, force: boolean):
       throw new GitClientError("this branch has commits that aren't merged anywhere", "unmerged");
     throw e;
   }
+}
+
+/**
+ * Deletes a branch on its remote ("origin/feature": git push origin --delete
+ * feature). The remote's own main branch (what origin/HEAD points at) can't be
+ * deleted from here. A branch that's already gone there is just tidied away locally.
+ */
+export async function deleteRemoteBranch(root: string, name: unknown): Promise<{ remote: string; branch: string }> {
+  const n = plain(name, "branch");
+  const remotes = (await git(root, ["remote"])).split("\n").filter(Boolean);
+  const remote = remotes.filter((r) => n.startsWith(r + "/")).sort((a, b) => b.length - a.length)[0];
+  if (!remote) throw new GitClientError(`"${n}" isn't a branch on a remote`);
+  const branch = n.slice(remote.length + 1);
+  if (!branch || !(await gitOk(root, ["check-ref-format", "--branch", branch])))
+    throw new GitClientError(`"${n}" isn't a branch name`);
+  const def = (await git(root, ["symbolic-ref", "-q", `refs/remotes/${remote}/HEAD`]).catch(() => "")).trim();
+  if (def === `refs/remotes/${remote}/${branch}`)
+    throw new GitClientError(`${n} is ${remote}'s main branch; it can't be deleted from here`, "default-branch");
+  const r = await exec(["git", "-C", root, "push", remote, "--delete", branch], {
+    env: env(),
+    timeoutMs: 2 * 60_000,
+  });
+  if (r.code !== 0) {
+    const msg = r.stderr || r.stdout || r.error || "";
+    // gone there already: forget our copy of it
+    if (/remote ref does not exist|unable to delete .*: remote ref/i.test(msg))
+      await git(root, ["branch", "-r", "-d", n]).catch(() => "");
+    else throw new GitClientError(cleanMessage(msg || "couldn't delete it on the remote"));
+  }
+  return { remote, branch };
 }
 
 // ---------- remotes ----------

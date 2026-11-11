@@ -47,6 +47,7 @@ export interface FerryEvent {
 export type {
   BisectMark,
   BisectState,
+  RemoteBranch,
   CommitFile,
   Comparison,
   ConflictParts,

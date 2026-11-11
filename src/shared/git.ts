@@ -207,9 +207,18 @@ export interface Branch {
 }
 
 /** GET /git/{id}/branches */
+/** A branch on a remote with no local copy. */
+export interface RemoteBranch {
+  name: string; // "origin/feature"
+  date: string;
+  subject: string;
+  /** commits on it that the current branch doesn't have (0: fully merged) */
+  unmerged: number;
+}
+
 export interface BranchList {
   local: Branch[];
-  remote: { name: string; date: string; subject: string }[];
+  remote: RemoteBranch[];
 }
 /** GET /git/{id}/stashes */
 export interface Stash {

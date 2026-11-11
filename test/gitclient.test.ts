@@ -36,6 +36,43 @@ async function repo(): Promise<string> {
 }
 
 describe("git client", () => {
+  test("delete a branch on the remote: merged or not, never its main branch, already gone is fine", async () => {
+    const d = await repo();
+    const main = sh(d, "branch", "--show-current").trim();
+    const bare = path.join(tempDir(), "remote.git");
+    sh(d, "init", "--bare", bare);
+    sh(d, "remote", "add", "origin", bare);
+    sh(d, "push", "-q", "-u", "origin", main);
+    sh(bare, "symbolic-ref", "HEAD", `refs/heads/${main}`);
+    sh(d, "remote", "set-head", "origin", "--auto");
+    // merged: a branch at the same commit; unmerged: two commits of its own
+    sh(d, "push", "-q", "origin", `${main}:refs/heads/done`);
+    sh(d, "switch", "-qc", "wip");
+    put(d, "w.txt", "1\n");
+    sh(d, "add", "w.txt");
+    sh(d, "commit", "-qm", "wip 1");
+    put(d, "w.txt", "2\n");
+    sh(d, "commit", "-qam", "wip 2");
+    sh(d, "push", "-q", "origin", "wip");
+    sh(d, "switch", "-q", main);
+    sh(d, "branch", "-q", "-D", "wip");
+
+    const list = await g.branches(d);
+    const by = Object.fromEntries(list.remote.map((b) => [b.name, b.unmerged]));
+    expect(by).toEqual({ "origin/done": 0, "origin/wip": 2 });
+
+    expect(await g.deleteRemoteBranch(d, "origin/wip")).toEqual({ remote: "origin", branch: "wip" });
+    expect(sh(bare, "branch", "--list", "wip").trim()).toBe(""); // gone on the remote
+    expect((await g.branches(d)).remote.map((b) => b.name)).toEqual(["origin/done"]);
+
+    await expect(g.deleteRemoteBranch(d, `origin/${main}`)).rejects.toThrow(/main branch/);
+    await expect(g.deleteRemoteBranch(d, "nowhere/x")).rejects.toThrow(/isn't a branch on a remote/);
+    // someone else deleted it already: our copy is tidied away, no error
+    sh(bare, "branch", "-D", "done");
+    await g.deleteRemoteBranch(d, "origin/done");
+    expect((await g.branches(d)).remote).toEqual([]);
+  });
+
   test("bisect finds the commit that broke it, step by step, and goes back to the branch", async () => {
     const d = await repo(); // commit 1: "first"
     const main = sh(d, "branch", "--show-current").trim();
