@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from "../components/Icon.svelte";
+  import Menu from "../components/Menu.svelte";
   import RelayLoading from "../components/RelayLoading.svelte";
   import Section from "../components/Section.svelte";
   import { api, enc } from "../lib/api.ts";
@@ -25,23 +26,23 @@
   let firstNew = $state(0);
 
   // what "All branches" would add: commits on other branches that this one doesn't have
-  let extra = $state<{ commits: number; branches: number } | null>(null);
+  let others = $state<{ commits: number; branches: number } | null>(null);
   $effect(() => {
     void git.selected;
     void branch;
     void head;
     void git.bump;
     api<{ commits: number; branches: number }>("GET", git.url("elsewhere")).then(
-      (r) => (extra = r),
-      () => (extra = null),
+      (r) => (others = r),
+      () => (others = null),
     );
   });
   const here = $derived(st.branch || "this branch");
   const extraTitle = $derived(
-    !extra
+    !others
       ? "Also commits on other branches and tags"
-      : extra.commits
-        ? `${plural(extra.commits, "commit")} on ${plural(extra.branches, "other branch", "other branches")} that ${here} doesn't have`
+      : others.commits
+        ? `${plural(others.commits, "commit")} on ${plural(others.branches, "other branch", "other branches")} that ${here} doesn't have`
         : `Every other branch is already part of ${here}, so this shows the same commits`,
   );
 
@@ -172,6 +173,31 @@
   <RelayLoading say="Reading the history" mood="thinking" />
 {:else}
   <Section id="g-hist" title="History" count={commits.length}>
+    {#snippet extra()}
+      <!-- the occasional tools: out of the toolbar, a click away -->
+      <Menu
+        label="More history tools"
+        items={[
+          ...(commits!.length > 1
+            ? [
+                {
+                  label: "Edit commits…",
+                  hint: "Reorder, reword, squash or drop recent commits",
+                  icon: "list",
+                  // your unpushed commits, or the last five when everything's pushed
+                  run: () => (git.rewrite = commits![Math.min(commits!.length - 1, (st.ahead || 5) - 1)]!.hash),
+                },
+              ]
+            : []),
+          {
+            label: "Find a break…",
+            hint: "Find the commit that broke something (bisect)",
+            icon: "search",
+            run: () => (git.bisect = {}),
+          },
+        ]}
+      />
+    {/snippet}
     <div class="tools">
       <div class="scope">
         <div class="seg" role="radiogroup" aria-label="Which commits">
@@ -193,23 +219,9 @@
               all = true;
               limit = PAGE;
             }}
-            >All branches{#if extra?.commits}<span class="more">+{extra.commits}</span>{/if}</button
+            >All branches{#if others?.commits}<span class="more">+{others.commits}</span>{/if}</button
           >
         </div>
-        {#if !all && commits.length > 1}
-          <!-- your unpushed commits, or the last five when everything's pushed -->
-          <button
-            class="btn small ghost"
-            title="Reorder, reword, squash or drop recent commits"
-            onclick={() => (git.rewrite = commits![Math.min(commits!.length - 1, (st.ahead || 5) - 1)]!.hash)}
-            ><Icon name="list" size={16} />Edit commits…</button
-          >
-          <button
-            class="btn small ghost"
-            title="Something that worked is broken now: find the commit that did it (bisect)"
-            onclick={() => (git.bisect = {})}><Icon name="search" size={16} />Find a break…</button
-          >
-        {/if}
       </div>
       <!-- at the end: the search, one field holding what to look for and (inside it) where to look -->
       <div class="end">
@@ -258,7 +270,7 @@
       </div>
     </div>
 
-    {#if all && extra && !extra.commits}
+    {#if all && others && !others.commits}
       <p class="same muted">Every other branch is already part of {here}, so this is the same list.</p>
     {/if}
     {#if searching}
