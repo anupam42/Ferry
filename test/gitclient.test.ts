@@ -36,6 +36,45 @@ async function repo(): Promise<string> {
 }
 
 describe("git client", () => {
+  test("compare two branches: commits on each side, and what one changed since they split", async () => {
+    const d = await repo();
+    const main = sh(d, "branch", "--show-current").trim();
+    sh(d, "switch", "-c", "feature");
+    put(d, "a.txt", "one\nTWO\nthree\n");
+    put(d, "new.txt", "hello\n");
+    sh(d, "add", "-A");
+    sh(d, "commit", "-m", "feature work");
+    sh(d, "switch", main);
+    put(d, "other.txt", "main moved on\n");
+    sh(d, "add", "-A");
+    sh(d, "commit", "-m", "main work");
+
+    const c = await g.compare(d, main, "feature");
+    expect(c.aheadCount).toBe(1);
+    expect(c.ahead.map((x) => x.subject)).toEqual(["feature work"]);
+    expect(c.behindCount).toBe(1);
+    expect(c.behind.map((x) => x.subject)).toEqual(["main work"]);
+    expect(c.mergeBase).not.toBe("");
+    // since they split: what feature changed, not main's other.txt
+    expect(c.files.map((f) => [f.path, f.status]).sort()).toEqual([
+      ["a.txt", "M"],
+      ["new.txt", "A"],
+    ]);
+    expect(c.files.find((f) => f.path === "a.txt")).toMatchObject({ added: 1, removed: 1 });
+
+    const diff = await g.compareFileDiff(d, main, "feature", "a.txt");
+    expect(diff.lines.some((l) => l.op === "+" && l.text === "TWO")).toBe(true);
+    expect(diff.lines.some((l) => l.op === "-" && l.text === "two")).toBe(true);
+
+    // the same branch: nothing either way
+    const same = await g.compare(d, main, main);
+    expect([same.aheadCount, same.behindCount, same.files.length]).toEqual([0, 0, 0]);
+    await expect(g.compare(d, main, "no-such-branch")).rejects.toThrow(
+      /no branch, tag or commit called "no-such-branch"/,
+    );
+    await expect(g.compare(d, "--all", main)).rejects.toThrow(/can't start with "-"/);
+  });
+
   test("what All branches adds: commits only on other branches, until they're merged", async () => {
     const d = await repo();
     expect(await g.elsewhere(d)).toEqual({ commits: 0, branches: 0 });

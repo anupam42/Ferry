@@ -88,9 +88,34 @@ export interface Commit {
   head?: boolean;
 }
 
+/** One file a commit (or a comparison) changed: A, M, D, R or C, and its line counts. */
+export interface CommitFile {
+  path: string;
+  from?: string;
+  status: string;
+  added: number;
+  removed: number;
+}
+
 export interface CommitDetail extends Commit {
   body: string;
-  files: { path: string; from?: string; status: string; added: number; removed: number }[];
+  files: CommitFile[];
+}
+
+/** GET /git/{id}/compare: what head has that base doesn't, and the other way round. */
+export interface Comparison {
+  base: string;
+  head: string;
+  /** where they split ("" when they share no history) */
+  mergeBase: string;
+  /** commits on head that base doesn't have, newest first (at most 200) */
+  ahead: Commit[];
+  aheadCount: number;
+  /** commits on base that head doesn't have, newest first (at most 200) */
+  behind: Commit[];
+  behindCount: number;
+  /** what head changed since they split (the three-dot diff, like a pull request) */
+  files: CommitFile[];
 }
 
 export interface Branch {

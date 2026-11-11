@@ -5,6 +5,7 @@
   import { git } from "../lib/git.svelte.ts";
   import AddRepo from "./AddRepo.svelte";
   import CommitDrawer from "./CommitDrawer.svelte";
+  import CompareDrawer from "./CompareDrawer.svelte";
   import ConflictDrawer from "./ConflictDrawer.svelte";
   import ChecksDrawer from "./ChecksDrawer.svelte";
   import FileDrawer from "./FileDrawer.svelte";
@@ -46,6 +47,7 @@
 {#if git.pr}<PrDrawer />{/if}
 {#if git.checks}<ChecksDrawer />{/if}
 {#if git.file}<FileDrawer />{/if}
+{#if git.compare}<CompareDrawer />{/if}
 {#if git.commit}<CommitDrawer />{/if}
 
 <style lang="scss">

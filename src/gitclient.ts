@@ -13,6 +13,8 @@ import path from "node:path";
 import { diff as lineDiff, type Line } from "./difftext.ts";
 import type { GhPullRequest, GlMergeRequest } from "./apitypes.ts";
 import type {
+  CommitFile,
+  Comparison,
   Insights,
   PullRequest,
   Branch,
@@ -611,13 +613,8 @@ function parseCommits(out: string): Commit[] {
     });
 }
 
-export async function commitDetail(root: string, hash: unknown): Promise<CommitDetail> {
-  const h = commitId(hash);
-  const meta = await git(root, ["show", "-s", "--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b", h]);
-  const [full, short, parents, author, email, date, subject, refs, body] = meta.split("\x1f");
-  const ps = parents ? parents.trim().split(" ").filter(Boolean) : [];
-  const range = ps.length ? [ps[0]!, full!.trim()] : ["--root", full!.trim()];
-  const diffArgs = ps.length ? ["diff", "-M", ...range] : ["diff-tree", "-r", "-M", "--no-commit-id", ...range];
+/** The files a diff changes (diffArgs: "diff A B" or "diff-tree …"), each with its status and line counts. */
+async function changedFiles(root: string, diffArgs: string[]): Promise<CommitFile[]> {
   const [names, nums] = await Promise.all([
     git(root, [...diffArgs, "--name-status"]),
     git(root, [...diffArgs, "--numstat"]),
@@ -631,7 +628,7 @@ export async function commitDetail(root: string, hash: unknown): Promise<CommitD
       .replace(/^.* => /, "");
     counts.set(p, [a === "-" ? 0 : +a!, r === "-" ? 0 : +r!]);
   }
-  const files = names
+  return names
     .split("\n")
     .filter(Boolean)
     .map((l) => {
@@ -640,6 +637,16 @@ export async function commitDetail(root: string, hash: unknown): Promise<CommitD
       const [added, removed] = counts.get(p) ?? [0, 0];
       return { path: p, from: b ? a : undefined, status: status![0]!, added, removed };
     });
+}
+
+export async function commitDetail(root: string, hash: unknown): Promise<CommitDetail> {
+  const h = commitId(hash);
+  const meta = await git(root, ["show", "-s", "--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b", h]);
+  const [full, short, parents, author, email, date, subject, refs, body] = meta.split("\x1f");
+  const ps = parents ? parents.trim().split(" ").filter(Boolean) : [];
+  const range = ps.length ? [ps[0]!, full!.trim()] : ["--root", full!.trim()];
+  const diffArgs = ps.length ? ["diff", "-M", ...range] : ["diff-tree", "-r", "-M", "--no-commit-id", ...range];
+  const files = await changedFiles(root, diffArgs);
   return {
     hash: full!.trim(),
     short: short!,
@@ -667,6 +674,63 @@ export async function commitFileDiff(root: string, hash: unknown, file: unknown)
     before: parents.length ? "Before this commit" : "Nothing (first commit)",
     after: "After this commit",
   });
+}
+
+// ---------- comparing branches ----------
+
+/** A branch, tag or commit that exists, as given; otherwise a clear error. */
+async function existingRef(root: string, v: unknown, what: string): Promise<string> {
+  const r = plain(v, what);
+  if (!(await gitOk(root, ["rev-parse", "--verify", "--quiet", r + "^{commit}"])))
+    throw new GitClientError(`there's no branch, tag or commit called "${r}"`, "bad-ref");
+  return r;
+}
+
+/**
+ * What head has that base doesn't (and the other way round), and what head
+ * changed since the two split: the same view as a pull request from head into base.
+ */
+export async function compare(root: string, base: unknown, head: unknown): Promise<Comparison> {
+  const b = await existingRef(root, base, "base"),
+    h = await existingRef(root, head, "head");
+  const mergeBase = (await git(root, ["merge-base", b, h]).catch(() => "")).trim();
+  const [counts, ahead, behind] = await Promise.all([
+    git(root, ["rev-list", "--left-right", "--count", `${b}...${h}`]),
+    git(root, ["log", "--date-order", LOG_FORMAT, "-n200", `${b}..${h}`, "--"]),
+    git(root, ["log", "--date-order", LOG_FORMAT, "-n200", `${h}..${b}`, "--"]),
+  ]);
+  const [behindCount, aheadCount] = counts.trim().split(/\s+/).map(Number);
+  // since they split; with no shared history, just the two trees against each other
+  const files = await changedFiles(root, ["diff", "-M", mergeBase ? `${b}...${h}` : b, ...(mergeBase ? [] : [h])]);
+  return {
+    base: b,
+    head: h,
+    mergeBase,
+    ahead: parseCommits(ahead),
+    aheadCount: aheadCount ?? 0,
+    behind: parseCommits(behind),
+    behindCount: behindCount ?? 0,
+    files,
+  };
+}
+
+/** One file's change in a comparison: from where base and head split, to head. */
+export async function compareFileDiff(root: string, base: unknown, head: unknown, file: unknown): Promise<FileDiff> {
+  const b = await existingRef(root, base, "base"),
+    h = await existingRef(root, head, "head");
+  const p = repoPath(root, file);
+  const split = (await git(root, ["merge-base", b, h]).catch(() => "")).trim();
+  const text = await git(root, [
+    "diff",
+    "--no-color",
+    "-M",
+    "-U3",
+    split ? `${b}...${h}` : b,
+    ...(split ? [] : [h]),
+    "--",
+    p,
+  ]);
+  return capped({ lines: parseUnified(text), before: split ? `${b}, where they split` : b, after: h });
 }
 
 // ---------- branches ----------

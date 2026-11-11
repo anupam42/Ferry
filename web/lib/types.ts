@@ -45,6 +45,8 @@ export interface FerryEvent {
   [k: string]: unknown;
 }
 export type {
+  CommitFile,
+  Comparison,
   Conversation,
   InsightsResponse,
   ShapeBatch,
