@@ -33,6 +33,8 @@ export interface RepoState {
   behind: number;
   operation: "" | "merge" | "rebase" | "cherry-pick" | "revert";
   operationBranch: string; // what is being merged, when known
+  /** a bisect is running: HEAD is a commit being tested, not your branch */
+  bisecting: boolean;
   files: FileChange[];
   stashes: number;
   remotes: string[];
@@ -100,6 +102,29 @@ export interface CommitFile {
 export interface CommitDetail extends Commit {
   body: string;
   files: CommitFile[];
+}
+
+/** One verdict in a bisect so far. */
+export interface BisectMark {
+  verdict: "good" | "bad" | "skip";
+  hash: string;
+  subject: string;
+}
+
+/** GET /git/{id}/bisect: where a bisect stands. */
+export interface BisectState {
+  active: boolean;
+  /** the branch it started from, where Stop goes back to */
+  branch: string;
+  /** the commit checked out to test now */
+  current: Commit | null;
+  /** commits still in question */
+  remaining: number;
+  /** about how many more tests it takes */
+  steps: number;
+  marks: BisectMark[];
+  /** the first bad commit, once it's found */
+  found: Commit | null;
 }
 
 /** One commit you can rewrite: its whole message, and whether it's already on a remote. */

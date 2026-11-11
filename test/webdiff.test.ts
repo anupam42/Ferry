@@ -120,6 +120,7 @@ describe("Relay's mood for a repository", () => {
     behind: 0,
     operation: "" as const,
     operationBranch: "",
+    bisecting: false,
     files: [],
     stashes: 0,
     remotes: ["origin"],

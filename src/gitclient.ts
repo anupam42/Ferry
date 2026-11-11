@@ -13,6 +13,8 @@ import path from "node:path";
 import { diff as lineDiff, type Line } from "./difftext.ts";
 import type { GhPullRequest, GlMergeRequest } from "./apitypes.ts";
 import type {
+  BisectMark,
+  BisectState,
   CommitFile,
   Comparison,
   ConflictParts,
@@ -195,6 +197,7 @@ export async function state(root: string): Promise<RepoState> {
     behind: 0,
     operation: "",
     operationBranch: "",
+    bisecting: false,
     files: [],
     stashes: 0,
     remotes: [],
@@ -246,6 +249,7 @@ export async function state(root: string): Promise<RepoState> {
   ]);
   st.operation = ops.kind;
   st.operationBranch = ops.branch;
+  st.bisecting = fs.existsSync(await gitPath(root, "BISECT_START"));
   st.stashes = stashes.split("\n").filter(Boolean).length;
   st.remotes = remotes.split("\n").filter(Boolean);
   if (last) {
@@ -678,6 +682,82 @@ export async function commitFileDiff(root: string, hash: unknown, file: unknown)
     before: parents.length ? "Before this commit" : "Nothing (first commit)",
     after: "After this commit",
   });
+}
+
+// ---------- bisect: finding the commit that broke something ----------
+
+/** Where a bisect stands: the commit to test now, what's been marked, and the first bad commit once found. */
+export async function bisectState(root: string): Promise<BisectState> {
+  const start = await gitPath(root, "BISECT_START");
+  if (!fs.existsSync(start))
+    return { active: false, branch: "", current: null, remaining: 0, steps: 0, marks: [], found: null };
+  const branch = fs.readFileSync(start, "utf8").trim();
+  const log = await git(root, ["bisect", "log"]).catch(() => "");
+  // "# good: [hash] subject", "# bad: …", "# skip: …"
+  const marks: BisectMark[] = [];
+  for (const m of log.matchAll(/^# (good|bad|skip): \[([0-9a-f]{7,64})\] (.*)$/gm))
+    marks.push({ verdict: m[1] as BisectMark["verdict"], hash: m[2]!, subject: m[3]! });
+  const refs = await git(root, ["for-each-ref", "--format=%(refname) %(objectname)", "refs/bisect/"]).catch(() => "");
+  let bad = "";
+  const good: string[] = [];
+  for (const l of refs.split("\n").filter(Boolean)) {
+    const [name, hash] = l.split(" ");
+    if (name === "refs/bisect/bad") bad = hash!;
+    else if (name!.startsWith("refs/bisect/good-")) good.push(hash!);
+  }
+  let remaining = 0;
+  if (bad && good.length)
+    remaining = Number((await git(root, ["rev-list", "--count", bad, "--not", ...good]).catch(() => "0")).trim());
+  const one = async (rev: string) => parseCommits(await git(root, ["log", "-1", LOG_FORMAT, rev, "--"]))[0] ?? null;
+  // only the bad commit itself left in question: that's the one
+  const found = bad && good.length && remaining === 1 ? await one(bad) : null;
+  return {
+    active: true,
+    branch,
+    current: found ? null : await one("HEAD"),
+    remaining,
+    steps: remaining > 1 ? Math.ceil(Math.log2(remaining)) : 0,
+    marks,
+    found,
+  };
+}
+
+/**
+ * Starts a bisect between a commit where things work and one where they're
+ * broken (HEAD by default), and checks out the commit halfway between to test.
+ * Needs a clean work tree: testing old commits shouldn't mix with your edits.
+ */
+export async function bisectStart(root: string, good: unknown, bad: unknown): Promise<BisectState> {
+  if ((await operation(root)).kind) throw new GitClientError("Finish or cancel what's in progress first.");
+  if (fs.existsSync(await gitPath(root, "BISECT_START"))) throw new GitClientError("A bisect is already running.");
+  const dirty = (await git(root, ["status", "--porcelain", "--untracked-files=no"])).trim();
+  if (dirty)
+    throw new GitClientError(
+      "Commit or stash your changes first: testing old commits checks them out over your work.",
+      "dirty",
+    );
+  const g = await existingRef(root, good, "the commit that works");
+  const b = bad === undefined || bad === "" ? "HEAD" : await existingRef(root, bad, "the commit that's broken");
+  if (!(await gitOk(root, ["merge-base", "--is-ancestor", g, b])))
+    throw new GitClientError("The working commit has to come before the broken one.");
+  if ((await git(root, ["rev-parse", g])).trim() === (await git(root, ["rev-parse", b])).trim())
+    throw new GitClientError("Those are the same commit.");
+  await git(root, ["bisect", "start", b, g, "--"]);
+  return bisectState(root);
+}
+
+/** Marks the commit being tested: it works (good), it's broken (bad), or it can't be tested (skip). */
+export async function bisectMark(root: string, verdict: unknown): Promise<BisectState> {
+  if (verdict !== "good" && verdict !== "bad" && verdict !== "skip")
+    throw new GitClientError("verdict must be good, bad or skip");
+  if (!fs.existsSync(await gitPath(root, "BISECT_START"))) throw new GitClientError("No bisect is running.");
+  await git(root, ["bisect", verdict]);
+  return bisectState(root);
+}
+
+/** Ends the bisect and goes back to the branch it started from. */
+export async function bisectReset(root: string): Promise<void> {
+  await git(root, ["bisect", "reset"]);
 }
 
 // ---------- rewriting recent commits (interactive rebase) ----------

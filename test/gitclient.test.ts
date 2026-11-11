@@ -36,6 +36,42 @@ async function repo(): Promise<string> {
 }
 
 describe("git client", () => {
+  test("bisect finds the commit that broke it, step by step, and goes back to the branch", async () => {
+    const d = await repo(); // commit 1: "first"
+    const main = sh(d, "branch", "--show-current").trim();
+    for (let i = 2; i <= 9; i++) {
+      put(d, "app.txt", i >= 6 ? `version ${i}\nBUG\n` : `version ${i}\n`);
+      sh(d, "add", "app.txt");
+      sh(d, "commit", "-qm", `change ${i}${i === 6 ? " (the bad one)" : ""}`);
+    }
+    const first = sh(d, "rev-list", "--max-parents=0", "HEAD").trim();
+
+    put(d, "a.txt", "uncommitted\n");
+    await expect(g.bisectStart(d, first, "")).rejects.toThrow(/Commit or stash/);
+    sh(d, "checkout", "--", "a.txt");
+
+    let st = await g.bisectStart(d, first, "");
+    expect(st.active).toBe(true);
+    expect(st.branch).toBe(main);
+    expect((await g.state(d)).bisecting).toBe(true);
+    let tests = 0;
+    while (!st.found && tests < 10) {
+      // what a person would do: look at the checked-out files and say whether it's broken
+      const broken = fs.existsSync(path.join(d, "app.txt")) && read(d, "app.txt").includes("BUG");
+      st = await g.bisectMark(d, broken ? "bad" : "good");
+      tests++;
+    }
+    expect(st.found?.subject).toBe("change 6 (the bad one)");
+    expect(tests).toBeLessThanOrEqual(4); // 9 commits: about log2(9)
+    expect(st.marks.length).toBe(tests + 2); // the two from the start, plus each test
+
+    await g.bisectReset(d);
+    expect(sh(d, "branch", "--show-current").trim()).toBe(main);
+    expect((await g.bisectState(d)).active).toBe(false);
+    expect((await g.state(d)).bisecting).toBe(false);
+    await expect(g.bisectMark(d, "good")).rejects.toThrow(/No bisect/);
+  });
+
   test("rewrite recent commits: reword, squash, drop and reorder, with work in progress kept", async () => {
     const d = await repo(); // "first": a.txt
     const add = (f: string, text: string, msg: string) => {

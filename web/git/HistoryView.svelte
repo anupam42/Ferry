@@ -204,6 +204,11 @@
             onclick={() => (git.rewrite = commits![Math.min(commits!.length - 1, (st.ahead || 5) - 1)]!.hash)}
             ><Icon name="list" size={16} />Edit commits…</button
           >
+          <button
+            class="btn small ghost"
+            title="Something that worked is broken now: find the commit that did it (bisect)"
+            onclick={() => (git.bisect = {})}><Icon name="search" size={16} />Find a break…</button
+          >
         {/if}
       </div>
       <!-- at the end: the search, one field holding what to look for and (inside it) where to look -->

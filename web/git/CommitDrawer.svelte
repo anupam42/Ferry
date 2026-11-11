@@ -189,6 +189,15 @@
           git.rewrite = h;
         }}>Rewrite from here</button
       >
+      <button
+        class="btn small"
+        title="Something broke after this commit? Find which commit did it (bisect)"
+        onclick={() => {
+          const h = c!.hash;
+          close();
+          git.bisect = { good: h };
+        }}>It worked here: find the break</button
+      >
       <button class="btn small" onclick={revert}>Revert</button>
       <button class="btn small brand" onclick={cherryPick}>Cherry-pick</button>
     {/if}

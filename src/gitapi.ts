@@ -3,11 +3,11 @@
 //   GET  /git/repos                         repositories: opened directly, and pair targets
 //   POST /git/repos                         {"action": "clone"|"create"|"add", "url", "path"}
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
-//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|conflict-parts|rewrite-plan|file|
+//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|conflict-parts|rewrite-plan|bisect|file|
 //                  folder|remote-check|undo-timeline|push-check|blame|file-history|search}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
 //                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|restore|branch-at|
-//                   shape-diff|shape-message|shape-commit|rewrite}   (GET /git/{id}/shape: the timeline to shape, see shape.ts)
+//                   shape-diff|shape-message|shape-commit|rewrite|bisect-start|bisect-mark|bisect-reset}   (GET /git/{id}/shape: the timeline to shape, see shape.ts)
 //
 // When a repository is also the target of a folder pair, actions that change
 // its files (switching branches, pulling, merging…) pause that pair first,
@@ -64,6 +64,9 @@ const CHANGES_FILES = new Set([
   "issue-start",
   "restore",
   "rewrite",
+  "bisect-start",
+  "bisect-mark",
+  "bisect-reset",
 ]);
 
 /** Background remote checks fetch at most this often per repository; force=1 (before a push) always fetches. */
@@ -142,6 +145,8 @@ export class GitApi {
     switch (action) {
       case "state":
         return json({ ...(await g.state(root)), name: r.name, pairs: r.pairs, standalone: r.standalone });
+      case "bisect":
+        return json(await g.bisectState(root));
       case "rewrite-plan":
         return json(await g.rewritePlan(root, q.get("from")));
       case "conflict-parts":
@@ -324,6 +329,13 @@ export class GitApi {
         return done();
       case "rewrite":
         return done(await g.rewrite(root, b));
+      case "bisect-start":
+        return done({ bisect: await g.bisectStart(root, b.good, b.bad) });
+      case "bisect-mark":
+        return done({ bisect: await g.bisectMark(root, b.verdict) });
+      case "bisect-reset":
+        await g.bisectReset(root);
+        return done();
       case "resolve":
         await g.resolveConflict(root, b.path, b.choice, b.text);
         return done();
