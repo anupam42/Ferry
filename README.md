@@ -430,7 +430,7 @@ Ideas being considered, roughly in priority order. Checked items are done.
 
 - [ ] **AI conflict resolution** — a "let Claude resolve this" choice for conflicts in the dashboard and web app, next to `s`/`t`/`n`/`b`/`m`. Sends the merge base and both versions, shows the reply for approval before writing. Reuses the Anthropic SDK already used for `{ai}` commit messages.
 - [ ] **Compressed ssh push** — stream the batch tar through `zstd` (falling back to plain tar when it isn't installed) to cut bandwidth to ssh targets.
-- [ ] **`/metrics` endpoint** on the local HTTP API (Prometheus format): files synced, errors, conflicts and last-pass time per pair, so the background service can be monitored.
+- [ ] **`/metrics` endpoint** on the local HTTP API (Prometheus format): files synced, errors, conflicts and last-pass time per pair, so the background service can be monitored. (due 2026-11-20)
 - [ ] **rclone targets** — treat `rclone` like `git-lfs`: an optional tool that adds Google Drive, Dropbox, OneDrive, WebDAV, SFTP and more as targets.
 - [ ] **`--bandwidth 1MB/s`** — byte-level throttling for ssh and cloud uploads (`--max-ops` already throttles operations).
 - [ ] **`ferry send <folder> user@host:path`** — one-shot transfer with no state or watching, reusing the ssh + tar plumbing.
@@ -444,6 +444,30 @@ Ideas being considered, roughly in priority order. Checked items are done.
 ### Web app
 
 - [x] **Todo tab** — a new sidebar tab that reads the Todo section of each project's README and turns it into a checklist per project: what's open, what's done, and what was added recently. The mascot keeps you on schedule, nudging you about items that have been open for a while or are past a date you set ("this one's been waiting three weeks"). Ticking an item off updates the README checkbox, so the list stays in the repo and in sync with the app.
+
+**Todo tab, next**
+
+- [ ] **Start work on an item** — a "Start" button makes a branch named after the item, like "Start work" for Jira issues. The item then shows its progress: the branch, how many commits, its pull request and whether the checks pass.
+- [ ] **Tick off merged work** — when a pull request or branch that matches an item is merged, Relay says "looks like you finished this" and offers to tick it. A done item links to the work that finished it.
+- [ ] **Time spent, without a timer** — Ferry already records every sync and commit, so it can say how long an item's branch has been worked on ("about 6 h over 3 days"), next to its due date.
+- [ ] **The list's history** — every README commit holds a version of the list, so chart open and done items over time, show a weekly recap ("ticked 4, added 2") and a streak, with nothing extra stored.
+- [ ] **Changelog from ticks** — ticking an item offers to add a line to `CHANGELOG.md` under the unreleased version, written in the changelog's own format.
+- [ ] **Today view** — the late and due-soon items of every project in one list. Relay gives a short briefing when you open Ferry, and a desktop notification on the day something is due.
+- [ ] **Workload warnings** — give an item a size, such as `(2h)`, and Relay warns when the items due in the same few days add up to more than there's time for ("3 items due Friday add up to 10 h").
+- [ ] **TODO comments in the code** — list `TODO:` and `FIXME` comments, aged by git blame ("in `sync.ts` for 8 months"), with a button to move one into the README list.
+- [ ] **Add from anywhere** — a quick-add box on the tab, "Add a todo" on a line in blame or a diff, and "Make this a follow-up" on a review comment, each writing a line into the README under the group you pick.
+- [ ] **Blocked items and order** — `(after: Stash selected files)` greys an item out until that one is ticked. Dragging items to reorder them rewrites the order in the README.
+- [ ] **Owners and issues** — `@name` on a line assigns it, so teammates see their items after a pull. Items can also be linked both ways with Jira or GitHub issues, keeping their status in step.
+
+**Editing in context**
+
+Not a full text editor (everyone using Ferry already has one), but quick, safe edits inside what Ferry already does: fixing a file you're looking at, getting a config file right, and making a fix from another device. Built on CodeMirror 6 (small and fast), with the app's theme.
+
+- [ ] **Quick edit** — an "Edit" button wherever a file is shown (Files, a diff, blame, a commit, a review comment) opens it in a plain editor with syntax highlighting (picked from the file name, as the language bar does), find and replace in the file, and marks in the margin for lines changed since the last commit; click one to undo just that change. Stage or commit the file straight from there.
+- [ ] **Safe saving** — saving writes the file in one step (no half-written files) and keeps its encoding and line endings. It warns before overwriting a file that changed on disk since you opened it, and runs the secret check so a pasted key is caught. Unsaved changes are kept as you type, so a closed tab or a crash brings them back. A file in a repository a folder pair syncs into is edited through the pair's working folder, like the Todo tab does.
+- [ ] **Config files** — `ferry.yaml`, `.gitignore`, `package.json` and other JSON and YAML files are checked as you type, with the broken line underlined and a plain explanation, plus format and sort keys. Ferry's own `ferry.yaml` gets suggestions and checks for its settings, so a typo doesn't stop a pair from starting.
+- [ ] **Scratch pad** — a throwaway tab for pasting things that aren't files: JSON from an API, a YAML snippet, a log, a stack trace. It gets the same highlighting (guessed from what you paste), the JSON and YAML checks, format and minify, and find. Scratch pads are kept in Ferry's data folder, so they survive a restart, until you clear them or save one as a file in a project.
+- [ ] **Edit from anywhere** — with the web app served to another device (`--host` with `--serve-token`), make a quick fix from your phone or another computer and commit it, without your editor or the code on that device.
 
 ### Git client
 
@@ -542,6 +566,14 @@ Bigger ideas about understanding a repository, not just recording it. Most need 
 - [ ] **Feature storyboard** — a feature's history as a row of cards: the commits, pull requests, reviews and screenshots, in order.
 - [ ] **Design over time** — track how a project's design tokens, colours, typography, spacing and components change across releases, and spot drift from the design system.
 - [ ] **Design to code** — link Figma components and design tokens to the code and commits that implement them, so a design change shows the code to update and the other way round.
+
+**Editor, later**
+
+Only if people ask for it once quick edit exists; a full editor competes with the ones Ferry users already have.
+
+- [ ] **Notes linked to the work** — Markdown notes per project, searchable and pinnable, that link to a file, a line, a commit or a todo item, and can be turned into a todo item or saved as a project file.
+- [ ] **A fuller editor** — tabs and split view, multiple cursors and box selection, project-wide find and replace with a preview, a live preview for Markdown and HTML, comparing any two files, the project's own formatter, recorded macros, a hex view for binary files, other encodings, go to symbol, and shortcut presets matching VS Code and Notepad++.
+- [ ] **Relay in the editor** — explain the selected code, fix a broken JSON or YAML file, or write a comment for a function, each shown as a change to accept before anything is written.
 
 **Experimental**
 
