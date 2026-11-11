@@ -8,6 +8,9 @@ import type { Event, Kind } from "../src/engine/types.ts";
 import { notifySettings } from "../src/notify.ts";
 
 notifySettings.enabled = false;
+// bun test runs JavaScript in UTC but leaves TZ unset, so git (a child process) would use the
+// computer's own time zone: between local midnight and UTC midnight the two disagree on "today"
+process.env.TZ = "UTC";
 
 export function tempDir(): string {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ferry-test-")));
