@@ -10,8 +10,19 @@ import path from "node:path";
 import { ApiServer, type PairManager } from "../api.ts";
 import { CHILD_ENV, newBoot, PORT_FILE_ENV, runningFromSource, supervise } from "../devreload.ts";
 import {
-  appendPairToFile, checkOverlaps, dataDir, setRepoInFile, expandHome, isRemoteSpec, loadFile, normalize, pairsFromObject, removePairFromFile,
-  type Pair, type Settings, emptySettings,
+  appendPairToFile,
+  checkOverlaps,
+  dataDir,
+  setRepoInFile,
+  expandHome,
+  isRemoteSpec,
+  loadFile,
+  normalize,
+  pairsFromObject,
+  removePairFromFile,
+  type Pair,
+  type Settings,
+  emptySettings,
 } from "../config.ts";
 import { Engine } from "../engine/engine.ts";
 import type { Event } from "../engine/types.ts";
@@ -34,7 +45,11 @@ export async function cmdUI(args: string[]): Promise<void> {
     .string("host", "127.0.0.1", "address to listen on (anything but localhost needs --serve-token)")
     .int("port", 7878, "port for the web app (the next free one is used if it's taken)")
     .bool("no-open", false, "don't open the browser")
-    .bool("dev", false, "for working on Ferry: rebuild and reload the page when web/ changes, restart when the code does");
+    .bool(
+      "dev",
+      false,
+      "for working on Ferry: rebuild and reload the page when web/ changes, restart when the code does",
+    );
   f.usage = () => {
     process.stderr.write("Usage: ferry ui [flags] [--config file | <source> <target>]\n");
     f.printDefaults();
@@ -58,7 +73,10 @@ export async function cmdUI(args: string[]): Promise<void> {
     }
     if (!process.env[CHILD_ENV]) {
       println(paint("90", "dev mode: editing web/ rebuilds and updates the page; editing .ts files restarts ferry"));
-      await supervise(args.filter((a) => a !== "--dev"), (m) => println(paint("90", "dev: " + m)));
+      await supervise(
+        args.filter((a) => a !== "--dev"),
+        (m) => println(paint("90", "dev: " + m)),
+      );
       process.exit(0);
     }
     dev = { boot: newBoot() };
@@ -74,7 +92,10 @@ export async function cmdUI(args: string[]): Promise<void> {
   if (pos.length > 0) {
     ({ pairs, settings } = loadPairs(f, pos));
   } else {
-    configFile = f.getString("config") || ["ferry.yaml", "ferry.yml", ".ferry.yaml"].find((c) => fs.existsSync(c)) || uiConfigPath();
+    configFile =
+      f.getString("config") ||
+      ["ferry.yaml", "ferry.yml", ".ferry.yaml"].find((c) => fs.existsSync(c)) ||
+      uiConfigPath();
     if (fs.existsSync(configFile)) {
       // a clash between saved pairs must not keep the web app from starting:
       // the pair listed later (added last) wins, and the other is set aside
@@ -106,7 +127,9 @@ export async function cmdUI(args: string[]): Promise<void> {
   const host = f.getString("host");
   const local = ["127.0.0.1", "localhost", "::1"].includes(host);
   if (!local && settings.serveToken === "") {
-    throw new Error("--host other than localhost needs --serve-token (or FERRY_TOKEN), so nobody else can control your folders");
+    throw new Error(
+      "--host other than localhost needs --serve-token (or FERRY_TOKEN), so nobody else can control your folders",
+    );
   }
 
   notifySettings.enabled = !f.getBool("no-notify") && (settings.notify === null || settings.notify);
@@ -126,12 +149,19 @@ export async function cmdUI(args: string[]): Promise<void> {
   const start = (p: Pair) => {
     if (p.mirror) {
       p.mirror = false;
-      emit({ time: Date.now(), pair: p.name, kind: "warn", msg: "mirror is skipped in the web app (it needs a confirmation); use ferry run --mirror once" });
+      emit({
+        time: Date.now(),
+        pair: p.name,
+        kind: "warn",
+        msg: "mirror is skipped in the web app (it needs a confirmation); use ferry run --mirror once",
+      });
     }
     const e = new Engine(p, emit);
     const own = new AbortController();
     ctl.signal.addEventListener("abort", () => own.abort(), { once: true });
-    const done = e.run(own.signal, false).catch((err) => emit({ time: Date.now(), pair: e.name, kind: "error", msg: (err as Error).message }));
+    const done = e
+      .run(own.signal, false)
+      .catch((err) => emit({ time: Date.now(), pair: e.name, kind: "error", msg: (err as Error).message }));
     engines.push(e);
     stops.set(e, { ctl: own, done });
   };
@@ -184,7 +214,8 @@ export async function cmdUI(args: string[]): Promise<void> {
       api.listen(`${host.includes(":") ? `[${host}]` : host}:${port}`);
       break;
     } catch (e) {
-      if (tries >= 20 || f.wasSet("port")) throw new Error(`can't listen on port ${port}: ${(e as Error).message}`);
+      if (tries >= 20 || f.wasSet("port"))
+        throw new Error(`can't listen on port ${port}: ${(e as Error).message}`, { cause: e });
       port++;
     }
   }
@@ -195,7 +226,9 @@ export async function cmdUI(args: string[]): Promise<void> {
   let url = `http://${shown}:${port}/`;
   if (settings.serveToken !== "") url += "?token=" + encodeURIComponent(settings.serveToken);
   println(`${paint("1", "ferry " + VERSION)} web app running at ${paint("1;36", url)}`);
-  println(paint("90", pairs.length === 0 ? "no folder pairs yet: add one in the browser" : `${pairs.length} pair(s) syncing`));
+  println(
+    paint("90", pairs.length === 0 ? "no folder pairs yet: add one in the browser" : `${pairs.length} pair(s) syncing`),
+  );
   if (configFile !== "") println(paint("90", "pairs are saved in " + tildify(configFile)));
   println(paint("90", "keep this window open while you sync; press Ctrl+C to stop"));
   if (!f.getBool("no-open")) openBrowser(url);
@@ -226,7 +259,8 @@ function cleanPairObject(obj: Record<string, unknown>): Record<string, unknown> 
   if (out.target !== undefined) out.target = abs(out.target);
   if (Array.isArray(out.targets)) out.targets = out.targets.map(abs);
   if (typeof out.source !== "string" || out.source === "") throw new Error("choose a source folder");
-  if ((typeof out.target !== "string" || out.target === "") && !Array.isArray(out.targets)) throw new Error("choose a target folder");
+  if ((typeof out.target !== "string" || out.target === "") && !Array.isArray(out.targets))
+    throw new Error("choose a target folder");
   return out;
 }
 
@@ -264,11 +298,15 @@ async function ensureWebApp(dev: boolean): Promise<void> {
 /** ferry ui --dev: rebuild the web app when web/ changes, and tell open pages what changed. */
 function watchWebApp(changed: (kind: "css" | "page") => void): void {
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let running = false, again = false;
+  let running = false,
+    again = false;
   const run = async () => {
     const b = await webBuild();
     if (!b) return;
-    if (running) { again = true; return; }
+    if (running) {
+      again = true;
+      return;
+    }
     running = true;
     try {
       const r = await b.buildWeb({ dev: true });
@@ -279,16 +317,19 @@ function watchWebApp(changed: (kind: "css" | "page") => void): void {
       println(paint("33", "! ") + (e as Error).message.split("\n").slice(0, 8).join("\n"));
     } finally {
       running = false;
-      if (again) { again = false; void run(); }
+      if (again) {
+        again = false;
+        void run();
+      }
     }
   };
   const dir = path.join(import.meta.dir, "..", "..", "web");
   if (!fs.existsSync(dir)) return;
   // kept in a module variable: an unreferenced watcher can be collected and go quiet
-  webWatcher = fs.watch(dir, { recursive: true }, () => {
+  _webWatcher = fs.watch(dir, { recursive: true }, () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void run(), 80);
   });
   println(paint("90", "dev: watching web/"));
 }
-let webWatcher: fs.FSWatcher | null = null;
+let _webWatcher: fs.FSWatcher | null = null;

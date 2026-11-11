@@ -28,19 +28,23 @@ export function diff(a: Uint8Array, b: Uint8Array, context: number): Line[] {
     if (bytesEqual(a, b)) return [];
     return [{ op: "@", text: `binary files differ (${a.length} → ${b.length} bytes)` }];
   }
-  const al = split(a), bl = split(b);
+  const al = split(a),
+    bl = split(b);
 
   // trim the common prefix/suffix to keep the table small
   let pre = 0;
   while (pre < al.length && pre < bl.length && al[pre] === bl[pre]) pre++;
   let suf = 0;
   while (suf < al.length - pre && suf < bl.length - pre && al[al.length - 1 - suf] === bl[bl.length - 1 - suf]) suf++;
-  const am = al.slice(pre, al.length - suf), bm = bl.slice(pre, bl.length - suf);
+  const am = al.slice(pre, al.length - suf),
+    bm = bl.slice(pre, bl.length - suf);
   if (am.length * bm.length > MAX_CELLS) {
     return [{ op: "@", text: `diff too large to display (${am.length} vs ${bm.length} changed lines)` }];
   }
 
-  const n = am.length, m = bm.length, W = m + 1;
+  const n = am.length,
+    m = bm.length,
+    W = m + 1;
   const dp = new Int32Array((n + 1) * W);
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
@@ -49,10 +53,16 @@ export function diff(a: Uint8Array, b: Uint8Array, context: number): Line[] {
     }
   }
 
-  interface Op { k: Line["op"]; s: string; ai: number; bi: number } // 1-based line numbers
+  interface Op {
+    k: Line["op"];
+    s: string;
+    ai: number;
+    bi: number;
+  } // 1-based line numbers
   const ops: Op[] = [];
   for (let i = 0; i < pre; i++) ops.push({ k: " ", s: al[i]!, ai: i + 1, bi: i + 1 });
-  let i = 0, j = 0;
+  let i = 0,
+    j = 0;
   while (i < n || j < m) {
     if (i < n && j < m && am[i] === bm[j]) {
       ops.push({ k: " ", s: am[i]!, ai: pre + i + 1, bi: pre + j + 1 });
@@ -72,7 +82,7 @@ export function diff(a: Uint8Array, b: Uint8Array, context: number): Line[] {
 
   // group into hunks
   const out: Line[] = [];
-  for (let k = 0; k < ops.length; ) {
+  for (let k = 0; k < ops.length;) {
     if (ops[k]!.k === " ") {
       k++;
       continue;
@@ -94,7 +104,8 @@ export function diff(a: Uint8Array, b: Uint8Array, context: number): Line[] {
       end = Math.min(end + context, ops.length);
       break;
     }
-    let aCount = 0, bCount = 0;
+    let aCount = 0,
+      bCount = 0;
     for (const o of ops.slice(start, end)) {
       if (o.k !== "+") aCount++;
       if (o.k !== "-") bCount++;

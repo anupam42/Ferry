@@ -1,0 +1,8 @@
+# generated or not ours
+node_modules/
+dist/
+src/web/app/
+exports/
+# the VS Code extension is plain JavaScript with its own style
+editors/
+bun.lock

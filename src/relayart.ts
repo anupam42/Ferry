@@ -16,12 +16,24 @@ export interface ArtStyle {
   bar: (s: string) => string;
 }
 
-export const plainStyle: ArtStyle = { body: (s) => s, scarf: (s) => s, active: (s) => s, muted: (s) => s, bar: (s) => s };
+export const plainStyle: ArtStyle = {
+  body: (s) => s,
+  scarf: (s) => s,
+  active: (s) => s,
+  muted: (s) => s,
+  bar: (s) => s,
+};
 
 const BAR = 12;
 
 /** Three lines of Relay comparing two files. frame advances the animation; total 0 means "unknown". */
-export function comparingArt(frame: number, done: number, total: number, label = "Relay is comparing files…", st: ArtStyle = plainStyle): string[] {
+export function comparingArt(
+  frame: number,
+  done: number,
+  total: number,
+  label = "Relay is comparing files…",
+  st: ArtStyle = plainStyle,
+): string[] {
   const left = Math.floor(frame / 4) % 2 === 0; // look at each file for four frames
   const face = left ? "•ᴗ•  " : "  •ᴗ•";
   const wave = frame % 2 === 0 ? "≈~≈~≈~≈" : "~≈~≈~≈~";
@@ -50,7 +62,10 @@ export class ComparingSpinner {
   private total = 0;
   private label = "Relay is comparing files…";
 
-  constructor(private out: NodeJS.WriteStream = process.stderr, private style: ArtStyle = plainStyle) {}
+  constructor(
+    private out: NodeJS.WriteStream = process.stderr,
+    private style: ArtStyle = plainStyle,
+  ) {}
 
   get enabled(): boolean {
     return !!this.out.isTTY;

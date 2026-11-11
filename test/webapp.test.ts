@@ -61,9 +61,11 @@ test("the old /next address sends you to /, keeping the token", async () => {
 
 test("with an access token, the app's code and pictures load without it; the page and your data don't", async () => {
   const api = new ApiServer([], "s3cret");
-  const get = (p: string, auth = false) => api.handle(new Request("http://example.com" + p, { headers: auth ? { Authorization: "Bearer s3cret" } : {} }));
+  const get = (p: string, auth = false) =>
+    api.handle(new Request("http://example.com" + p, { headers: auth ? { Authorization: "Bearer s3cret" } : {} }));
   for (const p of ["/app.js", "/app.css", "/logo.svg", "/mascot/happy.svg"]) expect((await get(p)).status).toBe(200);
-  for (const p of ["/", "/status", "/info", "/events/recent", "/mascot/../status"]) expect((await get(p)).status).toBe(401);
+  for (const p of ["/", "/status", "/info", "/events/recent", "/mascot/../status"])
+    expect((await get(p)).status).toBe(401);
   expect((await get("/", true)).status).toBe(200);
   expect((await get("/status", true)).status).toBe(200);
 });

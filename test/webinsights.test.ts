@@ -1,10 +1,39 @@
 import { describe, expect, test } from "bun:test";
-import { heatScale, hotspots, niceMax, rangeLabel, story, syncDays, ticks, weekly, yearCalendar, yearStart, ymd } from "../web/lib/insights.ts";
+import {
+  heatScale,
+  hotspots,
+  niceMax,
+  rangeLabel,
+  story,
+  syncDays,
+  ticks,
+  weekly,
+  yearCalendar,
+  yearStart,
+  ymd,
+} from "../web/lib/insights.ts";
 import type { InsightsResponse } from "../src/shared/git.ts";
 
 const base = (o: Partial<InsightsResponse> = {}): InsightsResponse => ({
-  today: "2026-11-10", days: {}, dayCommits: {}, hours: Array.from({ length: 7 }, () => Array(24).fill(0)), months: [], files: [], authors: [],
-  hotspots: [], together: [], me: "", total: 0, added: 0, removed: 0, activeDays: 0, streak: 0, longestStreak: 0, partial: false, sync: null, ...o,
+  today: "2026-11-10",
+  days: {},
+  dayCommits: {},
+  hours: Array.from({ length: 7 }, () => Array(24).fill(0)),
+  months: [],
+  files: [],
+  authors: [],
+  hotspots: [],
+  together: [],
+  me: "",
+  total: 0,
+  added: 0,
+  removed: 0,
+  activeDays: 0,
+  streak: 0,
+  longestStreak: 0,
+  partial: false,
+  sync: null,
+  ...o,
 });
 
 describe("heatScale", () => {
@@ -55,7 +84,11 @@ describe("the year", () => {
   test("weekly sums each week and compares the last 4 weeks to the 4 before", () => {
     const days: Record<string, number> = {};
     const t = new Date("2026-11-10T12:00:00");
-    for (let i = 0; i < 56; i++) { const x = new Date(t); x.setDate(t.getDate() - i); days[ymd(x)] = i < 28 ? 2 : 1; }
+    for (let i = 0; i < 56; i++) {
+      const x = new Date(t);
+      x.setDate(t.getDate() - i);
+      days[ymd(x)] = i < 28 ? 2 : 1;
+    }
     const w = weekly(base({ days }));
     expect(w.weeks.length).toBe(53);
     expect(w.weeks.reduce((a, b) => a + b.n, 0)).toBe(28 * 2 + 28);
@@ -67,24 +100,38 @@ describe("story", () => {
   test("names the busiest day, the usual time, and the busiest file", () => {
     const hours = Array.from({ length: 7 }, () => Array(24).fill(0));
     hours[2]![15] = 9;
-    const s = story(base({ total: 10, activeDays: 2, days: { "2026-11-04": 7, "2026-11-05": 3 }, hours,
-      files: [{ path: "src/app.ts", commits: 6, added: 1, removed: 1, months: [] }] }), false);
+    const s = story(
+      base({
+        total: 10,
+        activeDays: 2,
+        days: { "2026-11-04": 7, "2026-11-05": 3 },
+        hours,
+        files: [{ path: "src/app.ts", commits: 6, added: 1, removed: 1, months: [] }],
+      }),
+      false,
+    );
     expect(s.say).toBe("This project had 10 commits on 2 days this year.");
     expect(s.busiest).toBe("2026-11-04");
     expect(s.hint).toContain("Wednesdays");
     expect(s.hint).toContain("app.ts changes most (6 commits)");
-    expect(story(base({ total: 1, activeDays: 1, days: { "2026-11-04": 1 } }), true).say).toBe("You made 1 commit on 1 day this year.");
+    expect(story(base({ total: 1, activeDays: 1, days: { "2026-11-04": 1 } }), true).say).toBe(
+      "You made 1 commit on 1 day this year.",
+    );
   });
 });
 
 describe("hotspots", () => {
   test("drops empty files and ranks size × churn", () => {
-    const h = hotspots(base({ hotspots: [
-      { path: "big-busy.ts", commits: 20, lines: 5000, authors: 3 },
-      { path: "small-busy.ts", commits: 20, lines: 10, authors: 1 },
-      { path: "big-quiet.ts", commits: 1, lines: 5000, authors: 1 },
-      { path: "gone.ts", commits: 9, lines: 0, authors: 1 },
-    ] }));
+    const h = hotspots(
+      base({
+        hotspots: [
+          { path: "big-busy.ts", commits: 20, lines: 5000, authors: 3 },
+          { path: "small-busy.ts", commits: 20, lines: 10, authors: 1 },
+          { path: "big-quiet.ts", commits: 1, lines: 5000, authors: 1 },
+          { path: "gone.ts", commits: 9, lines: 0, authors: 1 },
+        ],
+      }),
+    );
     expect(h.pts.map((p) => p.path)).not.toContain("gone.ts");
     expect(h.top[0]!.path).toBe("big-busy.ts");
   });
@@ -92,7 +139,10 @@ describe("hotspots", () => {
 
 describe("syncDays", () => {
   test("8 weeks, from when the record starts, with the day's commits", () => {
-    const d = base({ days: { "2026-11-09": 2 }, sync: { pairs: ["site"], days: { "2026-11-09": 5, "2026-11-08": 3 }, since: "2026-11-01" } });
+    const d = base({
+      days: { "2026-11-09": 2 },
+      sync: { pairs: ["site"], days: { "2026-11-09": 5, "2026-11-08": 3 }, since: "2026-11-01" },
+    });
     const s = syncDays(d);
     expect(s[0]!.day).toBe("2026-11-01");
     expect(s[s.length - 1]!.day).toBe("2026-11-10");

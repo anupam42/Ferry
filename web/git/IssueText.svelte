@@ -17,4 +17,9 @@
   });
 </script>
 
-{#each parts as p, i (i)}{#if p.key}<a href="{site}/browse/{p.key}" target="_blank" rel="noopener noreferrer" onclick={(e) => e.stopPropagation()}>{p.t}</a>{:else}{p.t}{/if}{/each}
+{#each parts as p, i (i)}{#if p.key}<a
+      href="{site}/browse/{p.key}"
+      target="_blank"
+      rel="noopener noreferrer"
+      onclick={(e) => e.stopPropagation()}>{p.t}</a
+    >{:else}{p.t}{/if}{/each}

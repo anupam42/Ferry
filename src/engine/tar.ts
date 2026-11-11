@@ -70,7 +70,9 @@ export class TarWriter {
     if (link && !fitsUstar(link)) pax += paxRecord("linkpath", link);
     if (pax) {
       const body = Buffer.from(pax, "utf8");
-      this.write(header("PaxHeaders/" + e.name.slice(-80).replace(/[^\x20-\x7e]/g, "_"), 0o644, body.length, e.mtimeSec, "x"));
+      this.write(
+        header("PaxHeaders/" + e.name.slice(-80).replace(/[^\x20-\x7e]/g, "_"), 0o644, body.length, e.mtimeSec, "x"),
+      );
       this.write(body);
       this.pad(body.length);
     }

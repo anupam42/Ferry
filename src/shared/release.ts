@@ -36,7 +36,20 @@ export interface ReleaseInfo {
 }
 
 /** GET /release/health: one tool Ferry relies on */
-export interface Health { name: string; ok: boolean; detail: string; needed: boolean }
+export interface Health {
+  name: string;
+  ok: boolean;
+  detail: string;
+  needed: boolean;
+}
 
 /** GET /release/latest: the newest release on GitHub, against this one */
-export interface LatestRelease { version: string; name: string; url: string; date: string; notes: string; current: string; newer: boolean }
+export interface LatestRelease {
+  version: string;
+  name: string;
+  url: string;
+  date: string;
+  notes: string;
+  current: string;
+  newer: boolean;
+}

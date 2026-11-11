@@ -11,8 +11,14 @@
   <div class="list">
     {#each items as c (c.name)}
       <div class="row">
-        <span class="pill" class:red={c.state === "failed"} class:amber={c.state !== "failed" && c.state !== "passed"} class:green={c.state === "passed"}>
-          {c.state === "failed" ? "✗ failed" : c.state === "passed" ? "✓ passed" : "… running"}</span>
+        <span
+          class="pill"
+          class:red={c.state === "failed"}
+          class:amber={c.state !== "failed" && c.state !== "passed"}
+          class:green={c.state === "passed"}
+        >
+          {c.state === "failed" ? "✗ failed" : c.state === "passed" ? "✓ passed" : "… running"}</span
+        >
         <span class="grow">{c.name}</span>
         {#if c.url}<a class="btn small" href={c.url} target="_blank" rel="noopener noreferrer">Details</a>{/if}
       </div>
@@ -22,6 +28,22 @@
 
 <style lang="scss">
   @use "tokens" as *;
-  .list { display: flex; flex-direction: column; gap: 2px; }
-  .row { display: flex; align-items: center; gap: space(3); padding: space(2) space(3); border-radius: $radius-md; &:hover { background: var(--card2); } .grow { flex: 1; } }
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: space(3);
+    padding: space(2) space(3);
+    border-radius: $radius-md;
+    &:hover {
+      background: var(--card2);
+    }
+    .grow {
+      flex: 1;
+    }
+  }
 </style>

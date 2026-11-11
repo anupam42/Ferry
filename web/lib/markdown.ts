@@ -11,7 +11,11 @@ export type Inline =
   | { t: "img"; src: string; alt: string }
   | { t: "link"; href: string; kids: Inline[] };
 
-export interface ImgRef { src: string; alt: string; width?: string }
+export interface ImgRef {
+  src: string;
+  alt: string;
+  width?: string;
+}
 
 export type Block =
   | { t: "p"; kids: Inline[] }
@@ -61,7 +65,11 @@ export function parseMarkdown(text: string): Block[] {
       while (i < lines.length && LIST.test(lines[i]!)) {
         const it = lines[i++]!.replace(LIST, "");
         const task = /^\[( |x|X)\]\s+/.exec(it);
-        items.push(task ? { task: task[1] !== " ", kids: parseInline(it.slice(task[0].length)) } : { task: null, kids: parseInline(it) });
+        items.push(
+          task
+            ? { task: task[1] !== " ", kids: parseInline(it.slice(task[0].length)) }
+            : { task: null, kids: parseInline(it) },
+        );
       }
       i--;
       out.push({ t: "list", ordered, items });
@@ -70,11 +78,14 @@ export function parseMarkdown(text: string): Block[] {
       // <picture> keeps its <source> variants, so dark mode picks the right one
       flush();
       const buf = [line];
-      while (i + 1 < lines.length && lines[i + 1]!.includes("<") && HTML_ONLY.test(lines[i + 1]!)) buf.push(lines[++i]!);
+      while (i + 1 < lines.length && lines[i + 1]!.includes("<") && HTML_ONLY.test(lines[i + 1]!))
+        buf.push(lines[++i]!);
       const html = buf.join("\n");
       const img = (tag: string): ImgRef | null => {
         const src = /src="([^"]+)"/i.exec(tag)?.[1];
-        return src ? { src, alt: /alt="([^"]*)"/i.exec(tag)?.[1] ?? "", width: /\swidth="(\d{1,4})"/i.exec(tag)?.[1] } : null;
+        return src
+          ? { src, alt: /alt="([^"]*)"/i.exec(tag)?.[1] ?? "", width: /\swidth="(\d{1,4})"/i.exec(tag)?.[1] }
+          : null;
       };
       for (const pm of html.matchAll(/<picture>([\s\S]*?)<\/picture>/gi)) {
         const sources = [...pm[1]!.matchAll(/<source\b[^>]*>/gi)].flatMap((sm) => {
@@ -90,7 +101,11 @@ export function parseMarkdown(text: string): Block[] {
       }
     } else if (/^\s{0,3}<[a-zA-Z!/]/.test(line) && />\s*$/.test(line)) {
       // HTML with text in it (<b>…</b>, <em>…</em>, <br>): keep the text, as markdown where trivial
-      const txt = line.replace(/<\/?(b|strong)\s*>/gi, "**").replace(/<\/?(em|i)\s*>/gi, "*").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "");
+      const txt = line
+        .replace(/<\/?(b|strong)\s*>/gi, "**")
+        .replace(/<\/?(em|i)\s*>/gi, "*")
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<[^>]+>/g, "");
       if (txt.trim()) para.push(txt.trim());
     } else if (!line.trim()) flush();
     else para.push(line.trim());
@@ -102,8 +117,10 @@ export function parseMarkdown(text: string): Block[] {
 /** Inline markdown: code, bold, italic, links and images (asterisks only, so snake_case stays alone). */
 export function parseInline(s: string): Inline[] {
   const out: Inline[] = [];
-  const re = /`([^`]+)`|\*\*([^*\s](?:[^*\n]*[^*\s])?)\*\*|\*([^*\s](?:[^*\n]*[^*\s])?)\*|!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)|\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g;
-  let last = 0, m: RegExpExecArray | null;
+  const re =
+    /`([^`]+)`|\*\*([^*\s](?:[^*\n]*[^*\s])?)\*\*|\*([^*\s](?:[^*\n]*[^*\s])?)\*|!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)|\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g;
+  let last = 0,
+    m: RegExpExecArray | null;
   while ((m = re.exec(s))) {
     if (m.index > last) out.push({ t: "text", v: s.slice(last, m.index) });
     if (m[1] != null) out.push({ t: "code", v: m[1] });
@@ -153,10 +170,16 @@ export function htmlToText(s: string): string {
     .replace(/<img\b[^>]*\balt\s*=\s*"([^"]*)"[^>]*>/gi, "$1")
     .replace(/<img\b[^>]*>/gi, "")
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<summary\b[^>]*>/gi, "**").replace(/<\/summary>/gi, "**\n")
+    .replace(/<summary\b[^>]*>/gi, "**")
+    .replace(/<\/summary>/gi, "**\n")
     .replace(/<\/(p|div|li|tr|h[1-6]|details)>/gi, "\n")
     .replace(/<\/?[a-z][\w-]*(?:\s[^<>]*)?\/?>/gi, "")
-    .replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#39;/g, "'").replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

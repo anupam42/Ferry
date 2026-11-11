@@ -8,7 +8,7 @@
 
 ## Checklist
 
-- [ ] `bun run typecheck` and `bun test` pass
+- [ ] `bun run check` (types, ESLint, Prettier) and `bun test` pass
 - [ ] Tests added or updated for the change
 - [ ] Docs updated if behaviour changed (README, `ferry --help`, completions, `ferry.example.yaml`)
 - [ ] Files are still backed up and journaled before being overwritten or deleted (if the change touches syncing)

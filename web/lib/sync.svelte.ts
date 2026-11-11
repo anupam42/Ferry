@@ -69,7 +69,8 @@ class Sync {
     const list = [...(this.log[ev.pair] ?? []), ev];
     if (list.length > 400) list.splice(0, list.length - 400);
     this.log[ev.pair] = list;
-    if (ev.kind === "error") this.errors[ev.pair] = { at: Date.now(), msg: (ev.message || "error") + (ev.path ? ` (${ev.path})` : "") };
+    if (ev.kind === "error")
+      this.errors[ev.pair] = { at: Date.now(), msg: (ev.message || "error") + (ev.path ? ` (${ev.path})` : "") };
     this.soon();
   }
 
@@ -84,14 +85,26 @@ export const sync = new Sync();
 // ---------- actions several screens share ----------
 
 /** Settles a file that changed in both folders. */
-export async function resolve(p: PairStatus, file: string, choice: "source" | "target" | "both" | "merge", label: string): Promise<void> {
+export async function resolve(
+  p: PairStatus,
+  file: string,
+  choice: "source" | "target" | "both" | "merge",
+  label: string,
+): Promise<void> {
   await act(`${file}: ${label}`, () => api("POST", pairURL(p.name, "resolve"), { path: file, choice }), "happy");
   sync.soon();
 }
 
 /** Stops syncing a file (adds it to .syncignore), after asking. */
 export async function ignoreFile(p: PairStatus, file: string): Promise<void> {
-  const ok = await ask({ mood: "thinking", title: `Stop syncing ${file}?`, text: "I'll add it to .syncignore in your working folder. Copies I've already made stay where they are.", yes: "Ignore it", no: "Keep syncing it", yesMood: "wink" });
+  const ok = await ask({
+    mood: "thinking",
+    title: `Stop syncing ${file}?`,
+    text: "I'll add it to .syncignore in your working folder. Copies I've already made stay where they are.",
+    yes: "Ignore it",
+    no: "Keep syncing it",
+    yesMood: "wink",
+  });
   if (!ok) return;
   const r = await act(null, () => api<{ already?: boolean }>("POST", pairURL(p.name, "ignore"), { path: file }));
   if (r) toast(r.already ? `${file} was already ignored` : `Ignoring ${file} from now on`, { mood: "wink" });
@@ -114,7 +127,10 @@ export async function syncNow(p: PairStatus): Promise<void> {
     const copied = evs.filter((e) => ["add", "update", "delete", "rename"].includes(e.kind)).length;
     const errs = evs.filter((e) => e.kind === "error").length;
     if (errs) toast(`Finished with ${plural(errs, "error")}; see Activity`, { error: true });
-    else toast(copied ? `Sync finished: ${plural(copied, "file")} copied` : "Sync finished: everything already matched", { mood: "party" });
+    else
+      toast(copied ? `Sync finished: ${plural(copied, "file")} copied` : "Sync finished: everything already matched", {
+        mood: "party",
+      });
     sync.done = { name: p.name, until: Date.now() + 1600 };
     setTimeout(() => (sync.done = null), 1700);
   }
@@ -124,11 +140,20 @@ export async function syncNow(p: PairStatus): Promise<void> {
 
 /** Stops watching a pair, after a press-and-hold question. */
 export async function stopPair(p: PairStatus): Promise<void> {
-  const ok = await ask({ mood: "worried", hold: true, yes: "Stop", no: "Keep syncing", title: `Stop syncing “${p.name}”?`,
-    text: "I'll stop watching these two folders. Nothing is deleted, and you can add the pair again any time." });
+  const ok = await ask({
+    mood: "worried",
+    hold: true,
+    yes: "Stop",
+    no: "Keep syncing",
+    title: `Stop syncing “${p.name}”?`,
+    text: "I'll stop watching these two folders. Nothing is deleted, and you can add the pair again any time.",
+  });
   if (!ok) return;
   const r = await act(null, () => api<{ savedRemoval: boolean }>("POST", pairURL(p.name, "remove")));
-  if (r) toast(r.savedRemoval ? `Stopped and removed ${p.name}. See you!` : `Stopped syncing ${p.name} for this session.`, { mood: "sleepy" });
+  if (r)
+    toast(r.savedRemoval ? `Stopped and removed ${p.name}. See you!` : `Stopped syncing ${p.name} for this session.`, {
+      mood: "sleepy",
+    });
   void sync.refresh();
 }
 

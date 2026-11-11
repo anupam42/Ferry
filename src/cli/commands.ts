@@ -28,22 +28,8 @@ import {
   type PairStatus,
   type SavedPair,
 } from "../engine/engine.ts";
-import {
-  backupDir,
-  fromSlash,
-  listBackups,
-  pruneBackups,
-  restoreBackup,
-} from "../engine/fsops.ts";
-import {
-  allHistory,
-  batchTime,
-  counts,
-  restoreTo,
-  stats,
-  undo,
-  type Batch,
-} from "../engine/journal.ts";
+import { backupDir, fromSlash, listBackups, pruneBackups, restoreBackup } from "../engine/fsops.ts";
+import { allHistory, batchTime, counts, restoreTo, stats, undo, type Batch } from "../engine/journal.ts";
 import { parseChoice, type Change, type Kind } from "../engine/types.ts";
 import { probeWatcher } from "../engine/watch.ts";
 import * as gitx from "../gitx.ts";
@@ -122,9 +108,7 @@ export function cmdStatus(args: string[]): void {
     .bool("json", false, "print JSON")
     .bool("running", false, "only pairs that are running now");
   if (!parse(f, args)) return;
-  const list = readStatuses(dataDir()).filter(
-    (s) => !f.getBool("running") || s.running,
-  );
+  const list = readStatuses(dataDir()).filter((s) => !f.getBool("running") || s.running);
   if (f.getBool("json")) return printJSON(list);
   if (list.length === 0) {
     println("no pairs have run yet (start one with: ferry <source> <target>)");
@@ -140,12 +124,8 @@ function printPairStatus(s: PairStatus): void {
     else if (s.paused || (s.pending_batch ?? 0) > 0) icon = paint("33", "‖");
     else icon = paint("32", "●");
   }
-  println(
-    `${icon} ${paint("1", s.name)}  ${s.source} ${modeArrow(s.mode)} ${s.remote || s.target}`,
-  );
-  const parts = s.running
-    ? [s.state, `pid ${s.pid}`]
-    : [s.state, "last seen " + ago(parseTime(s.updated_at))];
+  println(`${icon} ${paint("1", s.name)}  ${s.source} ${modeArrow(s.mode)} ${s.remote || s.target}`);
+  const parts = s.running ? [s.state, `pid ${s.pid}`] : [s.state, "last seen " + ago(parseTime(s.updated_at))];
   const last = parseTime(s.last_sync);
   if (last) parts.push("last sync " + ago(last));
   parts.push(`+${s.added} ~${s.updated} -${s.deleted} ↻${s.renamed}`);
@@ -205,7 +185,7 @@ export async function cmdPlan(args: string[]): Promise<void> {
     try {
       changes = e.plan();
     } catch (err) {
-      throw new Error(`${p.name}: ${(err as Error).message}`);
+      throw new Error(`${p.name}: ${(err as Error).message}`, { cause: err });
     }
     const pp: PairPlan = {
       pair: p.name,
@@ -231,9 +211,7 @@ export async function cmdPlan(args: string[]): Promise<void> {
     println("# Ferry plan");
     println(`\n_${fmtDateHM(new Date())} · ${total} change(s)_`);
     for (const pp of plans) {
-      println(
-        `\n## ${pp.pair}\n\n\`${pp.source}\` ${modeArrow(pp.mode)} \`${pp.target}\` (${pp.mode})\n`,
-      );
+      println(`\n## ${pp.pair}\n\n\`${pp.source}\` ${modeArrow(pp.mode)} \`${pp.target}\` (${pp.mode})\n`);
       if (pp.changes.length === 0) {
         println("Nothing to do.");
         continue;
@@ -247,18 +225,13 @@ export async function cmdPlan(args: string[]): Promise<void> {
       }
       for (const c of pp.changes) {
         const d = pp.diffs?.[c.path];
-        if (d)
-          println(
-            `\n<details><summary><code>${c.path}</code></summary>\n\n\`\`\`diff\n${d}\`\`\`\n\n</details>`,
-          );
+        if (d) println(`\n<details><summary><code>${c.path}</code></summary>\n\n\`\`\`diff\n${d}\`\`\`\n\n</details>`);
       }
     }
     return;
   }
   for (const pp of plans) {
-    println(
-      `${paint("1", pp.pair)}  ${pp.source} ${modeArrow(pp.mode)} ${pp.target}`,
-    );
+    println(`${paint("1", pp.pair)}  ${pp.source} ${modeArrow(pp.mode)} ${pp.target}`);
     if (pp.changes.length === 0) {
       println(paint("90", "  nothing to do"));
       continue;
@@ -315,12 +288,9 @@ function planDiff(e: Engine, c: Change): string {
     dst = e.targetPath(c.path);
   let a: Buffer, b: Buffer;
   if (c.kind === "add") [a, b] = [none, read(c.dir === "←" ? dst : src)];
-  else if (c.kind === "delete")
-    [a, b] = [read(c.dir === "←" ? src : dst), none];
-  else if (c.kind === "update" && c.dir === "←")
-    [a, b] = [read(src), read(dst)];
-  else if (c.kind === "update" || c.kind === "conflict")
-    [a, b] = [read(dst), read(src)];
+  else if (c.kind === "delete") [a, b] = [read(c.dir === "←" ? src : dst), none];
+  else if (c.kind === "update" && c.dir === "←") [a, b] = [read(src), read(dst)];
+  else if (c.kind === "update" || c.kind === "conflict") [a, b] = [read(dst), read(src)];
   else return "";
   return diffText(diff(a, b, 3));
 }
@@ -337,8 +307,7 @@ export async function cmdCommit(args: string[]): Promise<void> {
   const pos = parse(f, args);
   if (!pos) return;
   const dir = pos[0] ?? ".";
-  if (!(await gitx.isRepo(dir)))
-    throw new Error(`${dir} is not a git repository`);
+  if (!(await gitx.isRepo(dir))) throw new Error(`${dir} is not a git repository`);
   const lines = await gitx.status(dir).catch(() => [] as string[]);
   if (lines.length === 0) {
     println("nothing to commit");
@@ -348,7 +317,8 @@ export async function cmdCommit(args: string[]): Promise<void> {
   if (msg.includes("{ai}")) {
     println(paint("90", "asking Claude for a commit message…"));
     const r = await ai.tryCommitMessage(lines, await gitx.pendingDiff(dir, false));
-    if (r.msg === null) println(paint("33", "! ") + "AI commit message unavailable (" + r.error + "); using the generated summary");
+    if (r.msg === null)
+      println(paint("33", "! ") + "AI commit message unavailable (" + r.error + "); using the generated summary");
     msg = msg.replaceAll("{ai}", r.msg ?? "sync: " + summarizeStatus(lines));
   }
   const hash = await gitx.commitAll(dir, msg, {
@@ -365,52 +335,28 @@ export async function cmdCommit(args: string[]): Promise<void> {
 // ---------- diff ----------
 
 export async function cmdDiff(args: string[]): Promise<void> {
-  const f = new FlagSet("diff").bool(
-    "sides",
-    false,
-    "compare target vs source instead of HEAD vs target",
-  );
+  const f = new FlagSet("diff").bool("sides", false, "compare target vs source instead of HEAD vs target");
   const pos = parse(f, args);
   if (!pos) return;
-  if (pos.length !== 3)
-    throw new Error("usage: ferry diff [--sides] <source> <target> <file>");
+  if (pos.length !== 3) throw new Error("usage: ferry diff [--sides] <source> <target> <file>");
   const p = pairFromArgs(pos[0]!, pos[1]!);
-  const { title, lines } = await new Engine(p, null).diff(
-    relTo(p, pos[2]!),
-    f.getBool("sides"),
-  );
+  const { title, lines } = await new Engine(p, null).diff(relTo(p, pos[2]!), f.getBool("sides"));
   printDiff(title, lines);
 }
 
 // ---------- backups ----------
 
 export function cmdBackups(args: string[]): void {
-  if (args.length === 0)
-    throw new Error(
-      "usage: ferry backups list|restore|prune <source> <target> [file]",
-    );
+  if (args.length === 0) throw new Error("usage: ferry backups list|restore|prune <source> <target> [file]");
   const sub = args[0]!;
   const f = new FlagSet("backups")
     .int("version", 1, "which version to restore (1 = newest)")
     .string("to", "", "restore to this path instead of the original location")
-    .string(
-      "older-than",
-      "",
-      "prune: delete versions older than this (e.g. 30d)",
-    )
-    .string(
-      "max-size",
-      "",
-      "prune: delete the oldest versions past this total per pair (e.g. 1GB)",
-    );
+    .string("older-than", "", "prune: delete versions older than this (e.g. 30d)")
+    .string("max-size", "", "prune: delete the oldest versions past this total per pair (e.g. 1GB)");
   const pos = parse(f, args.slice(1));
   if (!pos) return;
-  if (sub === "prune")
-    return backupsPrune(
-      pos,
-      f.getString("older-than"),
-      f.getString("max-size"),
-    );
+  if (sub === "prune") return backupsPrune(pos, f.getString("older-than"), f.getString("max-size"));
   if (pos.length < 2) throw new Error("expected <source> <target>");
   const p = pairFromArgs(pos[0]!, pos[1]!);
   const file = pos.length > 2 ? relTo(p, pos[2]!) : "";
@@ -429,9 +375,7 @@ export function cmdBackups(args: string[]): void {
         println(`${paint("1", b.rel)} ${paint("90", "(" + b.side + ")")}`);
       }
       n++;
-      println(
-        `   ${n}. ${b.time ? fmtDateTime(new Date(b.time)) : b.version}  ${humanSize(b.size)}`,
-      );
+      println(`   ${n}. ${b.time ? fmtDateTime(new Date(b.time)) : b.version}  ${humanSize(b.size)}`);
     }
     println(paint("90", "stored in " + backupDir(dataDir(), pairID(p))));
     return;
@@ -439,18 +383,11 @@ export function cmdBackups(args: string[]): void {
   if (sub === "restore") {
     if (file === "") throw new Error("restore needs a file");
     const ver = f.getInt("version");
-    if (list.length < ver || ver < 1)
-      throw new Error(
-        `no version ${ver} for ${file} (${list.length} available)`,
-      );
+    if (list.length < ver || ver < 1) throw new Error(`no version ${ver} for ${file} (${list.length} available)`);
     const b = list[ver - 1]!;
-    const dest =
-      f.getString("to") ||
-      path.join(b.side === "source" ? p.source : p.target, fromSlash(b.rel));
+    const dest = f.getString("to") || path.join(b.side === "source" ? p.source : p.target, fromSlash(b.rel));
     restoreBackup(dataDir(), pairID(p), b, dest, p.backups);
-    println(
-      `${paint("32", "restored")} ${b.rel} from ${fmtDateTime(new Date(b.time))} → ${dest}`,
-    );
+    println(`${paint("32", "restored")} ${b.rel} from ${fmtDateTime(new Date(b.time))} → ${dest}`);
     return;
   }
   throw new Error("usage: ferry backups list|restore|prune ...");
@@ -461,17 +398,14 @@ function backupsPrune(pos: string[], olderThan: string, maxSize: string): void {
   try {
     age = parseDuration(olderThan);
   } catch (e) {
-    throw new Error(`--older-than: ${(e as Error).message}`);
+    throw new Error(`--older-than: ${(e as Error).message}`, { cause: e });
   }
   try {
     size = parseSize(maxSize);
   } catch (e) {
-    throw new Error(`--max-size: ${(e as Error).message}`);
+    throw new Error(`--max-size: ${(e as Error).message}`, { cause: e });
   }
-  if (age <= 0 && size <= 0)
-    throw new Error(
-      "give --older-than (e.g. 30d) and/or --max-size (e.g. 1GB)",
-    );
+  if (age <= 0 && size <= 0) throw new Error("give --older-than (e.g. 30d) and/or --max-size (e.g. 1GB)");
   let ids: string[];
   if (pos.length >= 2) ids = [pairID(pairFromArgs(pos[0]!, pos[1]!))];
   else {
@@ -491,17 +425,13 @@ function backupsPrune(pos: string[], olderThan: string, maxSize: string): void {
     total += r.removed;
     freed += r.freed;
   }
-  println(
-    `${paint("32", "✓")} removed ${total} backup version(s), freed ${humanSize(freed)}`,
-  );
+  println(`${paint("32", "✓")} removed ${total} backup version(s), freed ${humanSize(freed)}`);
 }
 
 // ---------- service ----------
 
 export async function cmdService(args: string[]): Promise<void> {
-  const usageErr = new Error(
-    "usage: ferry service install|uninstall|start|stop|status|logs",
-  );
+  const usageErr = new Error("usage: ferry service install|uninstall|start|stop|status|logs");
   if (args.length === 0) throw usageErr;
   switch (args[0]) {
     case "install": {
@@ -552,32 +482,19 @@ function writeServiceConfig(file: string, p: Pair, s: Settings): void {
   if (s.serveToken) doc.serve_token = s.serveToken;
   if (s.webhooks.length > 0) doc.webhooks = s.webhooks;
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(
-    file,
-    "# generated by ferry service install\n" + YAML.stringify(doc),
-    { mode: 0o600 },
-  );
+  fs.writeFileSync(file, "# generated by ferry service install\n" + YAML.stringify(doc), { mode: 0o600 });
 }
 
 // ---------- conflicts / resolve ----------
 
 export async function cmdConflicts(args: string[]): Promise<void> {
-  const f = new FlagSet("conflicts").bool(
-    "diff",
-    false,
-    "show a diff (target vs source) for each conflict",
-  );
+  const f = new FlagSet("conflicts").bool("diff", false, "show a diff (target vs source) for each conflict");
   if (!parse(f, args)) return;
   let total = 0;
   for (const sp of savedPairs(dataDir())) {
     if (sp.conflicts.length === 0) continue;
-    const run =
-      sp.pid > 0
-        ? paint("32", `running (pid ${sp.pid})`)
-        : paint("90", "not running");
-    println(
-      `${paint("1", sp.pair.name)}  ${sp.pair.source} ⇄ ${sp.pair.target}  ${run}`,
-    );
+    const run = sp.pid > 0 ? paint("32", `running (pid ${sp.pid})`) : paint("90", "not running");
+    println(`${paint("1", sp.pair.name)}  ${sp.pair.source} ⇄ ${sp.pair.target}  ${run}`);
     const e = new Engine(sp.pair, null);
     for (const c of sp.conflicts) {
       total++;
@@ -592,12 +509,7 @@ export async function cmdConflicts(args: string[]): Promise<void> {
     println("no conflicts");
     return;
   }
-  println(
-    paint(
-      "90",
-      "\nresolve with: ferry resolve <file> --keep source|target|newer|both|merge   (or --all)",
-    ),
-  );
+  println(paint("90", "\nresolve with: ferry resolve <file> --keep source|target|newer|both|merge   (or --all)"));
 }
 
 export async function cmdResolve(args: string[]): Promise<void> {
@@ -609,17 +521,13 @@ export async function cmdResolve(args: string[]): Promise<void> {
   if (!pos) return;
   const choice = parseChoice(f.getString("keep"));
   if (!choice)
-    throw new Error(
-      "usage: ferry resolve <file>... --keep source|target|newer|both|merge [--all] [--pair NAME]",
-    );
+    throw new Error("usage: ferry resolve <file>... --keep source|target|newer|both|merge [--all] [--pair NAME]");
   const all = f.getBool("all"),
     pairName = f.getString("pair");
-  if (!all && pos.length === 0)
-    throw new Error("name the conflicted file(s), or use --all");
+  if (!all && pos.length === 0) throw new Error("name the conflicted file(s), or use --all");
 
   const cands: SavedPair[] = savedPairs(dataDir()).filter(
-    (sp) =>
-      sp.conflicts.length > 0 && (pairName === "" || sp.pair.name === pairName),
+    (sp) => sp.conflicts.length > 0 && (pairName === "" || sp.pair.name === pairName),
   );
   if (cands.length === 0) {
     println("no conflicts to resolve");
@@ -638,12 +546,8 @@ export async function cmdResolve(args: string[]): Promise<void> {
           todo.set(sp.id, [...(todo.get(sp.id) ?? []), rel]);
         }
       }
-      if (hits.length === 0)
-        throw new Error(`${file} is not a conflict (see: ferry conflicts)`);
-      if (hits.length > 1)
-        throw new Error(
-          `${file} is a conflict in several pairs; add --pair NAME`,
-        );
+      if (hits.length === 0) throw new Error(`${file} is not a conflict (see: ferry conflicts)`);
+      if (hits.length > 1) throw new Error(`${file} is a conflict in several pairs; add --pair NAME`);
     }
   }
 
@@ -655,16 +559,13 @@ export async function cmdResolve(args: string[]): Promise<void> {
     const pid = runningPID(dataDir(), sp.id);
     if (pid) {
       const deadline = Date.now() + 8000;
-      while (pendingRequests(dataDir(), sp.id) > 0 && Date.now() < deadline)
-        await Bun.sleep(200);
+      while (pendingRequests(dataDir(), sp.id) > 0 && Date.now() < deadline) await Bun.sleep(200);
       if (pendingRequests(dataDir(), sp.id) === 0) {
         println(
           `${paint("32", "✓")} ${files.length} conflict(s) in ${sp.pair.name} resolved by the running ferry (pid ${pid}): kept ${choice}`,
         );
       } else {
-        println(
-          `${paint("33", "…")} queued for ${sp.pair.name}; the running ferry (pid ${pid}) will apply it shortly`,
-        );
+        println(`${paint("33", "…")} queued for ${sp.pair.name}; the running ferry (pid ${pid}) will apply it shortly`);
       }
       continue;
     }
@@ -675,9 +576,7 @@ export async function cmdResolve(args: string[]): Promise<void> {
 // ---------- history / undo ----------
 
 function pickBatches(pairName: string): Batch[] {
-  return allHistory(dataDir()).filter(
-    (b) => pairName === "" || b.pair === pairName,
-  );
+  return allHistory(dataDir()).filter((b) => pairName === "" || b.pair === pairName);
 }
 
 export function cmdHistory(args: string[]): void {
@@ -686,10 +585,7 @@ export function cmdHistory(args: string[]): void {
     .int("n", 20, "how many batches to show")
     .bool("json", false, "print JSON");
   if (!parse(f, args)) return;
-  const list = pickBatches(f.getString("pair")).slice(
-    0,
-    Math.max(0, f.getInt("n")),
-  );
+  const list = pickBatches(f.getString("pair")).slice(0, Math.max(0, f.getInt("n")));
   if (f.getBool("json")) return printJSON(list);
   if (list.length === 0) {
     println("no sync batches recorded yet");
@@ -703,38 +599,23 @@ export function cmdHistory(args: string[]): void {
     b.entries
       .slice(0, 5)
       .forEach((en) =>
-        println(
-          `     ${en.op} ${en.path}${en.to ? " → " + en.to : ""}${paint("90", " (" + en.side + ")")}`,
-        ),
+        println(`     ${en.op} ${en.path}${en.to ? " → " + en.to : ""}${paint("90", " (" + en.side + ")")}`),
       );
-    if (b.entries.length > 5)
-      println(paint("90", `     … ${b.entries.length - 5} more`));
+    if (b.entries.length > 5) println(paint("90", `     … ${b.entries.length - 5} more`));
   }
-  println(
-    paint(
-      "90",
-      "\nundo the newest with: ferry undo   (or ferry undo --batch ID)",
-    ),
-  );
+  println(paint("90", "\nundo the newest with: ferry undo   (or ferry undo --batch ID)"));
 }
 
 export async function cmdUndo(args: string[]): Promise<void> {
   const f = new FlagSet("undo")
     .string("pair", "", "only this pair")
-    .string(
-      "batch",
-      "",
-      "undo this batch (see ferry history) instead of the newest",
-    )
+    .string("batch", "", "undo this batch (see ferry history) instead of the newest")
     .bool("yes", false, "don't ask for confirmation");
   if (!parse(f, args)) return;
   const batchID = f.getString("batch");
-  const target = pickBatches(f.getString("pair")).find(
-    (b) => (batchID === "" && !b.undone) || b.id === batchID,
-  );
+  const target = pickBatches(f.getString("pair")).find((b) => (batchID === "" && !b.undone) || b.id === batchID);
   if (!target) {
-    if (batchID !== "")
-      throw new Error(`no batch ${batchID} (see: ferry history)`);
+    if (batchID !== "") throw new Error(`no batch ${batchID} (see: ferry history)`);
     println("nothing to undo");
     return;
   }
@@ -744,20 +625,11 @@ export async function cmdUndo(args: string[]): Promise<void> {
   );
   target.entries
     .slice(0, 20)
-    .forEach((en) =>
-      println(
-        `   ${undoVerb(en.op)} ${en.path} ${paint("90", "(" + en.side + ")")}`,
-      ),
-    );
-  if (target.entries.length > 20)
-    println(`   … and ${target.entries.length - 20} more`);
+    .forEach((en) => println(`   ${undoVerb(en.op)} ${en.path} ${paint("90", "(" + en.side + ")")}`));
+  if (target.entries.length > 20) println(`   … and ${target.entries.length - 20} more`);
   if (!f.getBool("yes")) {
     if (!stdinIsTTY()) throw new Error("re-run with --yes to confirm");
-    if (
-      !(await confirm(
-        "Undo these changes? (current versions are backed up first) [y/N] ",
-      ))
-    ) {
+    if (!(await confirm("Undo these changes? (current versions are backed up first) [y/N] "))) {
       println("nothing changed");
       return;
     }
@@ -795,14 +667,19 @@ export async function cmdRestore(args: string[]): Promise<void> {
   }
   const remoteOnes = todo.filter((b) => b.remote);
   if (remoteOnes.length > 0) {
-    throw new Error(`${remoteOnes[0]!.pair} syncs to ${remoteOnes[0]!.remote}; restore isn't supported for ssh or cloud targets (use --pair to pick another pair)`);
+    throw new Error(
+      `${remoteOnes[0]!.pair} syncs to ${remoteOnes[0]!.remote}; restore isn't supported for ssh or cloud targets (use --pair to pick another pair)`,
+    );
   }
   const byPair = new Map<string, Batch[]>();
   for (const b of todo) byPair.set(b.pair_id, [...(byPair.get(b.pair_id) ?? []), b]);
   for (const bs of byPair.values()) {
     const files = new Set(bs.flatMap((b) => b.entries.map((en) => en.path)));
     println(`  ${paint("1", bs[0]!.pair)}: ${plural(bs.length, "sync batch")} touching ${plural(files.size, "file")}`);
-    [...files].sort().slice(0, 15).forEach((p) => println(paint("90", "     " + p)));
+    [...files]
+      .sort()
+      .slice(0, 15)
+      .forEach((p) => println(paint("90", "     " + p)));
     if (files.size > 15) println(paint("90", `     … and ${files.size - 15} more`));
   }
   if (f.getBool("dry-run")) {
@@ -823,7 +700,9 @@ export async function cmdRestore(args: string[]): Promise<void> {
     for (const p of r.problems) println(paint("33", "  ! ") + bs[0]!.pair + ": " + p);
   }
   println(`${paint("32", "✓")} reverted ${reverted} change(s) from ${plural(todo.length, "sync batch")}`);
-  println(paint("90", "  Changed your mind? Every replaced version was backed up: see ferry backups list <source> <target>."));
+  println(
+    paint("90", "  Changed your mind? Every replaced version was backed up: see ferry backups list <source> <target>."),
+  );
 }
 
 // ---------- stats ----------
@@ -853,8 +732,12 @@ export function cmdStats(args: string[]): void {
   println(paint("90", period));
   for (const s of active) {
     println(`\n${paint("1", s.pair)}`);
-    println(`  ${plural(s.batches, "sync batch")}${s.undone ? paint("90", ` (${s.undone} undone)`) : ""}, last at ${fmtDateHM(new Date(s.last))}`);
-    println(`  ${paint("32", "+" + s.added)} added  ${paint("33", "~" + s.updated)} updated  ${paint("31", "-" + s.deleted)} deleted  ${paint("35", "↻" + s.renamed)} renamed`);
+    println(
+      `  ${plural(s.batches, "sync batch")}${s.undone ? paint("90", ` (${s.undone} undone)`) : ""}, last at ${fmtDateHM(new Date(s.last))}`,
+    );
+    println(
+      `  ${paint("32", "+" + s.added)} added  ${paint("33", "~" + s.updated)} updated  ${paint("31", "-" + s.deleted)} deleted  ${paint("35", "↻" + s.renamed)} renamed`,
+    );
     if (s.toSource > 0) println(`  ${s.toTarget} written in the target, ${s.toSource} in the source`);
     if (s.busiestDay) println(`  busiest day: ${s.busiestDay} (${plural(s.busiestDayFiles, "file change")})`);
     if (s.perDay.length > 1) {
@@ -900,20 +783,11 @@ export async function cmdDoctor(args: string[]): Promise<void> {
   };
   const have = (name: string) => which(name) !== null;
 
-  println(
-    paint("1", "ferry " + VERSION) +
-      paint(
-        "90",
-        ` on ${process.platform}/${process.arch} (bun ${Bun.version})`,
-      ),
-  );
+  println(paint("1", "ferry " + VERSION) + paint("90", ` on ${process.platform}/${process.arch} (bun ${Bun.version})`));
   println(paint("1", "\nTools"));
   if (gitx.available()) {
     ok(await gitx.version());
-    const [name, email] = await Promise.all([
-      gitx.configGet(".", "user.name"),
-      gitx.configGet(".", "user.email"),
-    ]);
+    const [name, email] = await Promise.all([gitx.configGet(".", "user.name"), gitx.configGet(".", "user.email")]);
     if (name === "" || email === "") {
       warn(
         "git user.name / user.email are not set; commits will fail",
@@ -941,8 +815,7 @@ export async function cmdDoctor(args: string[]): Promise<void> {
         "notify-send not found; desktop notifications are off",
         "install libnotify-bin (Debian/Ubuntu) or libnotify (Fedora/Arch)",
       );
-  } else if (process.platform === "darwin")
-    ok("desktop notifications via osascript");
+  } else if (process.platform === "darwin") ok("desktop notifications via osascript");
   else if (process.platform === "win32") {
     if (have("powershell")) ok("desktop notifications via PowerShell toasts");
     else warn("powershell not found; desktop notifications are off");
@@ -957,39 +830,27 @@ export async function cmdDoctor(args: string[]): Promise<void> {
     fs.rmSync(probe);
     ok(dd);
   } catch (e) {
-    fail(
-      `${dd} is not writable: ${(e as Error).message}`,
-      "set FERRY_HOME to a writable folder",
-    );
+    fail(`${dd} is not writable: ${(e as Error).message}`, "set FERRY_HOME to a writable folder");
   }
   const held = savedPairs(dd).reduce((n, sp) => n + sp.conflicts.length, 0);
-  if (held > 0)
-    warn(`${held} conflict(s) waiting for a decision`, "ferry conflicts");
+  if (held > 0) warn(`${held} conflict(s) waiting for a decision`, "ferry conflicts");
 
   println(paint("1", "\nBackground service"));
-  if (await service.isInstalled())
-    ok("installed — " + (await service.status()).trim().split("\n")[0]);
+  if (await service.isInstalled()) ok("installed — " + (await service.status()).trim().split("\n")[0]);
   else muted("not installed (ferry service install --config ferry.yaml)");
 
   println(paint("1", "\nPairs"));
   let pairs: Pair[] = [];
   try {
-    if (f.getString("config") !== "" || pos.length > 0)
-      pairs = loadPairs(f, pos).pairs;
+    if (f.getString("config") !== "" || pos.length > 0) pairs = loadPairs(f, pos).pairs;
     else if (fs.existsSync("ferry.yaml")) {
       const g = newRunFlags("doctor");
       g.parse(["--config", "ferry.yaml", ...args]);
       pairs = loadPairs(g, []).pairs;
-    } else
-      muted(
-        "no ferry.yaml here; pass --config FILE or <source> <target> to check pairs",
-      );
+    } else muted("no ferry.yaml here; pass --config FILE or <source> <target> to check pairs");
   } catch (e) {
     if (e instanceof ExitError) throw e;
-    fail(
-      "config: " + (e as Error).message,
-      "fix the config, or run ferry init for a commented example",
-    );
+    fail("config: " + (e as Error).message, "fix the config, or run ferry init for a commented example");
   }
   for (const p of pairs) {
     println("  " + paint("1", p.name));
@@ -1001,11 +862,7 @@ export async function cmdDoctor(args: string[]): Promise<void> {
     println(paint("31", `${fails} problem(s), ${warns} warning(s)`));
     throw new ExitError(1);
   }
-  println(
-    warns > 0
-      ? paint("33", `no problems, ${warns} warning(s)`)
-      : paint("32", "all good"),
-  );
+  println(warns > 0 ? paint("33", `no problems, ${warns} warning(s)`) : paint("32", "all good"));
 }
 
 async function doctorPair(
@@ -1026,7 +883,10 @@ async function doctorPair(
         await cloud.open(cloud.parse(p.cloud)).check();
         ok(ind(`${p.cloud} is reachable with the current credentials`));
       } catch (e) {
-        fail(ind(`can't reach ${p.cloud}: ${errMsg(e).split("\n")[0]}`), "check the bucket name, region/endpoint and credentials");
+        fail(
+          ind(`can't reach ${p.cloud}: ${errMsg(e).split("\n")[0]}`),
+          "check the bucket name, region/endpoint and credentials",
+        );
       }
     }
   } else if (p.remote !== "") {
@@ -1036,58 +896,34 @@ async function doctorPair(
     } catch (e) {
       return fail(ind((e as Error).message));
     }
-    const r = await sp.run(
-      `mkdir -p ${sp.dir()} && test -w ${sp.dir()} && command -v tar`,
-      { timeoutMs: 20_000 },
-    );
+    const r = await sp.run(`mkdir -p ${sp.dir()} && test -w ${sp.dir()} && command -v tar`, { timeoutMs: 20_000 });
     if (r.code !== 0) {
       fail(
-        ind(
-          `can't reach ${p.remote}: ${(r.output + " " + (r.error ?? "")).trim().split("\n")[0]}`,
-        ),
+        ind(`can't reach ${p.remote}: ${(r.output + " " + (r.error ?? "")).trim().split("\n")[0]}`),
         `check that \`ssh ${sp.host}\` works without a password prompt (ssh keys or agent)`,
       );
     } else ok(ind(`ssh to ${sp.host} works and the folder is writable`));
     if (await gitx.isRepo(p.remote)) ok(ind("remote target is a git repo"));
   } else if (!fs.existsSync(p.target)) {
-    warn(
-      ind(`target ${p.target} doesn't exist yet`),
-      "it will be created on the first run",
-    );
+    warn(ind(`target ${p.target} doesn't exist yet`), "it will be created on the first run");
   } else if (await gitx.isRepo(p.target)) {
-    ok(
-      ind(
-        `target is a git repo (branch ${orDash(await gitx.currentBranch(p.target))})`,
-      ),
-    );
+    ok(ind(`target is a git repo (branch ${orDash(await gitx.currentBranch(p.target))})`));
     const r = await gitx.inProgress(p.target);
     if (r !== "")
-      warn(
-        ind(`target has a ${r}; ferry pauses until it's finished`),
-        "finish or abort it in the target repo",
-      );
+      warn(ind(`target has a ${r}; ferry pauses until it's finished`), "finish or abort it in the target repo");
   } else {
-    warn(
-      ind("target is not a git repo; commit features are off"),
-      "git init " + p.target,
-    );
+    warn(ind("target is not a git repo; commit features are off"), "git init " + p.target);
   }
-  if (p.every > 0)
-    ok(ind(`syncs every ${formatDuration(p.every)} (no file watcher)`));
+  if (p.every > 0) ok(ind(`syncs every ${formatDuration(p.every)} (no file watcher)`));
   else {
     const roots = p.mode === "two-way" ? [p.source, p.target] : [p.source];
     for (const r of roots) {
       if (!fs.existsSync(r)) continue;
       try {
         const dirs = probeWatcher(r);
-        if (
-          r.replaceAll("\\", "/").startsWith("/mnt/") &&
-          process.env.WSL_DISTRO_NAME
-        ) {
+        if (r.replaceAll("\\", "/").startsWith("/mnt/") && process.env.WSL_DISTRO_NAME) {
           warn(
-            ind(
-              `${r} is a Windows drive inside WSL; native events don't arrive there`,
-            ),
+            ind(`${r} is a Windows drive inside WSL; native events don't arrive there`),
             "use --watcher poll, or keep the folder inside the Linux filesystem",
           );
         } else {
@@ -1105,42 +941,25 @@ async function doctorPair(
         const fix = /too many|no space/i.test(msg)
           ? "raise the limit: sudo sysctl fs.inotify.max_user_watches=524288"
           : "network drives and some containers don't send events; polling works everywhere";
-        warn(
-          ind(
-            `native file events unavailable for ${r} (${msg}); ferry will poll`,
-          ),
-          fix,
-        );
+        warn(ind(`native file events unavailable for ${r} (${msg}); ferry will poll`), fix);
       }
     }
   }
   if (p.window !== "" || p.days.length > 0) {
     ok(
-      ind(
-        `sync window ${windowLabel(p)} — ${inWindow(p) ? "inside it now" : "outside it now, so syncing is paused"}`,
-      ),
+      ind(`sync window ${windowLabel(p)} — ${inWindow(p) ? "inside it now" : "outside it now, so syncing is paused"}`),
     );
   }
-  if (p.secrets === "off")
-    warn(ind("secret scanning is off"), "secrets: warn (or block)");
+  if (p.secrets === "off") warn(ind("secret scanning is off"), "secrets: warn (or block)");
   if (p.lfs && !(await gitx.lfsAvailable(".")))
     warn(ind("lfs: true but git-lfs is not installed"), "https://git-lfs.com");
-  if (p.pr && !which("gh"))
-    warn(
-      ind("pr: true but the gh CLI is not installed"),
-      "https://cli.github.com",
-    );
+  if (p.pr && !which("gh")) warn(ind("pr: true but the gh CLI is not installed"), "https://cli.github.com");
 }
 
 function inotifyLimit(): number {
   if (os.platform() !== "linux") return 0;
   try {
-    return (
-      parseInt(
-        fs.readFileSync("/proc/sys/fs/inotify/max_user_watches", "utf8").trim(),
-        10,
-      ) || 0
-    );
+    return parseInt(fs.readFileSync("/proc/sys/fs/inotify/max_user_watches", "utf8").trim(), 10) || 0;
   } catch {
     return 0;
   }

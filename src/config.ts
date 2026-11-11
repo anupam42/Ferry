@@ -100,25 +100,71 @@ export interface Settings {
   repos: string[];
 }
 
-export const emptySettings = (): Settings => ({ notify: null, serve: "", serveToken: "", theme: "", webhooks: [], repos: [] });
+export const emptySettings = (): Settings => ({
+  notify: null,
+  serve: "",
+  serveToken: "",
+  theme: "",
+  webhooks: [],
+  repos: [],
+});
 
 export const DEFAULT_COMMIT_MESSAGE = "sync: {count} file(s) from {source} at {datetime}";
 
 export function defaults(): Pair {
   return {
-    name: "", source: "", target: "",
-    mode: "one-way", delete: false, onDelete: "", mirror: false,
-    conflict: "ask", headlessConflict: "hold", merge: false,
-    ignore: [], useGitignore: true, defaultIgnores: true, only: [], map: null, targets: [], transform: null,
+    name: "",
+    source: "",
+    target: "",
+    mode: "one-way",
+    delete: false,
+    onDelete: "",
+    mirror: false,
+    conflict: "ask",
+    headlessConflict: "hold",
+    merge: false,
+    ignore: [],
+    useGitignore: true,
+    defaultIgnores: true,
+    only: [],
+    map: null,
+    targets: [],
+    transform: null,
     branch: "",
     autoCommit: { enabled: false, interval: 10 * 60_000, message: DEFAULT_COMMIT_MESSAGE, push: false },
-    gitGuard: true, checkUpstream: 0, autoPull: false, pullRebase: false, beforeCommit: "",
-    pr: false, prBase: "", signCommits: false, commitAuthor: "", lfs: false,
-    maxSize: 50 * 2 ** 20, binary: "warn", secrets: "warn", secretAllow: [], eol: "keep", symlinks: "skip",
-    batchLimit: 200, batchAction: "apply", batchSettle: 3000, maxOpsPerSec: 0,
-    backups: 5, backupMaxAge: 0, backupMaxSize: 0, trash: false,
-    watcher: "auto", interval: 500, settle: 300, every: 0, window: "", days: [],
-    remote: "", cloud: "", dryRun: false,
+    gitGuard: true,
+    checkUpstream: 0,
+    autoPull: false,
+    pullRebase: false,
+    beforeCommit: "",
+    pr: false,
+    prBase: "",
+    signCommits: false,
+    commitAuthor: "",
+    lfs: false,
+    maxSize: 50 * 2 ** 20,
+    binary: "warn",
+    secrets: "warn",
+    secretAllow: [],
+    eol: "keep",
+    symlinks: "skip",
+    batchLimit: 200,
+    batchAction: "apply",
+    batchSettle: 3000,
+    maxOpsPerSec: 0,
+    backups: 5,
+    backupMaxAge: 0,
+    backupMaxSize: 0,
+    trash: false,
+    watcher: "auto",
+    interval: 500,
+    settle: 300,
+    every: 0,
+    window: "",
+    days: [],
+    remote: "",
+    cloud: "",
+    dryRun: false,
   };
 }
 
@@ -132,24 +178,57 @@ type FieldType = "str" | "bool" | "int" | "dur" | "size" | "list" | "map" | "aut
 
 /** YAML key → [Pair field, type], in the order fields are written back out. */
 const FIELDS: [string, keyof Pair, FieldType][] = [
-  ["name", "name", "str"], ["source", "source", "str"], ["target", "target", "str"],
-  ["mode", "mode", "str"], ["delete", "delete", "bool"], ["on_delete", "onDelete", "str"], ["mirror", "mirror", "bool"],
-  ["conflict", "conflict", "str"], ["headless_conflict", "headlessConflict", "str"], ["merge", "merge", "bool"],
-  ["ignore", "ignore", "list"], ["use_gitignore", "useGitignore", "bool"], ["default_ignores", "defaultIgnores", "bool"],
-  ["only", "only", "list"], ["map", "map", "map"], ["targets", "targets", "list"], ["transform", "transform", "map"],
-  ["branch", "branch", "str"], ["auto_commit", "autoCommit", "auto"], ["git_guard", "gitGuard", "bool"],
-  ["check_upstream", "checkUpstream", "dur"], ["auto_pull", "autoPull", "bool"], ["pull_rebase", "pullRebase", "bool"],
-  ["before_commit", "beforeCommit", "str"], ["pr", "pr", "bool"], ["pr_base", "prBase", "str"],
-  ["sign_commits", "signCommits", "bool"], ["commit_author", "commitAuthor", "str"], ["lfs", "lfs", "bool"],
-  ["max_size", "maxSize", "size"], ["binary", "binary", "str"], ["secrets", "secrets", "str"],
-  ["secret_allow", "secretAllow", "list"], ["eol", "eol", "str"], ["symlinks", "symlinks", "str"],
-  ["batch_limit", "batchLimit", "int"], ["batch_action", "batchAction", "str"], ["batch_settle", "batchSettle", "dur"],
+  ["name", "name", "str"],
+  ["source", "source", "str"],
+  ["target", "target", "str"],
+  ["mode", "mode", "str"],
+  ["delete", "delete", "bool"],
+  ["on_delete", "onDelete", "str"],
+  ["mirror", "mirror", "bool"],
+  ["conflict", "conflict", "str"],
+  ["headless_conflict", "headlessConflict", "str"],
+  ["merge", "merge", "bool"],
+  ["ignore", "ignore", "list"],
+  ["use_gitignore", "useGitignore", "bool"],
+  ["default_ignores", "defaultIgnores", "bool"],
+  ["only", "only", "list"],
+  ["map", "map", "map"],
+  ["targets", "targets", "list"],
+  ["transform", "transform", "map"],
+  ["branch", "branch", "str"],
+  ["auto_commit", "autoCommit", "auto"],
+  ["git_guard", "gitGuard", "bool"],
+  ["check_upstream", "checkUpstream", "dur"],
+  ["auto_pull", "autoPull", "bool"],
+  ["pull_rebase", "pullRebase", "bool"],
+  ["before_commit", "beforeCommit", "str"],
+  ["pr", "pr", "bool"],
+  ["pr_base", "prBase", "str"],
+  ["sign_commits", "signCommits", "bool"],
+  ["commit_author", "commitAuthor", "str"],
+  ["lfs", "lfs", "bool"],
+  ["max_size", "maxSize", "size"],
+  ["binary", "binary", "str"],
+  ["secrets", "secrets", "str"],
+  ["secret_allow", "secretAllow", "list"],
+  ["eol", "eol", "str"],
+  ["symlinks", "symlinks", "str"],
+  ["batch_limit", "batchLimit", "int"],
+  ["batch_action", "batchAction", "str"],
+  ["batch_settle", "batchSettle", "dur"],
   ["max_ops_per_sec", "maxOpsPerSec", "int"],
-  ["backups", "backups", "int"], ["backup_max_age", "backupMaxAge", "dur"], ["backup_max_size", "backupMaxSize", "size"],
+  ["backups", "backups", "int"],
+  ["backup_max_age", "backupMaxAge", "dur"],
+  ["backup_max_size", "backupMaxSize", "size"],
   ["trash", "trash", "bool"],
-  ["watcher", "watcher", "str"], ["interval", "interval", "dur"], ["settle", "settle", "dur"], ["every", "every", "dur"],
-  ["window", "window", "str"], ["days", "days", "list"],
-  ["remote", "remote", "str"], ["cloud", "cloud", "str"],
+  ["watcher", "watcher", "str"],
+  ["interval", "interval", "dur"],
+  ["settle", "settle", "dur"],
+  ["every", "every", "dur"],
+  ["window", "window", "str"],
+  ["days", "days", "list"],
+  ["remote", "remote", "str"],
+  ["cloud", "cloud", "str"],
 ];
 
 class Decoder {
@@ -187,7 +266,8 @@ class Decoder {
   int(n: unknown, key: string): number {
     const v = this.scalar(n);
     if (v == null) return 0;
-    if (typeof v !== "number" || !Number.isInteger(v)) this.fail(n as Node, `${key}: expected a whole number, got ${JSON.stringify(v)}`);
+    if (typeof v !== "number" || !Number.isInteger(v))
+      this.fail(n as Node, `${key}: expected a whole number, got ${JSON.stringify(v)}`);
     return v;
   }
 
@@ -242,13 +322,27 @@ class Decoder {
       const v = it.value;
       const rec = p as unknown as Record<string, unknown>;
       switch (type) {
-        case "str": rec[field] = this.str(v, key); break;
-        case "bool": rec[field] = this.bool(v, key); break;
-        case "int": rec[field] = this.int(v, key); break;
-        case "dur": rec[field] = this.dur(v); break;
-        case "size": rec[field] = this.size(v); break;
-        case "list": rec[field] = this.list(v, key); break;
-        case "map": rec[field] = this.map(v, key); break;
+        case "str":
+          rec[field] = this.str(v, key);
+          break;
+        case "bool":
+          rec[field] = this.bool(v, key);
+          break;
+        case "int":
+          rec[field] = this.int(v, key);
+          break;
+        case "dur":
+          rec[field] = this.dur(v);
+          break;
+        case "size":
+          rec[field] = this.size(v);
+          break;
+        case "list":
+          rec[field] = this.list(v, key);
+          break;
+        case "map":
+          rec[field] = this.map(v, key);
+          break;
         case "auto":
           for (const a of this.items(v, key)) {
             const k = this.str(a.key, "key");
@@ -281,10 +375,18 @@ export function loadFile(
       const key = dec.str(it.key, "key");
       const v = it.value;
       switch (key) {
-        case "notify": settings.notify = dec.scalar(v) == null ? null : dec.bool(v, key); break;
-        case "serve": settings.serve = dec.str(v, key); break;
-        case "serve_token": settings.serveToken = dec.str(v, key); break;
-        case "theme": settings.theme = dec.str(v, key); break;
+        case "notify":
+          settings.notify = dec.scalar(v) == null ? null : dec.bool(v, key);
+          break;
+        case "serve":
+          settings.serve = dec.str(v, key);
+          break;
+        case "serve_token":
+          settings.serveToken = dec.str(v, key);
+          break;
+        case "theme":
+          settings.theme = dec.str(v, key);
+          break;
         case "webhooks":
           if (v != null && !isSeq(v)) dec.fail(v as Node, "webhooks: expected a list");
           for (const w of isSeq(v) ? v.items : []) {
@@ -298,8 +400,12 @@ export function loadFile(
             settings.webhooks.push(hook);
           }
           break;
-        case "repos": settings.repos = dec.list(v, key).map((r) => path.resolve(path.dirname(path.resolve(file)), expandHome(r))); break;
-        case "defaults": defaultsNode = v; break;
+        case "repos":
+          settings.repos = dec.list(v, key).map((r) => path.resolve(path.dirname(path.resolve(file)), expandHome(r)));
+          break;
+        case "defaults":
+          defaultsNode = v;
+          break;
         case "pairs":
           if (v != null && !isSeq(v)) dec.fail(v as Node, "pairs: expected a list");
           pairNodes = isSeq(v) ? v.items : [];
@@ -307,7 +413,7 @@ export function loadFile(
       }
     }
   } catch (e) {
-    throw new Error(`${file}: ${(e as Error).message}`);
+    throw new Error(`${file}: ${(e as Error).message}`, { cause: e });
   }
   for (const w of settings.webhooks) {
     if (!w.url) throw new Error(`${file}: every webhook needs a url`);
@@ -317,7 +423,7 @@ export function loadFile(
     try {
       dec.pair(defaultsNode, base);
     } catch (e) {
-      throw new Error(`${file} defaults: ${(e as Error).message}`);
+      throw new Error(`${file} defaults: ${(e as Error).message}`, { cause: e });
     }
   }
   if (pairNodes.length === 0 && !opts.allowEmpty) throw new Error(`${file}: no pairs defined`);
@@ -331,7 +437,7 @@ export function loadFile(
     try {
       dec.pair(n, p);
     } catch (e) {
-      throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`);
+      throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`, { cause: e });
     }
     p.ignore = [...base.ignore, ...p.ignore];
     const resolve = (t: string) =>
@@ -342,7 +448,7 @@ export function loadFile(
     try {
       for (const q of expandTargets(p)) pairs.push(...expandMap(q));
     } catch (e) {
-      throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`);
+      throw new Error(`${file} pair ${i + 1}: ${(e as Error).message}`, { cause: e });
     }
   });
   for (const p of pairs) normalize(p);
@@ -366,7 +472,13 @@ export function dropOverlaps(pairs: Pair[]): { kept: Pair[]; dropped: { pair: Pa
     const p = pairs[i]!;
     const clash = kept.find((q) => q.name === p.name || samePath(q.target, p.target));
     if (clash) {
-      dropped.unshift({ pair: p, reason: clash.name === p.name ? `has the same name as "${clash.name}"` : `writes to the same target as "${clash.name}"` });
+      dropped.unshift({
+        pair: p,
+        reason:
+          clash.name === p.name
+            ? `has the same name as "${clash.name}"`
+            : `writes to the same target as "${clash.name}"`,
+      });
     } else kept.unshift(p);
   }
   return { kept, dropped };
@@ -403,7 +515,7 @@ export function expandTargets(p: Pair): Pair[] {
 }
 
 function targetLabel(t: string): string {
-  const s = t.replace(/[\/]+$/, "");
+  const s = t.replace(/[/]+$/, "");
   if (cloud.isSpec(s)) {
     const c = cloud.parse(s);
     return c.prefix ? c.bucket + "/" + path.posix.basename(c.prefix) : c.bucket;
@@ -484,7 +596,8 @@ export function normalize(p: Pair): void {
   } catch {}
   if (!st?.isDirectory()) fail(`source "${p.source}" is not a folder`);
   if (samePath(p.source, p.target)) fail("source and target are the same folder");
-  if (inside(p.target, p.source) || inside(p.source, p.target)) fail("one folder is inside the other; that would loop forever");
+  if (inside(p.target, p.source) || inside(p.source, p.target))
+    fail("one folder is inside the other; that would loop forever");
   if (oneOf(p.mode, "", "one-way", "oneway")) p.mode = "one-way";
   else if (oneOf(p.mode, "two-way", "twoway", "bidirectional")) p.mode = "two-way";
   else fail("mode must be one-way or two-way");
@@ -599,7 +712,8 @@ export function parseDays(list: string[]): boolean[] {
       if (tok === "weekends" || tok === "weekend") tok = "sat-sun";
       const dash = tok.indexOf("-");
       if (dash >= 0) {
-        const a = day(tok.slice(0, dash)), b = day(tok.slice(dash + 1));
+        const a = day(tok.slice(0, dash)),
+          b = day(tok.slice(dash + 1));
         for (let d = a; ; d = (d + 1) % 7) {
           days[d] = true;
           if (d === b) break;
@@ -617,7 +731,8 @@ export function checkOverlaps(pairs: Pair[]): void {
   for (let i = 0; i < pairs.length; i++) {
     for (let j = 0; j < pairs.length; j++) {
       if (i === j) continue;
-      if (pairs[i]!.name === pairs[j]!.name) throw new Error(`two pairs are named "${pairs[i]!.name}"; names must be unique`);
+      if (pairs[i]!.name === pairs[j]!.name)
+        throw new Error(`two pairs are named "${pairs[i]!.name}"; names must be unique`);
       if (samePath(pairs[i]!.target, pairs[j]!.target)) {
         throw new Error(`pairs "${pairs[i]!.name}" and "${pairs[j]!.name}" write to the same target`);
       }
@@ -680,14 +795,19 @@ export function pairToYAMLObject(p: Pair): Record<string, unknown> {
     if (field === "targets" && (v as string[]).length === 0) continue;
     if (field === "transform" && v == null) continue;
     switch (type) {
-      case "dur": out[key] = formatDuration(v as number); break;
-      case "size": out[key] = humanSize(v as number); break;
+      case "dur":
+        out[key] = formatDuration(v as number);
+        break;
+      case "size":
+        out[key] = humanSize(v as number);
+        break;
       case "auto": {
         const a = v as AutoCommit;
         out[key] = { enabled: a.enabled, interval: formatDuration(a.interval), message: a.message, push: a.push };
         break;
       }
-      default: out[key] = v ?? {};
+      default:
+        out[key] = v ?? {};
     }
   }
   return out;
@@ -710,18 +830,19 @@ export function pairFromJSON(raw: unknown): Pair | null {
   const special: Record<string, keyof Pair> = { PR: "pr", PRBase: "prBase", LFS: "lfs", EOL: "eol" };
   const durs = new Set<string>(FIELDS.filter((f) => f[2] === "dur").map((f) => f[1]));
   for (const [k, v] of Object.entries(r)) {
-    const field = (special[k] ?? (k[0]!.toLowerCase() + k.slice(1))) as keyof Pair;
+    const field = (special[k] ?? k[0]!.toLowerCase() + k.slice(1)) as keyof Pair;
     if (!(field in p) || v == null) continue;
     if (field === "autoCommit") {
       const a = v as Record<string, unknown>;
       p.autoCommit = {
-        enabled: !!a.Enabled, interval: Number(a.Interval ?? 0) / 1e6,
-        message: String(a.Message ?? DEFAULT_COMMIT_MESSAGE), push: !!a.Push,
+        enabled: !!a.Enabled,
+        interval: Number(a.Interval ?? 0) / 1e6,
+        message: String(a.Message ?? DEFAULT_COMMIT_MESSAGE),
+        push: !!a.Push,
       };
-    } else if (durs.has(field)) {
-      (p as any)[field] = Number(v) / 1e6;
     } else {
-      (p as any)[field] = v;
+      // the old JSON format: field names map one to one, durations were in nanoseconds
+      (p as unknown as Record<string, unknown>)[field] = durs.has(field) ? Number(v) / 1e6 : v;
     }
   }
   return p;
@@ -827,7 +948,7 @@ export function pairsFromObject(obj: Record<string, unknown>): Pair[] {
   try {
     new Decoder(lc).pair(doc.contents, p);
   } catch (e) {
-    throw new Error((e as Error).message.replace(/^line \d+: /, ""));
+    throw new Error((e as Error).message.replace(/^line \d+: /, ""), { cause: e });
   }
   const out = expandTargets(p).flatMap(expandMap);
   for (const q of out) normalize(q);
@@ -868,7 +989,9 @@ export function setRepoInFile(file: string, repo: string, present: boolean): voi
   if (doc.errors.length > 0) throw new Error(`${file}: ${doc.errors[0]!.message}`);
   const list = doc.get("repos");
   const items: string[] = isSeq(list) ? list.items.map((it) => String(isScalar(it) ? it.value : it)) : [];
-  const next = present ? [...new Set([...items, repo])] : items.filter((r) => path.resolve(expandHome(r)) !== path.resolve(repo));
+  const next = present
+    ? [...new Set([...items, repo])]
+    : items.filter((r) => path.resolve(expandHome(r)) !== path.resolve(repo));
   if (next.length === items.length && next.every((r, i) => r === items[i])) return;
   doc.set("repos", doc.createNode(next));
   fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });

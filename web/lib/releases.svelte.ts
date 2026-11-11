@@ -7,7 +7,13 @@ import { git, type GitView } from "./git.svelte.ts";
 import { noticeKey, pickNotice, placeFor, relKey } from "./releases.ts";
 import type { LatestRelease, ReleaseInfo } from "./types.ts";
 
-const readJSON = <T>(key: string, fallback: T): T => { try { return (JSON.parse(localStorage.getItem(key) || "null") as T) ?? fallback; } catch { return fallback; } };
+const readJSON = <T>(key: string, fallback: T): T => {
+  try {
+    return (JSON.parse(localStorage.getItem(key) || "null") as T) ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 class Releases {
   info = $state<ReleaseInfo | null>(null);
@@ -27,18 +33,30 @@ class Releases {
   private loading: Promise<ReleaseInfo | null> | null = null;
 
   load(): Promise<ReleaseInfo | null> {
-    this.loading ??= api<ReleaseInfo>("GET", "/release").then((r) => {
-      this.info = r;
-      // a first visit isn't an update: start from here quietly
-      if (localStorage.getItem("ferry-seen-release") == null) this.markSeen();
-      return r;
-    }, (e) => { this.error = (e as Error).message; this.loading = null; return null; });
+    this.loading ??= api<ReleaseInfo>("GET", "/release").then(
+      (r) => {
+        this.info = r;
+        // a first visit isn't an update: start from here quietly
+        if (localStorage.getItem("ferry-seen-release") == null) this.markSeen();
+        return r;
+      },
+      (e) => {
+        this.error = (e as Error).message;
+        this.loading = null;
+        return null;
+      },
+    );
     return this.loading;
   }
 
   notice = $derived.by(() => {
     if (!this.info) return null;
-    const n = pickNotice(this.info.releases, this.info.version, { checkOn: this.checkOn, last: this.last?.r ?? null, seen: this.seen, now: this.now });
+    const n = pickNotice(this.info.releases, this.info.version, {
+      checkOn: this.checkOn,
+      last: this.last?.r ?? null,
+      seen: this.seen,
+      now: this.now,
+    });
     return n && !this.dismissed.includes(noticeKey(n)) ? n : null;
   });
   /** the rail's What's new dot: the newest release hasn't been looked at */
@@ -55,7 +73,8 @@ class Releases {
   }
   fold(key: string, on: boolean): void {
     this.folded = on ? key : "";
-    if (on) localStorage.setItem("ferry-notice-collapsed", key); else localStorage.removeItem("ferry-notice-collapsed");
+    if (on) localStorage.setItem("ferry-notice-collapsed", key);
+    else localStorage.removeItem("ferry-notice-collapsed");
   }
 
   setCheck(on: boolean): void {
@@ -74,8 +93,13 @@ class Releases {
     return r;
   }
 
-  openWhatsNew(only = ""): void { this.whatsNew = { only }; }
-  closeWhatsNew(): void { this.whatsNew = null; this.markSeen(); }
+  openWhatsNew(only = ""): void {
+    this.whatsNew = { only };
+  }
+  closeWhatsNew(): void {
+    this.whatsNew = null;
+    this.markSeen();
+  }
 
   /** A "Try it" place from the changelog, opened in the app. */
   go(place: string): void {
@@ -83,9 +107,14 @@ class Releases {
     if (!p) return;
     this.whatsNew = null;
     this.markSeen();
-    if (p.mode === "git") { app.go("git"); git.view = p.view as GitView; }
-    else if (p.mode === "settings") { app.section = p.section; localStorage.setItem("ferry-settings-sec", p.section); app.go("settings"); }
-    else app.go("sync");
+    if (p.mode === "git") {
+      app.go("git");
+      git.view = p.view as GitView;
+    } else if (p.mode === "settings") {
+      app.section = p.section;
+      localStorage.setItem("ferry-settings-sec", p.section);
+      app.go("settings");
+    } else app.go("sync");
   }
 
   start(): void {

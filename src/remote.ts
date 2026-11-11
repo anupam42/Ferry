@@ -51,7 +51,8 @@ export function parse(s: string): Spec {
     if (slash < 0 || hostPart === "" || p === "") {
       throw new Error(`remote "${s}": expected ssh://[user@]host[:port]/path`);
     }
-    let host = hostPart, port = "";
+    let host = hostPart,
+      port = "";
     const at = hostPart.lastIndexOf("@");
     const colon = hostPart.lastIndexOf(":");
     if (colon > at) {

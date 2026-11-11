@@ -18,7 +18,14 @@ export class Watcher {
    * In "auto" mode it falls back to polling if native events fail, e.g. on
    * network drives or when the OS watch limit is hit.
    */
-  constructor(mode: string, roots: string[], intervalMs: number, skip: SkipFn, private poke: () => void, warn: (msg: string) => void) {
+  constructor(
+    mode: string,
+    roots: string[],
+    intervalMs: number,
+    skip: SkipFn,
+    private poke: () => void,
+    warn: (msg: string) => void,
+  ) {
     if (mode !== "poll") {
       try {
         for (const r of roots) this.watchers.push(this.watchRoot(r, skip, warn));
@@ -29,9 +36,11 @@ export class Watcher {
         for (const w of this.watchers) w.close();
         this.watchers = [];
         const why = (e as Error).message;
-        warn(mode === "native"
-          ? `native file events unavailable (${why}); falling back to polling`
-          : `using polling: native file events unavailable (${why})`);
+        warn(
+          mode === "native"
+            ? `native file events unavailable (${why}); falling back to polling`
+            : `using polling: native file events unavailable (${why})`,
+        );
       }
     }
     this.kind = "poll";

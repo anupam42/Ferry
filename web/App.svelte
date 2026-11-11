@@ -30,7 +30,9 @@
 
 {#if app.connectionsOpen}<ConnectionsDrawer />{/if}
 {#if notes.open}<NotificationsDrawer />{/if}
-{#if releases.notice}{#key releases.notice.kind + releases.notice.version}<ReleaseNotice n={releases.notice} />{/key}{/if}
+{#if releases.notice}{#key releases.notice.kind + releases.notice.version}<ReleaseNotice
+      n={releases.notice}
+    />{/key}{/if}
 {#if releases.whatsNew && releases.info}<WhatsNew />{/if}
 <RelayAsk />
 <Toasts />
@@ -40,20 +42,43 @@
   @use "tokens" as *;
   @use "mixins" as *;
 
-  :global(:root) { --rail-w: 92px; }
-  :global([data-rail="thin"]) { --rail-w: 64px; }
-  :global([data-rail="wide"]) { --rail-w: 210px; }
+  :global(:root) {
+    --rail-w: 92px;
+  }
+  :global([data-rail="thin"]) {
+    --rail-w: 64px;
+  }
+  :global([data-rail="wide"]) {
+    --rail-w: 210px;
+  }
 
   .app {
-    display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr); gap: space(4) + 2; padding: space(4) + 2;
+    display: grid;
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    gap: space(4) + 2;
+    padding: space(4) + 2;
     min-height: calc(100vh / var(--zoom));
-    @include motion { transition: grid-template-columns $duration-slow $ease-out; }
+    @include motion {
+      transition: grid-template-columns $duration-slow $ease-out;
+    }
   }
   // resizing the rail: the page slides with a transform; its far edge is clipped rather than widening the document
-  :global(.rail-dragging) .app { transition: none; overflow-x: clip; }
-  .content { min-width: 0; }
-  :global([data-railpos="top"]) .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  :global(.rail-dragging) .app {
+    transition: none;
+    overflow-x: clip;
+  }
+  .content {
+    min-width: 0;
+  }
+  :global([data-railpos="top"]) .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
   @include below(phone) {
-    .app { grid-template-columns: minmax(0, 1fr); padding: space(2) + 2; gap: space(3); }
+    .app {
+      grid-template-columns: minmax(0, 1fr);
+      padding: space(2) + 2;
+      gap: space(3);
+    }
   }
 </style>

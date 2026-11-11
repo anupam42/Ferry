@@ -21,23 +21,35 @@ const MAX_CELLS = 4_000_000;
  * overlap (or touch adjacent lines, as in git) become conflict blocks with
  * <<<<<<< ======= >>>>>>> markers; their number is returned.
  */
-export function merge3(base: Uint8Array, ours: Uint8Array, theirs: Uint8Array, l: Labels): { data: Buffer; conflicts: number } {
-  const B = splitLines(base), O = splitLines(ours), T = splitLines(theirs);
+export function merge3(
+  base: Uint8Array,
+  ours: Uint8Array,
+  theirs: Uint8Array,
+  l: Labels,
+): { data: Buffer; conflicts: number } {
+  const B = splitLines(base),
+    O = splitLines(ours),
+    T = splitLines(theirs);
   const mo = match(B, O);
   const mt = match(B, T);
   const out: string[] = [];
   let conflicts = 0;
-  let i = 0, jo = 0, jt = 0;
+  let i = 0,
+    jo = 0,
+    jt = 0;
   for (;;) {
     // next base line that survived unchanged on both sides
     let k = i;
     while (k < B.length && (mo[k]! < 0 || mt[k]! < 0)) k++;
-    let eo = O.length, et = T.length;
+    let eo = O.length,
+      et = T.length;
     if (k < B.length) {
       eo = mo[k]!;
       et = mt[k]!;
     }
-    const bc = B.slice(i, k), oc = O.slice(jo, eo), tc = T.slice(jt, et);
+    const bc = B.slice(i, k),
+      oc = O.slice(jo, eo),
+      tc = T.slice(jt, et);
     if (equal(oc, tc)) out.push(...oc);
     else if (equal(bc, oc)) out.push(...tc);
     else if (equal(bc, tc)) out.push(...oc);
@@ -100,8 +112,10 @@ function match(a: string[], b: string[]): Int32Array {
     res[a.length - 1 - suf] = b.length - 1 - suf;
     suf++;
   }
-  const am = a.slice(pre, a.length - suf), bm = b.slice(pre, b.length - suf);
-  const n = am.length, m = bm.length;
+  const am = a.slice(pre, a.length - suf),
+    bm = b.slice(pre, b.length - suf);
+  const n = am.length,
+    m = bm.length;
   if (n === 0 || m === 0) return res;
   if (n * m > MAX_CELLS) throw new TooLargeError();
   const W = m + 1;
@@ -112,7 +126,8 @@ function match(a: string[], b: string[]): Int32Array {
       else dp[i * W + j] = Math.max(dp[(i + 1) * W + j]!, dp[i * W + j + 1]!);
     }
   }
-  let i = 0, j = 0;
+  let i = 0,
+    j = 0;
   while (i < n && j < m) {
     if (am[i] === bm[j]) {
       res[pre + i] = pre + j;

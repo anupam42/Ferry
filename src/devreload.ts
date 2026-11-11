@@ -54,7 +54,8 @@ export async function supervise(args: string[], log: (msg: string) => void): Pro
     });
     child = c;
     void c.exited.then((code) => {
-      if (child === c && !stopping && !restarting) log(`ferry ui stopped (exit ${code}); save a file to start it again`);
+      if (child === c && !stopping && !restarting)
+        log(`ferry ui stopped (exit ${code}); save a file to start it again`);
     });
   };
   let restarting = false;
@@ -91,11 +92,15 @@ export async function supervise(args: string[], log: (msg: string) => void): Pro
   // the changelog is bundled into the server (What's new, Settings → Updates), but lives next to src/
   const changelog = path.join(path.dirname(src), "CHANGELOG.md");
   let changelogTime = 0;
-  try { changelogTime = fs.statSync(changelog).mtimeMs; } catch {}
+  try {
+    changelogTime = fs.statSync(changelog).mtimeMs;
+  } catch {}
   const notesWatcher = fs.watch(path.dirname(src), (_ev, name) => {
     if (String(name ?? "") !== "CHANGELOG.md") return;
     let mtime = 0;
-    try { mtime = fs.statSync(changelog).mtimeMs; } catch {}
+    try {
+      mtime = fs.statSync(changelog).mtimeMs;
+    } catch {}
     if (mtime === changelogTime) return;
     changelogTime = mtime;
     if (timer) clearTimeout(timer);

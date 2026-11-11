@@ -3,7 +3,12 @@ import { dayOf, describe, important, noteList } from "../web/lib/notes.ts";
 import { cmpVersion, countdown, noticeKey, pickNotice, placeFor, relKey, whatsNew } from "../web/lib/releases.ts";
 import type { Release } from "../src/shared/release.ts";
 
-const ev = (kind: string, o: Record<string, unknown> = {}) => ({ kind, pair: "site", time: "2026-11-10T10:00:00Z", ...o });
+const ev = (kind: string, o: Record<string, unknown> = {}) => ({
+  kind,
+  pair: "site",
+  time: "2026-11-10T10:00:00Z",
+  ...o,
+});
 
 group("what an event means", () => {
   test("a held conflict needs you, and offers to resolve it in the pair's files", () => {
@@ -19,13 +24,23 @@ group("what an event means", () => {
     expect(d.action).toEqual({ label: "See changes", diff: { pair: "site", file: "a/.env" } });
   });
   test("synced counts become words; failures are errors", () => {
-    expect(describe(ev("synced", { message: "+2 ~1" }))).toMatchObject({ cat: "sync", title: "Copied 3 files", detail: "2 added, 1 updated" });
-    expect(describe(ev("synced", { message: "+1 !2" }))).toMatchObject({ cat: "errors", title: "2 files couldn't be copied" });
+    expect(describe(ev("synced", { message: "+2 ~1" }))).toMatchObject({
+      cat: "sync",
+      title: "Copied 3 files",
+      detail: "2 added, 1 updated",
+    });
+    expect(describe(ev("synced", { message: "+1 !2" }))).toMatchObject({
+      cat: "errors",
+      title: "2 files couldn't be copied",
+    });
   });
   test("commits, pushes and pull requests", () => {
     expect(describe(ev("commit", { message: "abc1234 Fix the header" }))!.title).toBe("Committed: Fix the header");
     expect(describe(ev("commit", { message: "pushed main" }))!.title).toBe("Pushed main");
-    expect(describe(ev("commit", { message: "opened pull request https://x/pr/1" }))!.action).toEqual({ label: "Open", url: "https://x/pr/1" });
+    expect(describe(ev("commit", { message: "opened pull request https://x/pr/1" }))!.action).toEqual({
+      label: "Open",
+      url: "https://x/pr/1",
+    });
   });
   test("noise is dropped, routine syncs aren't important", () => {
     expect(describe(ev("info", { message: "watching" }))).toBeNull();
@@ -52,7 +67,16 @@ group("the list", () => {
     expect(noteList(events, "sync", false, now).rows[0]!.group).toBe("Yesterday");
   });
   test("newest first, whatever order the events came in", () => {
-    const l = noteList([ev("error", { message: "b", time: "2026-11-10T11:00:00Z" }), ev("error", { message: "a", time: "2026-11-09T11:00:00Z" }), ev("error", { message: "c", time: "2026-11-10T11:30:00Z" })], "errors", false, now);
+    const l = noteList(
+      [
+        ev("error", { message: "b", time: "2026-11-10T11:00:00Z" }),
+        ev("error", { message: "a", time: "2026-11-09T11:00:00Z" }),
+        ev("error", { message: "c", time: "2026-11-10T11:30:00Z" }),
+      ],
+      "errors",
+      false,
+      now,
+    );
     expect(l.rows.map((r) => r.ev.message)).toEqual(["c", "b", "a"]);
   });
   test("day headings", () => {
@@ -61,7 +85,15 @@ group("the list", () => {
   });
 });
 
-const R = (version: string, o: Partial<Release> = {}): Release => ({ version, date: "2026-11-01", unreleased: false, planned: "", summary: "", groups: [], ...o });
+const R = (version: string, o: Partial<Release> = {}): Release => ({
+  version,
+  date: "2026-11-01",
+  unreleased: false,
+  planned: "",
+  summary: "",
+  groups: [],
+  ...o,
+});
 
 group("releases", () => {
   test("versions compare by number, not text", () => {
@@ -99,7 +131,12 @@ group("releases", () => {
   test("What's new covers every release since the one you saw, headline first and not repeated", () => {
     const item = (title: string) => ({ title, text: "", try: "" });
     const all = [
-      R("1.3.0", { groups: [{ kind: "fixed", items: [item("fix b")] }, { kind: "new", items: [item("feature a")] }] }),
+      R("1.3.0", {
+        groups: [
+          { kind: "fixed", items: [item("fix b")] },
+          { kind: "new", items: [item("feature a")] },
+        ],
+      }),
       R("1.2.0", { groups: [{ kind: "new", items: [item("old")] }] }),
       R("1.1.0"),
     ];
@@ -107,7 +144,10 @@ group("releases", () => {
     expect(w.show.map((r) => r.version)).toEqual(["1.3.0", "1.2.0"]);
     expect(w.star!.title).toBe("feature a");
     expect(w.rest(all[0]!).map((g) => g.kind)).toEqual(["fixed"]);
-    expect(w.counts).toEqual([["new", 2], ["fixed", 1]]);
+    expect(w.counts).toEqual([
+      ["new", 2],
+      ["fixed", 1],
+    ]);
     expect(whatsNew(all, "1.3.0").show.map((r) => r.version)).toEqual(["1.3.0"]);
     expect(whatsNew(all, "", "1.2.0").show.map((r) => r.version)).toEqual(["1.2.0"]);
   });

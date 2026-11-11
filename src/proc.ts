@@ -30,7 +30,7 @@ export async function exec(cmd: string[], o: ExecOptions = {}): Promise<ExecResu
   if (typeof o.stdin === "string") stdin = new TextEncoder().encode(o.stdin);
   else if (o.stdin instanceof Uint8Array) stdin = o.stdin;
   else if (o.stdin) stdin = Bun.file(o.stdin.file);
-  let proc: Bun.Subprocess<any, "pipe", "pipe">;
+  let proc: Bun.Subprocess<typeof stdin, "pipe", "pipe">;
   try {
     proc = Bun.spawn({
       cmd,
@@ -44,7 +44,7 @@ export async function exec(cmd: string[], o: ExecOptions = {}): Promise<ExecResu
       killSignal: "SIGKILL",
     });
   } catch (e) {
-    const msg = `exec: "${cmd[0]}": ${e instanceof Error && (e as any).code === "ENOENT" ? "executable file not found" : String(e)}`;
+    const msg = `exec: "${cmd[0]}": ${(e as NodeJS.ErrnoException | null)?.code === "ENOENT" ? "executable file not found" : String(e)}`;
     return { code: -1, stdout: "", stderr: msg, output: msg, error: msg };
   }
   const [stdout, stderr, code] = await Promise.all([
@@ -87,8 +87,8 @@ export function processAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch (e: any) {
-    return e?.code === "EPERM";
+  } catch (e) {
+    return (e as NodeJS.ErrnoException | null)?.code === "EPERM";
   }
 }
 

@@ -16,7 +16,7 @@ function detectDepth(): ColorDepth {
   return "16";
 }
 
-let depth: ColorDepth = detectDepth();
+const depth: ColorDepth = detectDepth();
 let dark = true;
 
 export function setDarkBackground(d: boolean): void {
@@ -46,10 +46,14 @@ function to16(r: number, g: number, b: number): number {
 function fgCode(hex: string): string {
   const [r, g, b] = rgb(hex);
   switch (depth) {
-    case "truecolor": return `38;2;${r};${g};${b}`;
-    case "256": return `38;5;${to256(r, g, b)}`;
-    case "16": return String(to16(r, g, b));
-    default: return "";
+    case "truecolor":
+      return `38;2;${r};${g};${b}`;
+    case "256":
+      return `38;5;${to256(r, g, b)}`;
+    case "16":
+      return String(to16(r, g, b));
+    default:
+      return "";
   }
 }
 
@@ -100,7 +104,9 @@ export class Style {
 
 // ---------- text measurement ----------
 
-const ANSI = /\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/y;
+// escape sequences start with the ESC control character (and OSC ones end with BEL): matching them is the point
+// eslint-disable-next-line no-control-regex
+const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/y;
 const segmenter = new Intl.Segmenter();
 
 export function width(s: string): number {
@@ -111,7 +117,9 @@ export function width(s: string): number {
 export function truncate(s: string, w: number): string {
   if (w <= 0) return "";
   if (width(s) <= w) return s;
-  let out = "", used = 0, styled = false;
+  let out = "",
+    used = 0,
+    styled = false;
   let i = 0;
   while (i < s.length) {
     ANSI.lastIndex = i;
@@ -191,9 +199,26 @@ export function parseKeys(data: string): string[] {
         const fin = data[j] ?? "";
         i = j + 1;
         const base = params.split(";")[0];
-        const map: Record<string, string> = { A: "up", B: "down", C: "right", D: "left", H: "home", F: "end", Z: "shift+tab" };
+        const map: Record<string, string> = {
+          A: "up",
+          B: "down",
+          C: "right",
+          D: "left",
+          H: "home",
+          F: "end",
+          Z: "shift+tab",
+        };
         if (fin === "~") {
-          const tilde: Record<string, string> = { "1": "home", "7": "home", "4": "end", "8": "end", "3": "delete", "5": "pgup", "6": "pgdown", "2": "insert" };
+          const tilde: Record<string, string> = {
+            "1": "home",
+            "7": "home",
+            "4": "end",
+            "8": "end",
+            "3": "delete",
+            "5": "pgup",
+            "6": "pgdown",
+            "2": "insert",
+          };
           if (base && tilde[base]) keys.push(tilde[base]!);
         } else if (map[fin]) keys.push(map[fin]!);
         continue;
@@ -271,7 +296,8 @@ export class Screen {
   }
 
   draw(lines: string[]): void {
-    const h = this.height, w = this.width;
+    const h = this.height,
+      w = this.width;
     let buf = "";
     for (let row = 0; row < h; row++) {
       const line = truncate(lines[row] ?? "", w);
@@ -302,6 +328,7 @@ export function queryDarkBackground(timeoutMs = 150): Promise<boolean | null> {
     };
     const onData = (d: Buffer) => {
       acc += d.toString("latin1");
+      // eslint-disable-next-line no-control-regex -- the terminal's reply starts with ESC
       const m = /\x1b\]11;rgb:([0-9a-f]+)\/([0-9a-f]+)\/([0-9a-f]+)/i.exec(acc);
       if (m) {
         const v = (h: string) => parseInt(h.slice(0, 2), 16);

@@ -5,10 +5,17 @@ import path from "node:path";
 const SCAN_MAX = 2 << 20; // only the first 2MB of a file are scanned
 
 const secretFileNames: Record<string, string> = {
-  id_rsa: "SSH private key", id_dsa: "SSH private key", id_ecdsa: "SSH private key",
-  id_ed25519: "SSH private key", ".pgpass": "PostgreSQL password file", ".netrc": "netrc credentials",
-  "credentials.json": "credentials file", "service-account.json": "service account key",
-  ".htpasswd": "password file", "secrets.yml": "secrets file", "secrets.yaml": "secrets file",
+  id_rsa: "SSH private key",
+  id_dsa: "SSH private key",
+  id_ecdsa: "SSH private key",
+  id_ed25519: "SSH private key",
+  ".pgpass": "PostgreSQL password file",
+  ".netrc": "netrc credentials",
+  "credentials.json": "credentials file",
+  "service-account.json": "service account key",
+  ".htpasswd": "password file",
+  "secrets.yml": "secrets file",
+  "secrets.yaml": "secrets file",
 };
 
 const secretExts = [".pem", ".key", ".p12", ".pfx", ".keystore", ".jks", ".ppk", ".kdbx"];
@@ -17,11 +24,11 @@ const secretPatterns: [string, RegExp][] = [
   ["private key", /-----BEGIN (?:[A-Z]+ )*PRIVATE KEY(?: BLOCK)?-----/],
   ["AWS access key", /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/],
   ["GitHub token", /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})/],
-  ["GitLab token", /\bglpat-[A-Za-z0-9_\-]{20,}/],
+  ["GitLab token", /\bglpat-[A-Za-z0-9_-]{20,}/],
   ["Slack token", /\bxox[abposr]-[A-Za-z0-9-]{10,}/],
   ["Stripe live key", /\b[sr]k_live_[A-Za-z0-9]{20,}/],
-  ["Google API key", /\bAIza[0-9A-Za-z_\-]{35}/],
-  ["API key (sk-…)", /\bsk-(?:ant-|proj-)?[A-Za-z0-9_\-]{32,}/],
+  ["Google API key", /\bAIza[0-9A-Za-z_-]{35}/],
+  ["API key (sk-…)", /\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{32,}/],
   [
     "password or token assignment",
     /\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|passw(?:or)?d)["']?\s*[:=]\s*["'][^"'\s]{12,}["']/i,
@@ -81,11 +88,11 @@ const redactors: [string, RegExp, (m: string, ...g: string[]) => string][] = [
   ],
   ["aws-key", /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, () => redacted("aws-key")],
   ["github-token", /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})/g, () => redacted("github-token")],
-  ["gitlab-token", /\bglpat-[A-Za-z0-9_\-]{20,}/g, () => redacted("gitlab-token")],
+  ["gitlab-token", /\bglpat-[A-Za-z0-9_-]{20,}/g, () => redacted("gitlab-token")],
   ["slack-token", /\bxox[abposr]-[A-Za-z0-9-]{10,}/g, () => redacted("slack-token")],
   ["stripe-key", /\b[sr]k_live_[A-Za-z0-9]{20,}/g, () => redacted("stripe-key")],
-  ["google-api-key", /\bAIza[0-9A-Za-z_\-]{35}/g, () => redacted("google-api-key")],
-  ["api-key", /\bsk-(?:ant-|proj-)?[A-Za-z0-9_\-]{32,}/g, () => redacted("api-key")],
+  ["google-api-key", /\bAIza[0-9A-Za-z_-]{35}/g, () => redacted("google-api-key")],
+  ["api-key", /\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{32,}/g, () => redacted("api-key")],
   [
     "secret",
     // keep the name and quotes, replace only the value

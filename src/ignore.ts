@@ -13,7 +13,7 @@ interface Rule {
   base: string; // slash path ("" = root)
 }
 
-const quoteMeta = (s: string) => s.replace(/[\\^$.*+?()[\]{}|\/-]/g, "\\$&");
+const quoteMeta = (s: string) => s.replace(/[\\^$.*+?()[\]{}|/-]/g, "\\$&");
 
 export class Matcher {
   private rules: Rule[] = [];

@@ -38,7 +38,13 @@ test("the dashboard fits the terminal", () => {
   const { e, s } = setup();
   write(s, "a.txt", "x");
   const dash = new Dashboard([e], "1.2.0", "mono");
-  dash.addEvent({ time: Date.now(), pair: e.name, kind: "add", path: "src/deep/file-with-a-very-long-name-that-must-be-cut.ts", dir: "→" });
+  dash.addEvent({
+    time: Date.now(),
+    pair: e.name,
+    kind: "add",
+    path: "src/deep/file-with-a-very-long-name-that-must-be-cut.ts",
+    dir: "→",
+  });
   const lines = (dash as any).view() as string[];
   expect(lines.length).toBe(24);
   for (const l of lines) expect(width(l)).toBeLessThanOrEqual(80);
@@ -59,8 +65,13 @@ test("api: status, history, unknown pair, token", async () => {
   expect(st[0].name).toBe(e.name);
   expect((await get("/pairs/nope/history")).status).toBe(404);
   expect((await get(`/pairs/${encodeURIComponent(e.name)}/history`)).status).toBe(200);
-  expect((await get(`/pairs/${encodeURIComponent(e.name)}/undo`, { method: "POST", headers: { "X-Ferry": "1" } })).status).toBe(409);
+  expect(
+    (await get(`/pairs/${encodeURIComponent(e.name)}/undo`, { method: "POST", headers: { "X-Ferry": "1" } })).status,
+  ).toBe(409);
   const locked = new ApiServer([e], "s3cret");
   expect((await locked.handle(new Request("http://example.com/status"))).status).toBe(401);
-  expect((await locked.handle(new Request("http://example.com/status", { headers: { Authorization: "Bearer s3cret" } }))).status).toBe(200);
+  expect(
+    (await locked.handle(new Request("http://example.com/status", { headers: { Authorization: "Bearer s3cret" } })))
+      .status,
+  ).toBe(200);
 });

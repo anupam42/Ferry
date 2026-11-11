@@ -9,10 +9,18 @@ import changelogText from "../CHANGELOG.md" with { type: "text" };
 import { dataDir } from "./config.ts";
 import { exec, which } from "./proc.ts";
 
-import type { ChangeItem, Health, InstallMethod, Release } from "./shared/release.ts";
+import type { Health, InstallMethod, Release } from "./shared/release.ts";
 export type { ChangeItem, Health, Release } from "./shared/release.ts";
 
-const KINDS: Record<string, Release["groups"][number]["kind"]> = { new: "new", added: "new", improved: "improved", changed: "improved", fixed: "fixed", breaking: "breaking", removed: "breaking" };
+const KINDS: Record<string, Release["groups"][number]["kind"]> = {
+  new: "new",
+  added: "new",
+  improved: "improved",
+  changed: "improved",
+  fixed: "fixed",
+  breaking: "breaking",
+  removed: "breaking",
+};
 
 /** Releases from CHANGELOG.md, newest first (see the file's header for the format). */
 export function parseChangelog(md: string): Release[] {
@@ -27,7 +35,14 @@ export function parseChangelog(md: string): Release[] {
       // "Planned 2026-12-05 15:00" (or just a date): a release that's scheduled, with a countdown in the app
       const plan = /planned\s+(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}:\d{2}))?/i.exec(when);
       const planned = plan ? `${plan[1]}T${(plan[2] ?? "09:00").padStart(5, "0")}` : "";
-      cur = { version: head[1]!, date: /^\d{4}-\d{2}-\d{2}$/.test(when) ? when : "", unreleased: /unreleased/i.test(when) || !!plan, planned, summary: "", groups: [] };
+      cur = {
+        version: head[1]!,
+        date: /^\d{4}-\d{2}-\d{2}$/.test(when) ? when : "",
+        unreleased: /unreleased/i.test(when) || !!plan,
+        planned,
+        summary: "",
+        groups: [],
+      };
       out.push(cur);
       group = null;
       continue;
@@ -39,12 +54,18 @@ export function parseChangelog(md: string): Release[] {
       cur.groups.push(group);
       continue;
     }
-    if (line.startsWith(">") && !group && !cur.summary) { cur.summary = line.replace(/^>\s?/, "").trim(); continue; }
+    if (line.startsWith(">") && !group && !cur.summary) {
+      cur.summary = line.replace(/^>\s?/, "").trim();
+      continue;
+    }
     const item = /^-\s+(.*)$/.exec(line);
     if (item && group) {
       let body = item[1]!;
       let place = "";
-      body = body.replace(/\s*\[try:\s*([\w-]+)\]\s*$/, (_, p: string) => { place = p; return ""; });
+      body = body.replace(/\s*\[try:\s*([\w-]+)\]\s*$/, (_, p: string) => {
+        place = p;
+        return "";
+      });
       const t = /^\*\*(.+?)\*\*[:.]?\s*(.*)$/.exec(body);
       // "**Title**: what it does" reads well in the file; shown on its own, the sentence starts with a capital
       const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -64,12 +85,25 @@ export function parseChangelog(md: string): Release[] {
 export function installMethod(): { method: InstallMethod; update: string; where: string } {
   const main = Bun.main;
   const compiled = main.startsWith("/$bunfs/") || /^[A-Za-z]:[\\/]~BUN[\\/]/.test(main) || main.includes("$bunfs");
-  const exe = (() => { try { return fs.realpathSync(process.execPath); } catch { return process.execPath; } })();
-  if (!compiled) return { method: "source", update: "git pull && bun install", where: path.dirname(path.dirname(path.resolve(main))) };
+  const exe = (() => {
+    try {
+      return fs.realpathSync(process.execPath);
+    } catch {
+      return process.execPath;
+    }
+  })();
+  if (!compiled)
+    return {
+      method: "source",
+      update: "git pull && bun install",
+      where: path.dirname(path.dirname(path.resolve(main))),
+    };
   const p = exe.replaceAll("\\", "/").toLowerCase();
   if (p.includes("/scoop/apps/")) return { method: "scoop", update: "scoop update ferry", where: exe };
-  if (p.includes("/winget/") || p.includes("/microsoft/winget/")) return { method: "winget", update: "winget upgrade anupam42.ferry", where: exe };
-  if (p.includes("/cellar/") || p.includes("/homebrew/") || p.includes("/linuxbrew/")) return { method: "homebrew", update: "brew upgrade ferry", where: exe };
+  if (p.includes("/winget/") || p.includes("/microsoft/winget/"))
+    return { method: "winget", update: "winget upgrade anupam42.ferry", where: exe };
+  if (p.includes("/cellar/") || p.includes("/homebrew/") || p.includes("/linuxbrew/"))
+    return { method: "homebrew", update: "brew upgrade ferry", where: exe };
   return { method: "binary", update: "", where: exe };
 }
 
@@ -93,7 +127,12 @@ export async function health(): Promise<Health[]> {
   } catch {}
   return [
     { name: "git", ok: !!git, detail: git ? git : "not found: Ferry needs git for repositories", needed: true },
-    { name: "GitHub CLI (gh)", ok: !!gh, detail: gh ? gh : "not installed: needed for GitHub pull requests", needed: false },
+    {
+      name: "GitHub CLI (gh)",
+      ok: !!gh,
+      detail: gh ? gh : "not installed: needed for GitHub pull requests",
+      needed: false,
+    },
     { name: "ssh", ok: !!ssh, detail: ssh ? ssh : "not found: needed for ssh targets", needed: false },
     { name: "Data folder", ok: writable, detail: writable ? dataDir() : `can't write to ${dataDir()}`, needed: true },
   ];
@@ -105,22 +144,44 @@ const REPO = "anupam42/Ferry";
  * The newest release on GitHub. Only called when the user asks (the update
  * check is off until they turn it on); sends nothing but the request itself.
  */
-export async function latestRelease(): Promise<{ version: string; name: string; url: string; date: string; notes: string }> {
+export async function latestRelease(): Promise<{
+  version: string;
+  name: string;
+  url: string;
+  date: string;
+  notes: string;
+}> {
   let res: Response;
   try {
-    res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json", "User-Agent": "ferry-update-check" }, signal: AbortSignal.timeout(10_000) });
+    res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "ferry-update-check" },
+      signal: AbortSignal.timeout(10_000),
+    });
   } catch (e) {
-    throw new Error(`couldn't reach GitHub: ${(e as Error).message}`);
+    throw new Error(`couldn't reach GitHub: ${(e as Error).message}`, { cause: e });
   }
   if (res.status === 404) throw new Error("no releases are published yet");
   if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
-  const j = (await res.json()) as { tag_name?: string; name?: string; html_url?: string; published_at?: string; body?: string };
-  return { version: String(j.tag_name ?? "").replace(/^v/, ""), name: j.name ?? "", url: j.html_url ?? `https://github.com/${REPO}/releases`, date: (j.published_at ?? "").slice(0, 10), notes: j.body ?? "" };
+  const j = (await res.json()) as {
+    tag_name?: string;
+    name?: string;
+    html_url?: string;
+    published_at?: string;
+    body?: string;
+  };
+  return {
+    version: String(j.tag_name ?? "").replace(/^v/, ""),
+    name: j.name ?? "",
+    url: j.html_url ?? `https://github.com/${REPO}/releases`,
+    date: (j.published_at ?? "").slice(0, 10),
+    notes: j.body ?? "",
+  };
 }
 
 /** a.b.c compared numerically; pre-release tags sort before the release. */
 export function compareVersions(a: string, b: string): number {
-  const pa = a.split(/[.-]/), pb = b.split(/[.-]/);
+  const pa = a.split(/[.-]/),
+    pb = b.split(/[.-]/);
   for (let i = 0; i < 3; i++) {
     const d = (+(pa[i] ?? 0) || 0) - (+(pb[i] ?? 0) || 0);
     if (d) return d;

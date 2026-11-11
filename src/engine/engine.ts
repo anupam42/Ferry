@@ -19,28 +19,76 @@ import { exec, isWindows, processAlive } from "../proc.ts";
 import * as cloud from "../cloud.ts";
 import * as remote from "../remote.ts";
 import {
-  cmp, errMsg, firstLine, fmtClock, fmtDate, fmtDateHM, fmtHM, fmtStamp, formatDuration, humanSize, isoTime,
-  lastLines, sleep, sortedKeys,
+  cmp,
+  errMsg,
+  firstLine,
+  fmtClock,
+  fmtDate,
+  fmtDateHM,
+  fmtHM,
+  fmtStamp,
+  formatDuration,
+  humanSize,
+  isoTime,
+  lastLines,
+  sleep,
+  sortedKeys,
 } from "../util.ts";
 import {
-  backupDir, backupFile, copyFile, copyLink, DEFAULT_IGNORES, fromSlash, HARD_IGNORES, isBinaryFile, isSymlink, lstat,
-  MODE_SYMLINK, mtimeNs, pruneBackups, removeEmptyParents, removeWithRetry, replaceFile, sameStat, scanDir,
-  snapshotsEqual, stat, writeFileAtomic, type FileStat, type Snapshot,
+  backupDir,
+  backupFile,
+  copyFile,
+  copyLink,
+  DEFAULT_IGNORES,
+  fromSlash,
+  HARD_IGNORES,
+  isBinaryFile,
+  isSymlink,
+  lstat,
+  MODE_SYMLINK,
+  mtimeNs,
+  pruneBackups,
+  removeEmptyParents,
+  removeWithRetry,
+  replaceFile,
+  sameStat,
+  scanDir,
+  snapshotsEqual,
+  stat,
+  writeFileAtomic,
+  type FileStat,
+  type Snapshot,
 } from "./fsops.ts";
 import { HashCache } from "./hashcache.ts";
 import {
-  appendBatch, history, journalPath, restoreTo, stats, undo, type Batch, type JournalEntry, type Stats,
+  appendBatch,
+  history,
+  journalPath,
+  restoreTo,
+  stats,
+  undo,
+  type Batch,
+  type JournalEntry,
+  type Stats,
 } from "./journal.ts";
 import { redactSecrets, scanSecretFile, secretNameHit } from "./secrets.ts";
 import { TarWriter } from "./tar.ts";
 import { moveToTrash } from "./trash.ts";
 import {
-  isPaused, stateOf, type Change, type ChangedFile, type Choice, type Event, type Kind, type Status,
+  isPaused,
+  stateOf,
+  type Change,
+  type ChangedFile,
+  type Choice,
+  type Event,
+  type Kind,
+  type Status,
 } from "./types.ts";
 import { Watcher } from "./watch.ts";
 
 type Side = 0 | 1;
-const SRC: Side = 0, DST: Side = 1;
+const SRC: Side = 0,
+  DST: Side = 1;
 const sideName = (s: Side) => (s === SRC ? "source" : "target");
 const other = (s: Side): Side => (s === SRC ? DST : SRC);
 const arrow = (s: Side) => (s === DST ? "→" : "←");
@@ -82,7 +130,7 @@ interface Base {
 }
 
 const survivor = (b: Base): Side => ((b.o ?? 1) - 1) as Side;
-const sizeOf = (b: Base, s: Side) => (s === SRC && b.sh ? b.ss ?? 0 : b.s);
+const sizeOf = (b: Base, s: Side) => (s === SRC && b.sh ? (b.ss ?? 0) : b.s);
 const hashOf = (b: Base, s: Side) => (s === SRC && b.sh ? b.sh : b.h);
 
 const MERGE_MAX = 2 << 20; // base copies are kept for text files up to this size
@@ -119,7 +167,10 @@ export class Engine {
   private only: Matcher | null;
   private secretAllow: Matcher | null;
   private transforms: [Matcher, string][] | null;
-  private rewriteCache = new Map<string, { key: string; out: { data: Buffer | null; block?: string; note?: string } }>();
+  private rewriteCache = new Map<
+    string,
+    { key: string; out: { data: Buffer | null; block?: string; note?: string } }
+  >();
   private hashes = new HashCache();
 
   // queue
@@ -169,14 +220,34 @@ export class Engine {
     this.gitTarget = cfg.remote !== "" ? cfg.remote : cfg.target;
     this.only = cfg.only.length > 0 ? new Matcher(...cfg.only) : null;
     this.secretAllow = cfg.secretAllow.length > 0 ? new Matcher(...cfg.secretAllow) : null;
-    this.transforms = cfg.transform && Object.keys(cfg.transform).length > 0
-      ? Object.entries(cfg.transform).map(([glob, cmd]) => [new Matcher(glob), cmd] as [Matcher, string])
-      : null;
+    this.transforms =
+      cfg.transform && Object.keys(cfg.transform).length > 0
+        ? Object.entries(cfg.transform).map(([glob, cmd]) => [new Matcher(glob), cmd] as [Matcher, string])
+        : null;
     this.status = {
-      name: cfg.name, source: cfg.source, target: cfg.target, remote: cfg.remote || cfg.cloud, mode: cfg.mode, watcher: "",
-      userPaused: false, guardReason: "", conflicts: [], pendingBatch: 0, pending: false, comparing: null,
-      lastSync: 0, added: 0, updated: 0, deleted: 0, renamed: 0, skipped: 0, failed: 0,
-      isGit: false, branch: "", gitStatus: [], changed: [],
+      name: cfg.name,
+      source: cfg.source,
+      target: cfg.target,
+      remote: cfg.remote || cfg.cloud,
+      mode: cfg.mode,
+      watcher: "",
+      userPaused: false,
+      guardReason: "",
+      conflicts: [],
+      pendingBatch: 0,
+      pending: false,
+      comparing: null,
+      lastSync: 0,
+      added: 0,
+      updated: 0,
+      deleted: 0,
+      renamed: 0,
+      skipped: 0,
+      failed: 0,
+      isGit: false,
+      branch: "",
+      gitStatus: [],
+      changed: [],
     };
     this.matcher = this.buildMatcher();
   }
@@ -354,7 +425,10 @@ export class Engine {
           else {
             try {
               const created = await gitx.ensureBranch(this.gitTarget, this.cfg.branch);
-              this.emit({ kind: "info", msg: (created ? "created and switched to branch " : "on branch ") + this.cfg.branch });
+              this.emit({
+                kind: "info",
+                msg: (created ? "created and switched to branch " : "on branch ") + this.cfg.branch,
+              });
             } catch (e) {
               this.branchErr = "can't switch to branch " + this.cfg.branch + ": " + firstLine(errMsg(e));
               this.errorf("", this.branchErr);
@@ -400,13 +474,21 @@ export class Engine {
         const roots = [this.cfg.source];
         if (this.twoWay) roots.push(this.cfg.target);
         let pollMode = false;
-        const w = new Watcher(this.cfg.watcher, roots, this.cfg.interval, (_root, rel, isDir) => this.matcher.match(rel, isDir), () => {
-          if (pollMode) cycleSoon(); // polling already spaces scans out
-          else {
-            if (debounce) clearTimeout(debounce);
-            debounce = setTimeout(cycleSoon, settle);
-          }
-        }, (m) => this.warn(m));
+        const w = new Watcher(
+          this.cfg.watcher,
+          roots,
+          this.cfg.interval,
+          (_root, rel, isDir) => this.matcher.match(rel, isDir),
+          () => {
+            if (pollMode)
+              cycleSoon(); // polling already spaces scans out
+            else {
+              if (debounce) clearTimeout(debounce);
+              debounce = setTimeout(cycleSoon, settle);
+            }
+          },
+          (m) => this.warn(m),
+        );
         pollMode = w.kind === "poll";
         this.watcherKind = w.kind;
         cleanups.push(() => w.close());
@@ -462,7 +544,8 @@ export class Engine {
     }
     const m = this.buildMatcher();
     this.matcher = m;
-    let S: Snapshot, T: Snapshot | null = null;
+    let S: Snapshot,
+      T: Snapshot | null = null;
     try {
       S = this.scan(this.cfg.source, m);
     } catch (e) {
@@ -503,7 +586,10 @@ export class Engine {
     if (n > this.cfg.batchLimit && this.cfg.batchLimit > 0 && !initial) {
       if (this.bigSince === 0) {
         this.bigSince = Date.now();
-        this.emit({ kind: "warn", msg: `large batch: ${n} changes, waiting ${formatDuration(this.cfg.batchSettle)} for activity to settle` });
+        this.emit({
+          kind: "warn",
+          msg: `large batch: ${n} changes, waiting ${formatDuration(this.cfg.batchSettle)} for activity to settle`,
+        });
       }
       const waited = Date.now() - this.bigSince;
       if (waited < this.cfg.batchSettle) {
@@ -615,7 +701,8 @@ export class Engine {
     const keys = new Set<string>([...S.keys(), ...T.keys(), ...this.state.keys()]);
     const ops: Op[] = [];
     for (const rel of sortedKeys(keys)) {
-      const s = S.get(rel), t = T.get(rel);
+      const s = S.get(rel),
+        t = T.get(rel);
       let b = this.state.get(rel);
 
       if (this.conflicts.has(rel)) {
@@ -700,7 +787,8 @@ export class Engine {
     }
     // the kept copy was edited again: it's live work, bring it back
     this.emit({
-      kind: "info", path: rel,
+      kind: "info",
+      path: rel,
       msg: `edited in ${sideName(surv)} after being deleted in ${sideName(other(surv))}; copying it back`,
     });
     return [[{ kind: "copy", rel, side: other(surv), isNew: true }], true];
@@ -714,7 +802,8 @@ export class Engine {
 
   /** Turns a conflict choice into concrete operations. */
   resolveOps(rel: string, c: Choice): Op[] {
-    const si = stat(this.abs(SRC, rel)), ti = stat(this.abs(DST, rel));
+    const si = stat(this.abs(SRC, rel)),
+      ti = stat(this.abs(DST, rel));
     const winner = (w: Side): Op[] => {
       const wok = w === SRC ? !!si : !!ti;
       const lok = w === SRC ? !!ti : !!si;
@@ -821,7 +910,12 @@ export class Engine {
   private async apply(ops: Op[]): Promise<Set<string>> {
     const failed = new Set<string>();
     const gap = this.cfg.maxOpsPerSec > 0 ? 1000 / this.cfg.maxOpsPerSec : 0;
-    let added = 0, updated = 0, deleted = 0, renamed = 0, skipped = 0, errs = 0;
+    let added = 0,
+      updated = 0,
+      deleted = 0,
+      renamed = 0,
+      skipped = 0,
+      errs = 0;
     const bdir = backupDir(this.dataDir, this.id);
     const journal: JournalEntry[] = [];
     const note = (op: string, s: Side, rel: string, to: string, backup: string) => {
@@ -870,12 +964,17 @@ export class Engine {
         case "conflict":
           if (!this.conflicts.has(o.rel)) {
             this.conflicts.add(o.rel);
-            const msg = this.cfg.conflict === "hold"
-              ? `changed on both sides; both files left as they are. Resolve with: ferry resolve ${o.rel} --keep source|target|newer|both|merge`
-              : "changed on both sides; choose a version";
+            const msg =
+              this.cfg.conflict === "hold"
+                ? `changed on both sides; both files left as they are. Resolve with: ferry resolve ${o.rel} --keep source|target|newer|both|merge`
+                : "changed on both sides; choose a version";
             this.emit({ kind: "conflict", path: o.rel, msg, held: true });
             this.track(o.rel, "conflict", "");
-            notify(this.cfg.name + "/conflict", "ferry: conflict in " + this.cfg.name, o.rel + " changed on both sides");
+            notify(
+              this.cfg.name + "/conflict",
+              "ferry: conflict in " + this.cfg.name,
+              o.rel + " changed on both sides",
+            );
           }
           break;
         case "chmod": {
@@ -892,7 +991,8 @@ export class Engine {
         }
         case "copy": {
           const from = other(o.side);
-          const fp = this.abs(from, o.rel), tp = this.abs(o.side, o.rel);
+          const fp = this.abs(from, o.rel),
+            tp = this.abs(o.side, o.rel);
           const kind: Kind = o.isNew ? "add" : "update";
           if (this.cfg.symlinks === "link" && isSymlink(fp)) {
             if (dry) {
@@ -932,7 +1032,11 @@ export class Engine {
           }
           if (tooBig && !viaLFS) {
             if (!sameStat(this.skipped.get(o.rel), fst)) {
-              this.emit({ kind: "skip", path: o.rel, msg: `too large (${humanSize(size)} > ${humanSize(this.cfg.maxSize)})` });
+              this.emit({
+                kind: "skip",
+                path: o.rel,
+                msg: `too large (${humanSize(size)} > ${humanSize(this.cfg.maxSize)})`,
+              });
               this.skipped.set(o.rel, fst);
             }
             skipped++;
@@ -947,15 +1051,25 @@ export class Engine {
               skipped++;
               break;
             }
-            if (o.isNew) this.emit({ kind: "warn", path: o.rel, msg: `binary file (${humanSize(size)}) — are you sure it belongs in git?` });
+            if (o.isNew)
+              this.emit({
+                kind: "warn",
+                path: o.rel,
+                msg: `binary file (${humanSize(size)}) — are you sure it belongs in git?`,
+              });
           }
           // in redact mode secrets are replaced below instead of reported
-          let content: Buffer | null = null, rewriteNote = "";
+          let content: Buffer | null = null,
+            rewriteNote = "";
           if (o.side === DST && !binary && this.rewrites(o.rel)) {
             const tc = this.targetContent(o.rel, fp);
             if (tc.block) {
               if (!sameStat(this.secretSeen.get(o.rel), fst)) {
-                this.emit({ kind: "skip", path: o.rel, msg: `possible secret: ${tc.block} — not copied (secrets: redact)` });
+                this.emit({
+                  kind: "skip",
+                  path: o.rel,
+                  msg: `possible secret: ${tc.block} — not copied (secrets: redact)`,
+                });
                 notify(this.cfg.name + "/secret", "ferry: held back a possible secret", o.rel);
                 this.secretSeen.set(o.rel, fst);
               }
@@ -972,7 +1086,11 @@ export class Engine {
               const fresh = !sameStat(this.secretSeen.get(o.rel), fst);
               if (this.cfg.secrets === "block") {
                 if (fresh) {
-                  this.emit({ kind: "skip", path: o.rel, msg: msg + " — not copied (secrets: block; allow it with secret_allow)" });
+                  this.emit({
+                    kind: "skip",
+                    path: o.rel,
+                    msg: msg + " — not copied (secrets: block; allow it with secret_allow)",
+                  });
                   notify(this.cfg.name + "/secret", "ferry: blocked a possible secret", o.rel);
                   this.secretSeen.set(o.rel, fst);
                 }
@@ -995,7 +1113,12 @@ export class Engine {
           const bk = o.isNew ? "" : backupFile(bdir, sideName(o.side), o.rel, tp, this.cfg.backups);
           try {
             if (content) {
-              writeFileAtomic(tp, this.cfg.eol !== "keep" ? convertEOL(content, this.cfg.eol) : content, fst.mode, fst.mod);
+              writeFileAtomic(
+                tp,
+                this.cfg.eol !== "keep" ? convertEOL(content, this.cfg.eol) : content,
+                fst.mode,
+                fst.mod,
+              );
             } else if (o.side === DST && this.cfg.eol !== "keep" && !binary) {
               writeFileAtomic(tp, convertEOL(fs.readFileSync(fp), this.cfg.eol), fst.mode, fst.mod);
             } else {
@@ -1054,7 +1177,8 @@ export class Engine {
             renamed++;
             break;
           }
-          const fromP = this.abs(o.side, o.rel), toP = this.abs(o.side, to);
+          const fromP = this.abs(o.side, o.rel),
+            toP = this.abs(o.side, to);
           try {
             fs.mkdirSync(path.dirname(toP), { recursive: true });
             replaceFile(fromP, toP);
@@ -1118,7 +1242,12 @@ export class Engine {
           this.conflicts.delete(o.rel);
           this.recordBase(o.rel);
           if (o.markers! > 0) {
-            this.emit({ kind: "warn", path: o.rel, dir: "⇄", msg: `merged with ${o.markers} conflict block(s); fix the <<<<<<< markers on either side` });
+            this.emit({
+              kind: "warn",
+              path: o.rel,
+              dir: "⇄",
+              msg: `merged with ${o.markers} conflict block(s); fix the <<<<<<< markers on either side`,
+            });
           } else {
             this.emit({ kind: "resolved", path: o.rel, dir: "⇄", msg: "merged edits from both sides" });
           }
@@ -1147,8 +1276,10 @@ export class Engine {
 
   private recordBase(rel: string): void {
     if (!this.twoWay || this.cfg.dryRun) return;
-    const sp = this.abs(SRC, rel), tp = this.abs(DST, rel);
-    const si = stat(sp), ti = stat(tp);
+    const sp = this.abs(SRC, rel),
+      tp = this.abs(DST, rel);
+    const si = stat(sp),
+      ti = stat(tp);
     if (!si || !ti) {
       this.state.delete(rel);
       this.dropBaseCopy(rel);
@@ -1293,7 +1424,8 @@ export class Engine {
    */
   private same(a: string, b: string): boolean {
     if (this.cfg.symlinks === "link") {
-      const la = isSymlink(a), lb = isSymlink(b);
+      const la = isSymlink(a),
+        lb = isSymlink(b);
       if (la || lb) {
         if (!la || !lb) return false;
         try {
@@ -1303,7 +1435,8 @@ export class Engine {
         }
       }
     }
-    const ia = stat(a), ib = stat(b);
+    const ia = stat(a),
+      ib = stat(b);
     if (!ia || !ib) return false;
     if (ia.size === ib.size) {
       try {
@@ -1347,7 +1480,8 @@ export class Engine {
    */
   async prepareCompare(onProgress?: (done: number, total: number) => void): Promise<void> {
     const m = this.buildMatcher();
-    let S: Snapshot, T: Snapshot | null = null;
+    let S: Snapshot,
+      T: Snapshot | null = null;
     try {
       S = this.scan(this.cfg.source, m);
       if (this.twoWay) T = this.scan(this.cfg.target, m);
@@ -1371,7 +1505,8 @@ export class Engine {
       if (size === s.size) work.push([this.abs(SRC, rel), tp]);
     }
     const started = performance.now();
-    let lastYield = started, shown = false;
+    let lastYield = started,
+      shown = false;
     const report = (done: number) => {
       this.compareProgress = { done, total: work.length };
       this.publish();
@@ -1435,7 +1570,11 @@ export class Engine {
       ops = this.planOneWay(S);
     }
     ops = this.detectRenames(ops);
-    const out: Change[] = sortedKeys(this.conflicts).map((c) => ({ kind: "conflict", path: c, note: "held from an earlier run" }));
+    const out: Change[] = sortedKeys(this.conflicts).map((c) => ({
+      kind: "conflict",
+      path: c,
+      note: "held from an earlier run",
+    }));
     for (const o of ops) {
       switch (o.kind) {
         case "copy":
@@ -1451,10 +1590,19 @@ export class Engine {
           out.push({ kind: "conflict", path: o.rel, note: "changed on both sides" });
           break;
         case "orphan":
-          out.push({ kind: "kept", path: o.rel, note: `deleted in ${sideName(other(o.side))}; kept in ${sideName(o.side)}` });
+          out.push({
+            kind: "kept",
+            path: o.rel,
+            note: `deleted in ${sideName(other(o.side))}; kept in ${sideName(o.side)}`,
+          });
           break;
         case "merge":
-          out.push({ kind: "update", path: o.rel, dir: "⇄", note: "three-way merge" + (o.markers! > 0 ? " with conflict markers" : "") });
+          out.push({
+            kind: "update",
+            path: o.rel,
+            dir: "⇄",
+            note: "three-way merge" + (o.markers! > 0 ? " with conflict markers" : ""),
+          });
           break;
         case "dup":
           out.push({ kind: "add", path: o.to!, dir: arrow(o.side), note: "copy of " + o.rel });
@@ -1480,7 +1628,8 @@ export class Engine {
   private async checkGuard(): Promise<void> {
     let reason = this.branchErr;
     if (reason === "" && this.isGit && this.cfg.gitGuard) reason = await gitx.inProgress(this.gitTarget);
-    if (reason === "" && this.isGit && this.behindBy > 0) reason = `target is ${this.behindBy} commit(s) behind upstream — pull first`;
+    if (reason === "" && this.isGit && this.behindBy > 0)
+      reason = `target is ${this.behindBy} commit(s) behind upstream — pull first`;
     let windowed = false;
     if (reason === "" && !inWindow(this.cfg, new Date())) {
       reason = "outside the sync window (" + windowLabel(this.cfg) + ")";
@@ -1559,14 +1708,19 @@ export class Engine {
     let msg = expandMessage(tmpl, this.cfg, lines);
     if (msg.includes("{ai}")) {
       this.emit({ kind: "info", msg: "asking Claude for a commit message…" });
-      const { msg: written, error } = await ai.tryCommitMessage(lines, await gitx.pendingDiff(this.gitTarget, stagedOnly));
+      const { msg: written, error } = await ai.tryCommitMessage(
+        lines,
+        await gitx.pendingDiff(this.gitTarget, stagedOnly),
+      );
       if (written === null) this.warn("AI commit message unavailable (" + error + "); using the generated summary");
       msg = msg.replaceAll("{ai}", written ?? summarizeStatus(lines));
     }
     const opts = { author: this.cfg.commitAuthor, sign: this.cfg.signCommits };
     let hash: string;
     try {
-      hash = stagedOnly ? await gitx.commitStaged(this.gitTarget, msg, opts) : await gitx.commitAll(this.gitTarget, msg, opts);
+      hash = stagedOnly
+        ? await gitx.commitStaged(this.gitTarget, msg, opts)
+        : await gitx.commitAll(this.gitTarget, msg, opts);
     } catch (e) {
       this.errorf("", "commit failed: " + firstLine(errMsg(e)));
       return;
@@ -1641,14 +1795,16 @@ export class Engine {
     if (this.cfg.cloud !== "") return this.pushCloud();
     if (this.cfg.remote === "" || this.cfg.dryRun) return;
     if (this.remoteFull) {
-      for (const rel of scanDir(this.cfg.target, new Matcher(...HARD_IGNORES), false, null, "link").keys()) this.remoteAdd.add(rel);
+      for (const rel of scanDir(this.cfg.target, new Matcher(...HARD_IGNORES), false, null, "link").keys())
+        this.remoteAdd.add(rel);
     }
     if (this.remoteAdd.size === 0 && this.remoteDel.size === 0) {
       this.remoteFull = false;
       return;
     }
     const sp = remote.parse(this.cfg.remote);
-    const adds = sortedKeys(this.remoteAdd), dels = sortedKeys(this.remoteDel);
+    const adds = sortedKeys(this.remoteAdd),
+      dels = sortedKeys(this.remoteDel);
     fs.mkdirSync(this.dataDir, { recursive: true });
     const archive = path.join(this.dataDir, `push-${crypto.randomBytes(6).toString("hex")}.tar`);
     try {
@@ -1676,7 +1832,8 @@ export class Engine {
   private async pushCloud(): Promise<void> {
     if (this.cfg.dryRun) return;
     if (this.remoteFull) {
-      for (const rel of scanDir(this.cfg.target, new Matcher(...HARD_IGNORES), false, null, "follow").keys()) this.remoteAdd.add(rel);
+      for (const rel of scanDir(this.cfg.target, new Matcher(...HARD_IGNORES), false, null, "follow").keys())
+        this.remoteAdd.add(rel);
     }
     if (this.remoteAdd.size === 0 && this.remoteDel.size === 0) {
       this.remoteFull = false;
@@ -1684,8 +1841,10 @@ export class Engine {
     }
     const spec = cloud.parse(this.cfg.cloud);
     const store = cloud.open(spec);
-    const adds = sortedKeys(this.remoteAdd), dels = sortedKeys(this.remoteDel);
-    let up = 0, gone = 0;
+    const adds = sortedKeys(this.remoteAdd),
+      dels = sortedKeys(this.remoteDel);
+    let up = 0,
+      gone = 0;
     try {
       await cloud.eachLimit(adds, 8, async (rel) => {
         const p = this.abs(DST, rel);
@@ -1701,9 +1860,10 @@ export class Engine {
         gone++;
       });
     } catch (e) {
-      throw new Error(`upload to ${this.cfg.cloud} failed: ${firstLine(errMsg(e))}`);
+      throw new Error(`upload to ${this.cfg.cloud} failed: ${firstLine(errMsg(e))}`, { cause: e });
     } finally {
-      if (up + gone > 0) this.emit({ kind: "info", msg: `uploaded ${up} file(s) and removed ${gone} on ${this.cfg.cloud}` });
+      if (up + gone > 0)
+        this.emit({ kind: "info", msg: `uploaded ${up} file(s) and removed ${gone} on ${this.cfg.cloud}` });
     }
     this.remoteFull = false;
   }
@@ -1747,14 +1907,25 @@ export class Engine {
         return Buffer.alloc(0);
       }
     };
-    const tpath = this.abs(DST, rel), spath = this.abs(SRC, rel);
+    const tpath = this.abs(DST, rel),
+      spath = this.abs(SRC, rel);
     const missing = (p: string) => !lstat(p);
     if (conflict || !(await gitx.isRepo(this.gitTarget))) {
-      if (missing(tpath) && missing(spath)) return { title: "not found: " + rel, lines: [{ op: "@", text: `${rel} isn't in either folder any more (it may have been moved or deleted)` }] };
+      if (missing(tpath) && missing(spath))
+        return {
+          title: "not found: " + rel,
+          lines: [{ op: "@", text: `${rel} isn't in either folder any more (it may have been moved or deleted)` }],
+        };
       return { title: "target ↔ source: " + rel, lines: diff(read(tpath), read(spath), 3) };
     }
     const head = await gitx.showHead(this.gitTarget, rel);
-    if (!head && missing(tpath)) return { title: "not found: " + rel, lines: [{ op: "@", text: `${rel} isn't in the target or in the last commit (it may have been moved or deleted)` }] };
+    if (!head && missing(tpath))
+      return {
+        title: "not found: " + rel,
+        lines: [
+          { op: "@", text: `${rel} isn't in the target or in the last commit (it may have been moved or deleted)` },
+        ],
+      };
     const title = head ? "HEAD ↔ working copy: " + rel : "new file (not in HEAD): " + rel;
     return { title, lines: diff(head ?? Buffer.alloc(0), read(tpath), 3) };
   }
@@ -1764,8 +1935,13 @@ export class Engine {
   private appendJournal(entries: JournalEntry[]): void {
     const now = new Date();
     const b: Batch = {
-      id: fmtStamp(now, 6, Math.floor((performance.now() * 1000) % 1000)), time: now.toISOString(),
-      pair: this.cfg.name, pair_id: this.id, source: this.cfg.source, target: this.cfg.target, entries,
+      id: fmtStamp(now, 6, Math.floor((performance.now() * 1000) % 1000)),
+      time: now.toISOString(),
+      pair: this.cfg.name,
+      pair_id: this.id,
+      source: this.cfg.source,
+      target: this.cfg.target,
+      entries,
     };
     if (this.cfg.remote || this.cfg.cloud) b.remote = this.cfg.remote || this.cfg.cloud;
     this.journalN++;
@@ -1793,7 +1969,10 @@ export class Engine {
     const r = restoreTo(this.dataDir, this.id, t, this.cfg.backups);
     if (r.batches.length > 0) {
       void this.do(() =>
-        this.emit({ kind: "info", msg: `restored to ${fmtClock(new Date(t))}: undid ${r.batches.length} sync batch(es)` }),
+        this.emit({
+          kind: "info",
+          msg: `restored to ${fmtClock(new Date(t))}: undid ${r.batches.length} sync batch(es)`,
+        }),
       );
     }
     return r;
@@ -1852,7 +2031,10 @@ export class Engine {
       const files: Record<string, Base> = {};
       for (const [k, v] of this.state) files[k] = v;
       const tmp = p + ".tmp";
-      fs.writeFileSync(tmp, JSON.stringify({ version: 3, pair: this.cfg, files, conflicts: sortedKeys(this.conflicts) }));
+      fs.writeFileSync(
+        tmp,
+        JSON.stringify({ version: 3, pair: this.cfg, files, conflicts: sortedKeys(this.conflicts) }),
+      );
       replaceFile(tmp, p);
     } catch {}
   }
@@ -1862,7 +2044,10 @@ export class Engine {
     const dir = requestDir(this.dataDir, this.id);
     let files: string[];
     try {
-      files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort(cmp);
+      files = fs
+        .readdirSync(dir)
+        .filter((f) => f.endsWith(".json"))
+        .sort(cmp);
     } catch {
       return;
     }
@@ -1934,11 +2119,27 @@ export class Engine {
     if (this.cfg.dryRun) return;
     const st = this.getStatus();
     const ps: PairStatus = {
-      id: this.id, name: st.name, source: st.source, target: st.target, mode: st.mode,
-      pid: process.pid, running, state: running ? stateOf(st) : "stopped", paused: isPaused(st),
-      conflicts: st.conflicts, is_git: st.isGit, uncommitted: st.gitStatus.length, staged: gitx.stagedCount(st.gitStatus),
-      last_sync: isoTime(st.lastSync), added: st.added, updated: st.updated, deleted: st.deleted,
-      renamed: st.renamed, skipped: st.skipped, failed: st.failed, updated_at: new Date().toISOString(),
+      id: this.id,
+      name: st.name,
+      source: st.source,
+      target: st.target,
+      mode: st.mode,
+      pid: process.pid,
+      running,
+      state: running ? stateOf(st) : "stopped",
+      paused: isPaused(st),
+      conflicts: st.conflicts,
+      is_git: st.isGit,
+      uncommitted: st.gitStatus.length,
+      staged: gitx.stagedCount(st.gitStatus),
+      last_sync: isoTime(st.lastSync),
+      added: st.added,
+      updated: st.updated,
+      deleted: st.deleted,
+      renamed: st.renamed,
+      skipped: st.skipped,
+      failed: st.failed,
+      updated_at: new Date().toISOString(),
     };
     if (this.cfg.remote || this.cfg.cloud) ps.remote = this.cfg.remote || this.cfg.cloud;
     if (st.guardReason) ps.guard_reason = st.guardReason;
@@ -1972,7 +2173,12 @@ function countWrites(ops: Op[]): number {
  * Pipes data through a shell command run in the source folder. {path} in the
  * command is replaced by the file's pair-relative path, quoted for the shell.
  */
-export function runTransform(cmd: string, rel: string, cwd: string, data: Buffer): { ok: true; data: Buffer } | { ok: false; error: string } {
+export function runTransform(
+  cmd: string,
+  rel: string,
+  cwd: string,
+  data: Buffer,
+): { ok: true; data: Buffer } | { ok: false; error: string } {
   const quoted = isWindows ? `"${rel.replaceAll('"', "")}"` : remote.quote(rel);
   const line = cmd.replaceAll("{path}", quoted);
   const argv = isWindows ? ["cmd", "/C", line] : ["sh", "-c", line];
@@ -1999,7 +2205,8 @@ function permString(perm: number): string {
 function sameIgnoringEOL(a: string, b: string, ia: fs.BigIntStats, ib: fs.BigIntStats): boolean {
   if (ia.size > EOL_MAX || ib.size > EOL_MAX) return false;
   try {
-    const da = fs.readFileSync(a), db = fs.readFileSync(b);
+    const da = fs.readFileSync(a),
+      db = fs.readFileSync(b);
     if (isBinary(da) || isBinary(db)) return false;
     return convertEOL(da, "lf").equals(convertEOL(db, "lf"));
   } catch {
@@ -2020,9 +2227,15 @@ export function expandMessage(tmpl: string, p: Pair, lines: string[]): string {
   const shown = files.length > 5 ? [...files.slice(0, 5), `+${files.length - 5} more`] : files;
   const target = p.remote || p.cloud || path.basename(p.target);
   const vars: Record<string, string> = {
-    "{count}": String(files.length), "{files}": shown.join(", "), "{summary}": summarizeStatus(lines),
-    "{source}": path.basename(p.source), "{target}": target, "{pair}": p.name,
-    "{date}": fmtDate(now), "{time}": fmtHM(now), "{datetime}": fmtDateHM(now),
+    "{count}": String(files.length),
+    "{files}": shown.join(", "),
+    "{summary}": summarizeStatus(lines),
+    "{source}": path.basename(p.source),
+    "{target}": target,
+    "{pair}": p.name,
+    "{date}": fmtDate(now),
+    "{time}": fmtHM(now),
+    "{datetime}": fmtDateHM(now),
   };
   return tmpl.replace(/\{(count|files|summary|source|target|pair|date|time|datetime)\}/g, (m) => vars[m]!);
 }
@@ -2079,7 +2292,11 @@ function readStateFile(file: string): StateFile | null {
   if (!data || typeof data !== "object") return null;
   const d = data as Record<string, unknown>;
   if (d.files && typeof d.files === "object") {
-    return { pair: pairFromState(d.pair), files: d.files as Record<string, Base>, conflicts: (d.conflicts as string[]) ?? [] };
+    return {
+      pair: pairFromState(d.pair),
+      files: d.files as Record<string, Base>,
+      conflicts: (d.conflicts as string[]) ?? [],
+    };
   }
   // the v1.0 format: just the file map
   return { pair: null, files: d as Record<string, Base>, conflicts: [] };
@@ -2102,7 +2319,11 @@ export function savedPairs(dataDir: string): SavedPair[] {
 
 function dirs(dataDir: string): string[] {
   try {
-    return fs.readdirSync(dataDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort(cmp);
+    return fs
+      .readdirSync(dataDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .sort(cmp);
   } catch {
     return [];
   }
@@ -2213,14 +2434,25 @@ export function readStatuses(dataDir: string): PairStatus[] {
 /** A Status as JSON with the Go version's field names (GET /status). */
 export function statusJSON(s: Status): Record<string, unknown> {
   const o: Record<string, unknown> = {
-    name: s.name, source: s.source, target: s.target,
+    name: s.name,
+    source: s.source,
+    target: s.target,
   };
   if (s.remote) o.remote = s.remote;
   Object.assign(o, { mode: s.mode, watcher: s.watcher, user_paused: s.userPaused });
   if (s.guardReason) o.guard_reason = s.guardReason;
   Object.assign(o, {
-    conflicts: s.conflicts, pending_batch: s.pendingBatch, pending: s.pending, comparing: s.comparing, last_sync: isoTime(s.lastSync),
-    added: s.added, updated: s.updated, deleted: s.deleted, renamed: s.renamed, skipped: s.skipped, failed: s.failed,
+    conflicts: s.conflicts,
+    pending_batch: s.pendingBatch,
+    pending: s.pending,
+    comparing: s.comparing,
+    last_sync: isoTime(s.lastSync),
+    added: s.added,
+    updated: s.updated,
+    deleted: s.deleted,
+    renamed: s.renamed,
+    skipped: s.skipped,
+    failed: s.failed,
     is_git: s.isGit,
   });
   if (s.branch) o.branch = s.branch;

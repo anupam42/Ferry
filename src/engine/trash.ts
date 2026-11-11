@@ -22,7 +22,8 @@ export async function moveToTrash(p: string): Promise<void> {
     case "win32": {
       const ps =
         "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('" +
-        abs.replaceAll("'", "''") + "', 'OnlyErrorDialogs', 'SendToRecycleBin')";
+        abs.replaceAll("'", "''") +
+        "', 'OnlyErrorDialogs', 'SendToRecycleBin')";
       check(await exec(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps]));
       return;
     }
@@ -36,7 +37,8 @@ export async function moveToTrash(p: string): Promise<void> {
 function freedesktopTrash(abs: string): void {
   const dataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share");
   const trash = path.join(dataHome, "Trash");
-  const files = path.join(trash, "files"), info = path.join(trash, "info");
+  const files = path.join(trash, "files"),
+    info = path.join(trash, "info");
   fs.mkdirSync(files, { recursive: true, mode: 0o700 });
   fs.mkdirSync(info, { recursive: true, mode: 0o700 });
   const base = path.basename(abs);

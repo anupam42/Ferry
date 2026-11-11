@@ -8,12 +8,23 @@
   const here = $derived(!tag && ref === current);
 </script>
 
-<span class="pill ref" class:amber={tag} class:violet={remote} class:blue={!tag && !remote} class:here
-  title={tag ? "tag" : remote ? "branch on the remote" : here ? "the branch you're on" : "branch"}>
+<span
+  class="pill ref"
+  class:amber={tag}
+  class:violet={remote}
+  class:blue={!tag && !remote}
+  class:here
+  title={tag ? "tag" : remote ? "branch on the remote" : here ? "the branch you're on" : "branch"}
+>
   {#if tag}<Icon name="tag" size={12} />{ref.slice(5)}{:else}{ref}{/if}
 </span>
 
 <style>
-  .ref { flex: none; }
-  .here { box-shadow: inset 0 0 0 1.5px currentColor; font-weight: 700; }
+  .ref {
+    flex: none;
+  }
+  .here {
+    box-shadow: inset 0 0 0 1.5px currentColor;
+    font-weight: 700;
+  }
 </style>

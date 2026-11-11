@@ -34,7 +34,8 @@ export interface Setup {
 export function setup(mut?: (p: Pair) => void): Setup {
   process.env.FERRY_HOME = tempDir();
   const root = tempDir();
-  const s = path.join(root, "src"), d = path.join(root, "dst");
+  const s = path.join(root, "src"),
+    d = path.join(root, "dst");
   fs.mkdirSync(s, { recursive: true });
   fs.mkdirSync(d, { recursive: true });
   const p = defaults();

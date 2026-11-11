@@ -9,7 +9,18 @@ import { Printer, type Sink } from "../printer.ts";
 import { ExitError } from "../util.ts";
 import { Dispatcher } from "../webhook.ts";
 import { ComparingSpinner } from "../relayart.ts";
-import { confirm, isTTY, out, paint, printDiff, println, relayStyle, stdinIsTTY, stdinLines, VERSION } from "./common.ts";
+import {
+  confirm,
+  isTTY,
+  out,
+  paint,
+  printDiff,
+  println,
+  relayStyle,
+  stdinIsTTY,
+  stdinLines,
+  VERSION,
+} from "./common.ts";
 import { FlagError, HelpRequested } from "./flags.ts";
 import { loadPairs, newRunFlags } from "./runflags.ts";
 
@@ -66,8 +77,12 @@ export async function cmdRun(args: string[]): Promise<void> {
   }
 
   const printer = new Printer({
-    log: logSink, color: out.color, quiet: f.getBool("quiet"), json: uiMode === "json",
-    showGit: f.getBool("git"), showPair: pairs.length > 1,
+    log: logSink,
+    color: out.color,
+    quiet: f.getBool("quiet"),
+    json: uiMode === "json",
+    showGit: f.getBool("git"),
+    showPair: pairs.length > 1,
   });
 
   // the dashboard is loaded only when it's used
@@ -85,7 +100,8 @@ export async function cmdRun(args: string[]): Promise<void> {
   }
 
   // plain terminal: Relay shows up while files are compared by content
-  const spinner = uiMode === "plain" && tty && !f.getBool("quiet") ? new ComparingSpinner(process.stdout, relayStyle()) : null;
+  const spinner =
+    uiMode === "plain" && tty && !f.getBool("quiet") ? new ComparingSpinner(process.stdout, relayStyle()) : null;
   if (spinner) {
     const base = emit;
     emit = (ev) => {
@@ -129,7 +145,9 @@ export async function cmdRun(args: string[]): Promise<void> {
   if (tui && !once) dashboard = new tui.Dashboard(engines, VERSION, settings.theme);
   if (spinner) {
     const poll = setInterval(() => {
-      let done = 0, total = 0, any = false;
+      let done = 0,
+        total = 0,
+        any = false;
       for (const e of engines) {
         const c = e.getStatus().comparing;
         if (!c) continue;
@@ -152,9 +170,13 @@ export async function cmdRun(args: string[]): Promise<void> {
     if (list.length === 0) continue;
     if (!f.getBool("yes") && !p.dryRun) {
       if (!stdinIsTTY()) {
-        throw new Error(`pair "${p.name}": --mirror would delete ${list.length} target files; re-run with --yes to confirm`);
+        throw new Error(
+          `pair "${p.name}": --mirror would delete ${list.length} target files; re-run with --yes to confirm`,
+        );
       }
-      println(`${paint("1;33", "!")} mirror for ${p.name} will delete ${list.length} file(s) in ${p.target} that are not in the source:`);
+      println(
+        `${paint("1;33", "!")} mirror for ${p.name} will delete ${list.length} file(s) in ${p.target} that are not in the source:`,
+      );
       for (let j = 0; j < list.length; j++) {
         if (j === 20) {
           println(`   … and ${list.length - 20} more`);
@@ -176,7 +198,8 @@ export async function cmdRun(args: string[]): Promise<void> {
   process.on("SIGTERM", stop);
 
   if (once) {
-    let code = 0, held = 0;
+    let code = 0,
+      held = 0;
     for (const e of engines) {
       try {
         await e.run(ctl.signal, true);
@@ -186,7 +209,9 @@ export async function cmdRun(args: string[]): Promise<void> {
       }
       const st = e.getStatus();
       if (uiMode !== "json") {
-        println(`${paint("36", "done")} ${e.name}: +${st.added} ~${st.updated} -${st.deleted} ↻${st.renamed}, ${st.skipped} skipped, ${st.failed} failed${dryRun ? paint("90", " (dry-run, nothing written)") : ""}`);
+        println(
+          `${paint("36", "done")} ${e.name}: +${st.added} ~${st.updated} -${st.deleted} ↻${st.renamed}, ${st.skipped} skipped, ${st.failed} failed${dryRun ? paint("90", " (dry-run, nothing written)") : ""}`,
+        );
       }
       if (st.failed > 0) code = 1;
       for (const rel of e.heldConflicts()) {
@@ -222,7 +247,9 @@ export async function cmdRun(args: string[]): Promise<void> {
   if (uiMode === "plain") {
     for (const p of pairs) {
       const arrow = p.mode === "two-way" ? "⇄" : "→";
-      println(`${paint("1", "ferry " + VERSION)} ${paint("90", p.name)}  ${p.source} ${arrow} ${p.remote || p.cloud || p.target}`);
+      println(
+        `${paint("1", "ferry " + VERSION)} ${paint("90", p.name)}  ${p.source} ${arrow} ${p.remote || p.cloud || p.target}`,
+      );
     }
     if (settings.serve !== "") println(paint("90", "HTTP API on http://" + settings.serve));
     println(paint("90", "watching for changes… press Ctrl+C to stop"));
@@ -230,7 +257,9 @@ export async function cmdRun(args: string[]): Promise<void> {
 
   const running = Promise.all(
     engines.map((e) =>
-      e.run(ctl.signal, false).catch((err) => emit({ time: Date.now(), pair: e.name, kind: "error", msg: (err as Error).message })),
+      e
+        .run(ctl.signal, false)
+        .catch((err) => emit({ time: Date.now(), pair: e.name, kind: "error", msg: (err as Error).message })),
     ),
   );
 
@@ -263,7 +292,9 @@ export async function cmdRun(args: string[]): Promise<void> {
     apiSrv?.stop();
     for (const e of engines) {
       const st = e.getStatus();
-      println(`${paint("36", "stopped")} ${e.name}: +${st.added} ~${st.updated} -${st.deleted} ↻${st.renamed} this session`);
+      println(
+        `${paint("36", "stopped")} ${e.name}: +${st.added} ~${st.updated} -${st.deleted} ↻${st.renamed} this session`,
+      );
     }
     process.exit(0);
   }
@@ -291,7 +322,9 @@ async function askChoice(e: Engine, rel: string): Promise<Choice | null> {
       continue;
     }
     if (answer === "l" || answer === "later" || answer === "") {
-      println(paint("90", `  left as is. Resolve later with: ferry resolve ${rel} --keep source|target|newer|both|merge`));
+      println(
+        paint("90", `  left as is. Resolve later with: ferry resolve ${rel} --keep source|target|newer|both|merge`),
+      );
       return null;
     }
     const c = parseChoice(answer);

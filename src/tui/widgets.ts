@@ -9,7 +9,10 @@ export class TextInput {
   private pos = 0;
   focused = false;
 
-  constructor(public placeholder = "", public charLimit = 0) {}
+  constructor(
+    public placeholder = "",
+    public charLimit = 0,
+  ) {}
 
   get value(): string {
     return this.chars.join("");
@@ -31,14 +34,28 @@ export class TextInput {
   /** Handles an editing key; returns false for keys it doesn't use. */
   update(key: string): boolean {
     switch (key) {
-      case "left": case "ctrl+b": this.pos = Math.max(0, this.pos - 1); return true;
-      case "right": case "ctrl+f": this.pos = Math.min(this.chars.length, this.pos + 1); return true;
-      case "home": case "ctrl+a": this.pos = 0; return true;
-      case "end": case "ctrl+e": this.pos = this.chars.length; return true;
-      case "backspace": case "ctrl+h":
+      case "left":
+      case "ctrl+b":
+        this.pos = Math.max(0, this.pos - 1);
+        return true;
+      case "right":
+      case "ctrl+f":
+        this.pos = Math.min(this.chars.length, this.pos + 1);
+        return true;
+      case "home":
+      case "ctrl+a":
+        this.pos = 0;
+        return true;
+      case "end":
+      case "ctrl+e":
+        this.pos = this.chars.length;
+        return true;
+      case "backspace":
+      case "ctrl+h":
         if (this.pos > 0) this.chars.splice(--this.pos, 1);
         return true;
-      case "delete": case "ctrl+d":
+      case "delete":
+      case "ctrl+d":
         this.chars.splice(this.pos, 1);
         return true;
       case "ctrl+u":
@@ -84,7 +101,10 @@ export class Viewport {
   private lines: string[] = [];
   offset = 0;
 
-  constructor(public width = 80, public height = 20) {}
+  constructor(
+    public width = 80,
+    public height = 20,
+  ) {}
 
   setContent(s: string): void {
     this.lines = s.replace(/\n$/, "").split("\n");
@@ -112,15 +132,40 @@ export class Viewport {
   update(key: string): boolean {
     const half = Math.max(1, Math.floor(this.height / 2));
     switch (key) {
-      case "up": case "k": this.offset--; break;
-      case "down": case "j": this.offset++; break;
-      case "pgup": case "b": this.offset -= this.height; break;
-      case "pgdown": case "f": case " ": this.offset += this.height; break;
-      case "u": case "ctrl+u": this.offset -= half; break;
-      case "ctrl+d": this.offset += half; break;
-      case "home": case "g": this.offset = 0; break;
-      case "end": case "G": this.offset = this.maxOffset(); break;
-      default: return false;
+      case "up":
+      case "k":
+        this.offset--;
+        break;
+      case "down":
+      case "j":
+        this.offset++;
+        break;
+      case "pgup":
+      case "b":
+        this.offset -= this.height;
+        break;
+      case "pgdown":
+      case "f":
+      case " ":
+        this.offset += this.height;
+        break;
+      case "u":
+      case "ctrl+u":
+        this.offset -= half;
+        break;
+      case "ctrl+d":
+        this.offset += half;
+        break;
+      case "home":
+      case "g":
+        this.offset = 0;
+        break;
+      case "end":
+      case "G":
+        this.offset = this.maxOffset();
+        break;
+      default:
+        return false;
     }
     this.clamp();
     return true;

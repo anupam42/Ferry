@@ -3,7 +3,16 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { cmp, parseTime } from "../util.ts";
-import { backupDir, backupFile, copyFile, fromSlash, removeEmptyParents, removeWithRetry, replaceFile, stat } from "./fsops.ts";
+import {
+  backupDir,
+  backupFile,
+  copyFile,
+  fromSlash,
+  removeEmptyParents,
+  removeWithRetry,
+  replaceFile,
+  stat,
+} from "./fsops.ts";
 
 /** One file operation in a sync batch. */
 export type { Batch, JournalEntry } from "../shared/pairs.ts";
@@ -84,9 +93,13 @@ export function allHistory(dataDir: string): Batch[] {
     entries = fs.readdirSync(dataDir, { withFileTypes: true });
   } catch {}
   const out: Batch[] = [];
-  for (const en of entries.sort((a, b) => cmp(a.name, b.name))) if (en.isDirectory()) out.push(...history(dataDir, en.name));
+  for (const en of entries.sort((a, b) => cmp(a.name, b.name)))
+    if (en.isDirectory()) out.push(...history(dataDir, en.name));
   // stable sort, newest first
-  return out.map((b, i) => [b, i] as const).sort((x, y) => batchTime(y[0]) - batchTime(x[0]) || x[1] - y[1]).map((x) => x[0]);
+  return out
+    .map((b, i) => [b, i] as const)
+    .sort((x, y) => batchTime(y[0]) - batchTime(x[0]) || x[1] - y[1])
+    .map((x) => x[0]);
 }
 
 /**
@@ -102,7 +115,8 @@ export function undo(dataDir: string, b: Batch, keep: number): { done: string[];
   if (keep < 1) keep = 5;
   const bdir = backupDir(dataDir, b.pair_id);
   const root = (s: string) => (s === "source" ? b.source : b.target);
-  const done: string[] = [], problems: string[] = [];
+  const done: string[] = [],
+    problems: string[] = [];
   for (let i = b.entries.length - 1; i >= 0; i--) {
     const en = b.entries[i]!;
     const r = root(en.side);
@@ -179,10 +193,14 @@ export function batchesSince(dataDir: string, id: string, t: number): Batch[] {
  * restore can itself be reverted with "ferry backups restore".
  */
 export function restoreTo(
-  dataDir: string, id: string, t: number, keep: number,
+  dataDir: string,
+  id: string,
+  t: number,
+  keep: number,
 ): { batches: Batch[]; done: string[]; problems: string[] } {
   const batches = batchesSince(dataDir, id, t);
-  const done: string[] = [], problems: string[] = [];
+  const done: string[] = [],
+    problems: string[] = [];
   for (const b of batches) {
     const r = undo(dataDir, b, keep);
     done.push(...r.done);
@@ -198,12 +216,26 @@ import type { Stats } from "../shared/pairs.ts";
 /** Totals over the batches recorded since `since` (ms; 0 = all history). */
 export function stats(pair: string, batches: Batch[], since: number, topN = 10): Stats {
   const st: Stats = {
-    pair, batches: 0, undone: 0, added: 0, updated: 0, deleted: 0, renamed: 0, toTarget: 0, toSource: 0,
-    first: "", last: "", busiestDay: "", busiestDayFiles: 0, topFiles: [], perDay: [],
+    pair,
+    batches: 0,
+    undone: 0,
+    added: 0,
+    updated: 0,
+    deleted: 0,
+    renamed: 0,
+    toTarget: 0,
+    toSource: 0,
+    first: "",
+    last: "",
+    busiestDay: "",
+    busiestDayFiles: 0,
+    topFiles: [],
+    perDay: [],
   };
   const files = new Map<string, number>();
   const days = new Map<string, number>();
-  let first = Infinity, last = 0;
+  let first = Infinity,
+    last = 0;
   for (const b of batches) {
     const t = batchTime(b);
     if (since > 0 && t < since) continue;

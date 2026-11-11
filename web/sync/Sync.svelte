@@ -22,7 +22,10 @@
       <div class="card empty">
         <img src={face("excited")} alt="Relay" class="float" />
         <h2>Hi, I'm Relay. Let's sync your first folder.</h2>
-        <p>Pick the folder you work in and the folder (usually a git repository) it should be copied to. I'll watch for changes and copy them for you, with backups, undo and help with conflicts.</p>
+        <p>
+          Pick the folder you work in and the folder (usually a git repository) it should be copied to. I'll watch for
+          changes and copy them for you, with backups, undo and help with conflicts.
+        </p>
         {#if canAdd}<button class="btn brand" onclick={() => (sync.adding = true)}>New folder pair</button>
         {:else}<p>Start ferry with “ferry ui” to add pairs from here.</p>{/if}
       </div>
@@ -37,7 +40,18 @@
   @use "tokens" as *;
   @use "mixins" as *;
 
-  .sync { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: space(4) + 2; align-items: start; }
-  .main { min-width: 0; }
-  @include below(laptop) { .sync { grid-template-columns: minmax(0, 1fr); } }
+  .sync {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: space(4) + 2;
+    align-items: start;
+  }
+  .main {
+    min-width: 0;
+  }
+  @include below(laptop) {
+    .sync {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
 </style>

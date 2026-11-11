@@ -56,7 +56,10 @@ export async function commitMessage(statusLines: string[], diff: string, timeout
 }
 
 /** commitMessage, or null with the reason when it can't be used. */
-export async function tryCommitMessage(statusLines: string[], diff: string): Promise<{ msg: string | null; error: string }> {
+export async function tryCommitMessage(
+  statusLines: string[],
+  diff: string,
+): Promise<{ msg: string | null; error: string }> {
   // the SDK also finds `ant auth login` profiles, so try even without the env vars
   try {
     return { msg: await commitMessage(statusLines, diff), error: "" };

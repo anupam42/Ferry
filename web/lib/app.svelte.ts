@@ -41,17 +41,25 @@ export const app = new App();
 
 // ---------- toasts ----------
 
-export interface Toast { id: number; text: string; error: boolean; mood: string }
+export interface Toast {
+  id: number;
+  text: string;
+  error: boolean;
+  mood: string;
+}
 let nextToast = 1;
 export const toasts = $state<Toast[]>([]);
 
 export function toast(text: string, o: { error?: boolean; mood?: string } = {}): void {
   const t: Toast = { id: nextToast++, text, error: !!o.error, mood: o.mood || (o.error ? "sad" : "happy") };
   toasts.push(t);
-  setTimeout(() => {
-    const i = toasts.findIndex((x) => x.id === t.id);
-    if (i >= 0) toasts.splice(i, 1);
-  }, o.error ? 7000 : 3800);
+  setTimeout(
+    () => {
+      const i = toasts.findIndex((x) => x.id === t.id);
+      if (i >= 0) toasts.splice(i, 1);
+    },
+    o.error ? 7000 : 3800,
+  );
 }
 
 /** Runs an action; on failure shows Relay's toast and returns null. */
@@ -85,15 +93,31 @@ export interface AskOptions {
   /** more items than listed */
   more?: number;
 }
-export interface AskField { name: string; label: string; value?: string | boolean; placeholder?: string; hint?: string; type?: "text" | "check" }
+export interface AskField {
+  name: string;
+  label: string;
+  value?: string | boolean;
+  placeholder?: string;
+  hint?: string;
+  type?: "text" | "check";
+}
 
-type Pending = AskOptions & { fields?: AskField[]; resolve: (v: boolean, values?: Record<string, string | boolean>) => void };
+type Pending = AskOptions & {
+  fields?: AskField[];
+  resolve: (v: boolean, values?: Record<string, string | boolean>) => void;
+};
 export const asking = $state<{ current: Pending | null }>({ current: null });
 
 export function ask(o: AskOptions): Promise<boolean> {
   asking.current?.resolve(false);
   return new Promise((resolve) => {
-    asking.current = { ...o, resolve: (v) => { asking.current = null; resolve(v); } };
+    asking.current = {
+      ...o,
+      resolve: (v) => {
+        asking.current = null;
+        resolve(v);
+      },
+    };
   });
 }
 
@@ -101,6 +125,12 @@ export function ask(o: AskOptions): Promise<boolean> {
 export function askFields(o: AskOptions & { fields: AskField[] }): Promise<Record<string, string | boolean> | null> {
   asking.current?.resolve(false);
   return new Promise((resolve) => {
-    asking.current = { ...o, resolve: (v, values) => { asking.current = null; resolve(v ? values ?? {} : null); } };
+    asking.current = {
+      ...o,
+      resolve: (v, values) => {
+        asking.current = null;
+        resolve(v ? (values ?? {}) : null);
+      },
+    };
   });
 }

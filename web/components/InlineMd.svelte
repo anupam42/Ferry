@@ -15,7 +15,8 @@
     {:else if k.t === "img"}{k.alt}
     {:else}
       {@const to = linkTarget(k.href)}
-      {#if to && "web" in to}<a href={to.web} target="_blank" rel="noopener noreferrer">{@render run(k.kids)}</a>{:else}{@render run(k.kids)}{/if}
+      {#if to && "web" in to}<a href={to.web} target="_blank" rel="noopener noreferrer">{@render run(k.kids)}</a
+        >{:else}{@render run(k.kids)}{/if}
     {/if}
   {/each}
 {/snippet}

@@ -14,10 +14,21 @@
   <Switch label="Routine activity" checked={notes.prefs.routine} onchange={(on) => notes.setPrefs({ routine: on })} />
 </Row>
 <Row label="Open Ferry on" hint="What you see first when the page opens">
-  <select aria-label="Open Ferry on" bind:value={start} onchange={() => (start ? localStorage.setItem("ferry-start", start) : localStorage.removeItem("ferry-start"))}>
+  <select
+    aria-label="Open Ferry on"
+    bind:value={start}
+    onchange={() => (start ? localStorage.setItem("ferry-start", start) : localStorage.removeItem("ferry-start"))}
+  >
     <option value="">Where I left off</option><option value="sync">Folder pairs</option><option value="git">Git</option>
   </select>
 </Row>
 <Row label="Unread notifications" hint={notes.unread ? `${notes.unread} new` : "Nothing new"}>
-  <button class="btn small" disabled={!notes.unread} onclick={() => { notes.markAllRead(); toast("All caught up", { mood: "happy" }); }}>Mark all as read</button>
+  <button
+    class="btn small"
+    disabled={!notes.unread}
+    onclick={() => {
+      notes.markAllRead();
+      toast("All caught up", { mood: "happy" });
+    }}>Mark all as read</button
+  >
 </Row>
