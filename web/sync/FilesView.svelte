@@ -56,7 +56,7 @@
             <td class="file">{c.path.split("/").pop()}<small>{folder(c.path)}</small></td>
             <td><span class="pill {k[1]}">{k[0]}</span></td>
             <td class="opt muted">{where(c.direction)}</td>
-            <td class="opt muted">{ago(c.time)}</td>
+            <td class="opt muted when">{ago(c.time)}</td>
             <td class="end">
               {#if c.kind !== "delete"}<button class="btn small" onclick={() => see(c.path)}><Icon name="eye" size={16} />See changes</button>{/if}
               <button class="btn small ghost" title="Stop syncing this file (adds it to .syncignore)" onclick={() => ignoreFile(p, c.path)}>Ignore</button>

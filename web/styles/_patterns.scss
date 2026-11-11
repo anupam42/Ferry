@@ -41,7 +41,10 @@
   th { text-align: left; font-weight: $weight-medium; color: var(--muted); font-size: 13px; padding: space(2) space(3) + 2; }
   td { padding: space(3) - 1 space(3) + 2; border-top: 1px solid var(--line); vertical-align: middle; }
   tr:hover td { background: var(--accent-soft); }
-  .file { font-weight: $weight-semibold; overflow-wrap: anywhere; small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; } }
+  // a file's name: wide enough that ordinary names stay whole (the browser shrinks a column that may
+  // break anywhere first); only a very long name wraps, rather than pushing the table out of its card
+  .file { font-weight: $weight-semibold; min-width: 160px; overflow-wrap: anywhere; small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; } }
+  .when { white-space: nowrap; }
   .end { text-align: right; white-space: nowrap; }
   @include below(phone) { .opt { display: none; } }
 }
