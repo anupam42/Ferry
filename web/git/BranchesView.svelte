@@ -4,9 +4,9 @@
   import Section from "../components/Section.svelte";
   import { api, ApiError } from "../lib/api.ts";
   import { act, ask, askFields, toast } from "../lib/app.svelte.ts";
-  import { ago } from "../lib/format.ts";
+  import { ago, plural } from "../lib/format.ts";
   import { git } from "../lib/git.svelte.ts";
-  import type { Branch, BranchList, RepoStateResponse } from "../lib/types.ts";
+  import type { Branch, BranchList, RemoteBranch, RepoStateResponse } from "../lib/types.ts";
 
   let { st }: { st: RepoStateResponse } = $props();
   let b = $state<BranchList | null>(null);
@@ -69,6 +69,24 @@
     });
     if (v) await git.try("branch-rename", { from: x.name, to: v.to }, "Renamed to " + v.to, "wink");
   }
+  /** Deletes a branch on the remote; if it has commits the current branch doesn't, that takes a press-and-hold. */
+  async function removeRemote(x: RemoteBranch) {
+    const where = x.name.split("/")[0];
+    const lost = x.unmerged;
+    const ok = await ask({
+      mood: lost ? "worried" : "thinking",
+      hold: lost > 0,
+      title: `Delete ${x.name} on ${where}?`,
+      text: lost
+        ? `It has ${plural(lost, "commit")} that ${st.branch || "this branch"} doesn't. Deleted on the remote, they may not be anywhere else, for you or anyone.`
+        : `Everything on it is already in ${st.branch || "this branch"}, so nothing is lost. It's removed for everyone who uses ${where}.`,
+      yes: "Delete it",
+      no: "Keep it",
+      yesMood: "sad",
+    });
+    if (ok) await git.try("branch-delete-remote", { name: x.name }, `Deleted ${x.name}`, "sleepy");
+  }
+
   async function remove(x: Branch) {
     const ok = await ask({
       mood: "worried",
@@ -154,7 +172,12 @@
         <tbody>
           {#each b.remote as x (x.name)}
             <tr>
-              <td class="file">{x.name}<small>{x.subject} · {ago(x.date)}</small></td>
+              <td class="file"
+                >{x.name}
+                {#if !x.unmerged}<span class="pill green" title="Everything on it is already in {st.branch}"
+                    >merged</span
+                  >{/if}<small>{x.subject} · {ago(x.date)}</small></td
+              >
               <td class="end"
                 ><button
                   class="btn small ghost"
@@ -169,7 +192,7 @@
                       (r) => `Checked out ${r.branch}`,
                       "wink",
                     )}>Check out</button
-                ></td
+                ><button class="btn small ghost danger" onclick={() => removeRemote(x)}>Delete</button></td
               >
             </tr>
           {/each}

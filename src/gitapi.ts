@@ -296,6 +296,8 @@ export class GitApi {
       case "branch-delete":
         await g.deleteBranch(root, b.name, b.force === true);
         return done();
+      case "branch-delete-remote":
+        return done(await g.deleteRemoteBranch(root, b.name));
       case "merge":
         return done(await g.merge(root, b.branch));
       case "cherry-pick":
