@@ -1,0 +1,5 @@
+# Commits that only reformatted code. GitHub's blame view skips these by itself; locally:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format the TypeScript and Svelte code with Prettier
+16f95910ff09de9332b9ce5b2333fb77b8ad9508
