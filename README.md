@@ -477,6 +477,60 @@ Features other Git apps have, or that people ask for, ordered by how often they'
 - [ ] **Git update notice** — check the installed Git version against the latest release, and when a new one is out, the mascot says so with what's new in it and how to update for your system (Homebrew, apt, winget or the installer). Also warn when the installed Git is too old for a feature the app uses, and turn that feature off instead of failing.
 - [ ] **New repositories use your default branch** — creating a repository in the app always names the first branch `main`, even when your Git settings say something else (`init.defaultBranch`).
 
+### Further out
+
+Bigger ideas about understanding a repository, not just recording it. Most need Claude (like `{ai}` commit messages, and sending code out only when you turn it on); the rest build on Insights. Roughly from most to least doable.
+
+- [ ] **Ask the repository** — ask questions in plain language ("why did we remove the retry logic?", "who knows the sync engine best?"). The answer cites the commits, pull requests and lines it's based on. It uses history search, blame and pull requests to find them, then Claude to answer.
+- [ ] **Why it changed** — next to a commit or a blame line, a short explanation of the intent behind a change, drawn from its message, its pull request discussion and the code around it. Useful on commits whose message says only "fix".
+- [ ] **Conflict forecast** — warn before a pull request is opened, or while you're still editing, when another branch or someone else's open pull request changes the same lines, so a conflict can be avoided instead of resolved. Builds on drift warnings above. It also catches **silent conflicts**: two changes that merge cleanly but break each other, such as one branch renaming a function another branch starts calling. It finds them by building and testing the merged result before the real merge.
+- [ ] **Impact preview** — before you commit, show what else a change may affect: files that usually change together with it (Insights already finds these), the code that calls the functions you changed, and the tests that cover them. A **confidence score** sums it up: how well tested the changed code is, how far the change reaches, and how often changes there needed a fix afterwards.
+- [ ] **Undo a feature** — pick a feature, by pull request, branch or a description, and revert all of its commits together, even when they're spread across history between unrelated work. It previews exactly what will go and stops for a conflict instead of guessing. The reverse too: **bring back a removed feature**, finding the code where it was deleted and adapting it to how the codebase looks today.
+- [ ] **Component story** — replay how one file or folder grew: a timeline of its commits with the big moments (created, split, rewritten, moved) marked, and its size and number of authors over time. An animated version of file history. For a whole branch or product, it condenses thousands of commits into a short story of how it evolved, with the turning points marked, and can lay two branches side by side to show how they drifted apart.
+- [ ] **Health over time** — track size, complexity, hotspots and TODO comments commit by commit, and show when a part of the codebase started getting worse. Extends the Insights hotspot chart. A **risk map** colours areas that change often, have few tests and are tied to many other files. It also flags **regret commits**, the ones that needed fix after fix, and shortcuts that keep costing time. It can find bug families (bugs that look unrelated but trace back to the same code), and forecast which areas are likely to need work next.
+- [ ] **Onboarding guide** — write a guide for someone new from the repository itself: the main folders and what they do, the key decisions in its history, who knows which part, and where to start. Kept in the repo, and refreshed on request. It also makes a **handover summary** for someone taking over a branch or an area: open work, recent decisions, known problems and the pull requests to read. When someone leaves, their documented decisions and reasoning (commit messages, pull request discussions) stay findable; it doesn't imitate their style.
+- [ ] **Docs that keep up** — when a commit changes code that a README or doc page describes (a command, a flag, a config key), point out the text that's now out of date and offer a fix as part of the same commit.
+- [ ] **Decision map** — link a decision to everything around it: the issue or ticket (from the Jira key in messages), the discussion, the commits and pull requests, and the code they touched. A graph you can follow both ways: from code to why, and from the decision to the code. It can grow into a **feature map**: each product feature linked to its files, tests, APIs and docs. It answers "why is it built this way?" years later.
+- [ ] **Run any commit** — check out any commit into a temporary worktree with the dependency versions it used, install them, and start it, to see how the project behaved back then. Also works for a pull request, so a reviewer can try it without touching their own checkout. With that in place, it can run a commit's tests to **replay how a bug came in** step by step, or run a change against older supported versions to check it still works with them.
+- [ ] **Maintenance pull requests** — find outdated patterns and dependencies (deprecated APIs, old config formats), propose the change and open it as a small pull request for review, never pushing on its own. For a big move (a new framework version, Node to Bun, an old API), it writes a **migration plan** split into small steps, each its own pull request.
+- [ ] **Similar code across repositories** — find the same pattern or near-copies in the repositories Ferry knows about, so a fix in one can be applied to the others, adapted to each codebase rather than copied line by line.
+- [ ] **Try alternatives** — build two or more versions of a change on their own branches (yours, or ones Claude drafts), run the same tests and benchmarks on each, and compare the results side by side before choosing one. Can also start from a description: write what you want ("add a retry with backoff to pushes") and Claude drafts the change on a branch as reviewable commits. Or ask "what if we hadn't made this decision?" and it sketches that version on a branch.
+
+**Before you commit and in review**
+
+- [ ] **Reviewer panel** — separate Claude reviews of the same change, each focused on one thing (bugs, security, performance, accessibility, architecture), shown as one list with the reviewer's area on each finding. It can run on staged changes before you commit, so problems are caught while you're still working.
+- [ ] **House rules check** — write down a repository's architecture conventions ("the web app never imports from `src/engine`", "no new `any`") in a small file, and check them on every commit, with the rule and the line that breaks it.
+- [ ] **Explain this change** — turn a big or unfamiliar diff into a plain explanation for someone new to the code: what it does, why, and a small diagram of the parts it touches, linking each point to the lines.
+- [ ] **One review per feature** — show a pull request grouped by layer (database, API, backend, frontend, tests) and in the order data flows through them, instead of as an alphabetical file list.
+- [ ] **Review memory** — remember concerns raised in past reviews ("don't call the API from this component") and point it out when a new change brings the same problem back.
+- [ ] **Kinder review comments** — before you post, an optional rewrite of a terse comment into clear, specific feedback with a suggestion. Received comments can be explained the same way.
+- [ ] **Tests that prevent repeats** — when a bug is fixed, propose a test that would have caught it. When the same kind of bug keeps coming back, suggest a check or lint rule for it.
+- [ ] **Fix after a regression** — when a merge breaks the tests, find the commit responsible (bisect), propose a fix, run the tests on it and offer it as a pull request.
+
+**Working as a team**
+
+- [ ] **Who's working nearby** — show who has recent commits or open branches touching the same files or modules as you, across branches, so you can talk before you collide.
+- [ ] **Who knows this** — for any file or folder, the people who have worked on it most and most recently, from commits and reviews. Shown as a map of the codebase.
+- [ ] **Team pulse** — point out bottlenecks: pull requests waiting a long time for review, areas only one person has ever changed, and branches that never merge. It also counts work that commit counts miss, such as reviews, refactors and deletions. It never ranks people.
+- [ ] **Changes across repositories** — when a change needs updates in other repositories (a library and the apps that use it), track them as one change: the pull requests in each, the order to merge them, and who needs to approve. Builds on Git dependencies below.
+- [ ] **Context on every change** — attach the requirement, ticket or design note to a commit or pull request, so it shows up next to the code in blame and history. Builds on the decision map and change notices.
+- [ ] **Repository passport** — a one-page profile of a repository: languages (the language bar already exists), structure, conventions, dependencies, health and how to run it. Shareable, or used to set up the onboarding guide.
+
+**Visual**
+
+- [ ] **Repository map** — explore a repository as an interactive map: folders as regions, files sized by how big or busy they are, and lines for imports between them. Zoom from the whole app down to one file. Circular dependencies and tightly coupled areas stand out.
+- [ ] **Screenshot diff** — for a web project, take screenshots of its pages before and after a commit and show what changed visually, beside the code diff. Can also flag layout and accessibility regressions (contrast, missing labels, overlapping text).
+- [ ] **See any branch's UI** — preview a component or page from another branch, or from an old commit, without switching your own checkout. Built on run any commit.
+- [ ] **Evolution replay** — play an app's history as a film: screenshots of its pages at each release, with the big architecture changes and test coverage over time.
+- [ ] **Feature storyboard** — a feature's history as a row of cards: the commits, pull requests, reviews and screenshots, in order.
+- [ ] **Design over time** — track how a project's design tokens, colours, typography, spacing and components change across releases, and spot drift from the design system.
+- [ ] **Design to code** — link Figma components and design tokens to the code and commits that implement them, so a design change shows the code to update and the other way round.
+
+**Experimental**
+
+- [ ] **Cost of a shortcut** — when a commit adds a TODO, a workaround or a disabled test, estimate its future cost from how similar shortcuts in this repository played out.
+- [ ] **Repository twin** — a model of how a project's parts depend on each other and behave, kept up to date, to try a proposed change against before making it.
+
 ### Wishes from developers
 
 Things people wish Git did, and how Ferry could do them.
