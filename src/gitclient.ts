@@ -564,6 +564,23 @@ export async function log(
   return parseCommits(await git(root, args));
 }
 
+/**
+ * What "All branches" adds to the current branch's history: commits on other
+ * branches (local and remote) and tags that the current branch doesn't have,
+ * and how many branches they're on. Zero when every other branch is already
+ * part of this one, so the two lists are the same.
+ */
+export async function elsewhere(root: string): Promise<{ commits: number; branches: number }> {
+  if (!(await gitOk(root, ["rev-parse", "--verify", "-q", "HEAD"]))) return { commits: 0, branches: 0 };
+  const [count, refs] = await Promise.all([
+    git(root, ["rev-list", "--count", "--branches", "--remotes", "--tags", "--not", "HEAD"]),
+    git(root, ["for-each-ref", "--no-merged", "HEAD", "--format=%(refname)", "refs/heads", "refs/remotes"]),
+  ]);
+  // origin/HEAD only points at another remote branch
+  const branches = refs.split("\n").filter((r) => r && !r.endsWith("/HEAD")).length;
+  return { commits: Number(count.trim()) || 0, branches };
+}
+
 /** Commits from `git log` with LOG_FORMAT. */
 const LOG_FORMAT = "--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b%x1e";
 function parseCommits(out: string): Commit[] {

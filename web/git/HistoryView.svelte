@@ -24,6 +24,27 @@
     seenKey = "";
   let firstNew = $state(0);
 
+  // what "All branches" would add: commits on other branches that this one doesn't have
+  let extra = $state<{ commits: number; branches: number } | null>(null);
+  $effect(() => {
+    void git.selected;
+    void st.branch;
+    void st.head;
+    void git.bump;
+    api<{ commits: number; branches: number }>("GET", git.url("elsewhere")).then(
+      (r) => (extra = r),
+      () => (extra = null),
+    );
+  });
+  const here = $derived(st.branch || "this branch");
+  const extraTitle = $derived(
+    !extra
+      ? "Also commits on other branches and tags"
+      : extra.commits
+        ? `${plural(extra.commits, "commit")} on ${plural(extra.branches, "other branch", "other branches")} that ${here} doesn't have`
+        : `Every other branch is already part of ${here}, so this shows the same commits`,
+  );
+
   $effect(() => {
     const key = [git.selected, all, st.branch].join("|");
     const want = limit;
@@ -164,10 +185,12 @@
             class:on={all}
             role="radio"
             aria-checked={all}
+            title={extraTitle}
             onclick={() => {
               all = true;
               limit = PAGE;
-            }}>All branches</button
+            }}
+            >All branches{#if extra?.commits}<span class="more">+{extra.commits}</span>{/if}</button
           >
         </div>
       </div>
@@ -218,6 +241,9 @@
       </div>
     </div>
 
+    {#if all && extra && !extra.commits}
+      <p class="same muted">Every other branch is already part of {here}, so this is the same list.</p>
+    {/if}
     {#if searching}
       <RelayLoading
         card={false}
@@ -293,6 +319,20 @@
     .seg {
       padding: 4px;
     }
+  }
+  .more {
+    margin-left: space(1) + 2;
+    padding: 0 space(1) + 2;
+    border-radius: $radius-pill;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11.5px;
+    font-weight: $weight-bold;
+  }
+  .same {
+    margin: 0;
+    padding: 0 space(4) space(2);
+    font-size: fs(sm);
   }
   // the search sits at the end of the row; "Search all history" appears just before it
   .end {

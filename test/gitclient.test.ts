@@ -36,6 +36,26 @@ async function repo(): Promise<string> {
 }
 
 describe("git client", () => {
+  test("what All branches adds: commits only on other branches, until they're merged", async () => {
+    const d = await repo();
+    expect(await g.elsewhere(d)).toEqual({ commits: 0, branches: 0 });
+    const main = sh(d, "branch", "--show-current").trim();
+    sh(d, "switch", "-c", "side");
+    put(d, "b.txt", "b\n");
+    sh(d, "add", "b.txt");
+    sh(d, "commit", "-m", "on side");
+    put(d, "c.txt", "c\n");
+    sh(d, "add", "c.txt");
+    sh(d, "commit", "-m", "on side again");
+    sh(d, "switch", main);
+    // from the main branch: two commits elsewhere, on one branch, and All branches shows them
+    expect(await g.elsewhere(d)).toEqual({ commits: 2, branches: 1 });
+    expect((await g.log(d, { all: true })).length).toBe((await g.log(d)).length + 2);
+    // merged: the side branch is part of this one now, so the two lists are the same
+    sh(d, "merge", "--no-edit", "side");
+    expect(await g.elsewhere(d)).toEqual({ commits: 0, branches: 0 });
+  });
+
   test("state, staging, commit, amend and undo", async () => {
     const d = await repo();
     put(d, "a.txt", "one\nTWO\nthree\n");
