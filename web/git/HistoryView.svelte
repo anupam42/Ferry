@@ -149,56 +149,64 @@
 {:else}
   <Section id="g-hist" title="History" count={commits.length}>
     <div class="tools">
-      <div class="seg" role="radiogroup" aria-label="Which commits">
-        <button
-          class:on={!all}
-          role="radio"
-          aria-checked={!all}
-          onclick={() => {
-            all = false;
-            limit = PAGE;
-          }}>On {st.branch || "this branch"}</button
-        >
-        <button
-          class:on={all}
-          role="radio"
-          aria-checked={all}
-          onclick={() => {
-            all = true;
-            limit = PAGE;
-          }}>All branches</button
-        >
+      <div class="scope">
+        <span class="lbl" id="h-scope">Show</span>
+        <div class="seg" role="radiogroup" aria-labelledby="h-scope">
+          <button
+            class:on={!all}
+            role="radio"
+            aria-checked={!all}
+            onclick={() => {
+              all = false;
+              limit = PAGE;
+            }}>On {st.branch || "this branch"}</button
+          >
+          <button
+            class:on={all}
+            role="radio"
+            aria-checked={all}
+            onclick={() => {
+              all = true;
+              limit = PAGE;
+            }}>All branches</button
+          >
+        </div>
       </div>
-      <input
-        type="search"
-        class="search"
-        bind:value={query}
-        aria-label="Find a commit"
-        placeholder={mode === "code"
-          ? "Text that was added or removed, e.g. a function name"
-          : "Find a commit: message, author or id"}
-        onkeydown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            void deepSearch();
-          }
-        }}
-      />
-      <div class="seg" role="radiogroup" aria-label="Search in">
-        <button
-          class:on={mode === "message"}
-          role="radio"
-          aria-checked={mode === "message"}
-          title="Commit messages, authors and ids"
-          onclick={() => setMode("message")}>Messages</button
-        >
-        <button
-          class:on={mode === "code"}
-          role="radio"
-          aria-checked={mode === "code"}
-          title="Commits that added or removed the text"
-          onclick={() => setMode("code")}>Code changes</button
-        >
+      <!-- one search field: what to look for, and (inside it) where to look -->
+      <div class="find">
+        <Icon name="search" size={16} />
+        <input
+          type="search"
+          bind:value={query}
+          aria-label={mode === "code" ? "Find commits that added or removed this text" : "Find a commit"}
+          placeholder={mode === "code" ? "Text added or removed, e.g. a function name" : "Message, author or commit id"}
+          onkeydown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void deepSearch();
+            }
+            if (e.key === "Escape") query = "";
+          }}
+        />
+        {#if query}<button type="button" class="clear" aria-label="Clear the search" onclick={() => (query = "")}
+            ><Icon name="close" size={14} /></button
+          >{/if}
+        <div class="seg mini" role="radiogroup" aria-label="Search in">
+          <button
+            class:on={mode === "message"}
+            role="radio"
+            aria-checked={mode === "message"}
+            title="Commit messages, authors and ids"
+            onclick={() => setMode("message")}>Messages</button
+          >
+          <button
+            class:on={mode === "code"}
+            role="radio"
+            aria-checked={mode === "code"}
+            title="Commits that added or removed the text"
+            onclick={() => setMode("code")}>Code</button
+          >
+        </div>
       </div>
       {#if q.length >= 2}<button class="btn small" onclick={deepSearch}
           ><Icon name="search" size={16} />{mode === "code" ? "Find in all code changes" : "Search all history"}</button
@@ -272,10 +280,81 @@
     flex-wrap: wrap;
     padding: 2px space(4) space(2) + 2;
   }
-  .search {
-    max-width: 340px;
+  .scope {
+    display: flex;
+    align-items: center;
+    gap: space(2);
+    // the same height as the search field beside it
+    .seg {
+      padding: 4px;
+    }
+  }
+  .lbl {
+    font-size: fs(sm);
+    font-weight: $weight-semibold;
+    color: var(--muted);
+  }
+  // the search field: icon, input, clear, and where to search, in one pill the same height as the toggles
+  .find {
+    display: flex;
+    align-items: center;
+    gap: space(2);
     flex: 1;
-    min-width: 200px;
+    min-width: 260px;
+    max-width: 560px;
+    height: 40px;
+    padding: 0 3px 0 space(3) + 2;
+    border: 1px solid var(--line);
+    border-radius: $radius-pill;
+    background: var(--card-solid);
+    color: var(--muted);
+    @include motion {
+      transition:
+        border-color $duration-fast,
+        box-shadow $duration-fast;
+    }
+    &:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: none;
+      padding: 0;
+      box-shadow: none;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      &::-webkit-search-cancel-button {
+        display: none;
+      }
+    }
+  }
+  .clear {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--card2);
+    color: var(--muted);
+    cursor: pointer;
+    flex: none;
+    &:hover {
+      color: var(--text);
+    }
+  }
+  .seg.mini {
+    flex: none;
+    padding: 2px;
+    button {
+      padding: space(1) space(2) + 2;
+      font-size: 12.5px;
+    }
   }
   .found-head {
     display: flex;

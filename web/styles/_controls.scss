@@ -52,6 +52,8 @@ input[type=text], input[type=password], input[type=search], input[type=email], s
     &.on { background: var(--card-solid); color: var(--text); box-shadow: 0 1px 4px rgba(9, 35, 72, .1); }
   }
 }
+// in dark mode the card and the track are both deep navy: tint the chosen option so it stands out
+[data-theme="dark"] .seg button.on { background: color-mix(in srgb, var(--accent) 24%, var(--card-solid)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
 
 .switch {
   position: relative; display: inline-block; width: 44px; height: 26px; cursor: pointer; flex: none;
