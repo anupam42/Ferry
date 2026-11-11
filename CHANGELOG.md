@@ -33,6 +33,7 @@ How an entry is written:
 
 ### Improved
 
+- **A rebuilt web app**: every page of `ferry ui` was rebuilt, with the same features and settings as before. When you reach Ferry from another computer with an access token, Relay's pictures show up now too.
 - **Files**: a folder-at-a-time browser with the last commit for every entry, "go to file" search, and each folder's README underneath. [try: git-files]
 - **History graph**: draws itself in, with light flowing up every branch toward HEAD. [try: git-history]
 - **Toolbar**: views and actions in one dock you can expand to show names, down the right or across the top. [try: settings-appearance]

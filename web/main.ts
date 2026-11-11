@@ -4,6 +4,7 @@ import { mount } from "svelte";
 import App from "./App.svelte";
 import { api } from "./lib/api.ts";
 import { app } from "./lib/app.svelte.ts";
+import { reloadHere, restorePlace } from "./lib/devstate.ts";
 import { connectEvents } from "./lib/events.ts";
 import { git } from "./lib/git.svelte.ts";
 import { notes } from "./lib/notes.svelte.ts";
@@ -25,8 +26,9 @@ async function start() {
   git.start();
   void notes.load();
   releases.start();
+  restorePlace(); // after a dev reload: the same section, view and scroll
   mount(App, { target: document.getElementById("app")! });
-  connectEvents({ info: app.info, onEvent: (ev) => { sync.onEvent(ev); notes.add(ev); relay.onEvent(ev); }, onOnline: (up) => { if (up) sync.soon(); } });
+  connectEvents({ info: app.info, reload: reloadHere, onEvent: (ev) => { sync.onEvent(ev); notes.add(ev); relay.onEvent(ev); }, onOnline: (up) => { if (up) sync.soon(); } });
 }
 
 void start();

@@ -7,6 +7,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { buildWeb } from "./build-web.ts";
+
 const root = path.join(import.meta.dir, "..");
 process.chdir(root);
 
@@ -30,6 +32,10 @@ const archive = args.includes("--archive");
 const only = args.filter((a) => !a.startsWith("--"));
 const chosen = only.length ? targets.filter(([t, os, arch]) => only.some((o) => t === o || t === "bun-" + o || `${os}-${arch}` === o)) : targets;
 if (chosen.length === 0) throw new Error(`unknown target ${only.join(" ")}; use e.g. linux-x64 or windows-amd64`);
+
+// the web app is embedded in every binary: build it first, so a binary never ships without it
+const web = await buildWeb();
+console.log(`built the web app in ${web.ms} ms`);
 
 fs.mkdirSync("dist", { recursive: true });
 const sums: string[] = [];

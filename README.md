@@ -458,7 +458,8 @@ src/remote.ts           ssh target parsing and commands
 src/cloud.ts            S3-compatible targets (Bun's S3 client)
 src/ai.ts               {ai} commit messages (Claude API)
 src/api.ts              local HTTP API (Bun.serve, server-sent events); also serves the web app
-src/web/index.html      the web app (one self-contained file, bundled into the binary)
+src/webapp.ts           serves the web app at / (built from web/, embedded in the binary)
+web/                    the web app: Svelte 5, TypeScript and SCSS (scripts/build-web.ts builds it)
 src/cli/ui.ts           ferry ui: runs pairs in the background and adds/removes them from the browser
 src/webhook.ts          Slack / Discord / ntfy / JSON webhooks
 src/tui/                dashboard: term.ts (styles, boxes, keys, screen), widgets, theme, diffview

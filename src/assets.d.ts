@@ -8,8 +8,8 @@ declare module "*.md" {
   export default text;
 }
 
-// the new web app's build output (src/web/next), embedded as text
-declare module "*/web/next/app.js" {
+// the web app's build output (src/web/app), embedded as text
+declare module "*/web/app/app.js" {
   const text: string;
   export default text;
 }

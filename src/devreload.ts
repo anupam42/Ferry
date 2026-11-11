@@ -4,9 +4,9 @@
 //   - a supervisor that runs the real "ferry ui" as a child and restarts it
 //     when Ferry's TypeScript changes. The browser notices the new server and
 //     reloads, keeping your place.
-//   - a page watcher inside that child: the page is read from src/web on every
-//     request, and saving it tells open browsers to update. An edit that only
-//     touches <style> is swapped in without a reload.
+//   - inside that child, src/cli/ui.ts rebuilds the web app when web/ changes
+//     and tells open browsers: a style-only change is swapped in without a
+//     reload, anything else reloads the page where you were.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -17,54 +17,16 @@ export const CHILD_ENV = "FERRY_DEV_CHILD";
 /** Where the child writes the port it settled on, so a restart reuses it. */
 export const PORT_FILE_ENV = "FERRY_DEV_PORT_FILE";
 
-/** The page in the source tree, or "" when Ferry runs from a compiled binary. */
-export function sourcePage(): string {
-  const file = path.join(import.meta.dir, "web", "index.html");
-  return fs.existsSync(file) ? file : "";
+/** True when Ferry runs from its source tree (web/ is next to src/), not from a compiled binary. */
+export function runningFromSource(): boolean {
+  return fs.existsSync(path.join(import.meta.dir, "..", "web", "main.ts"));
 }
 
+/** What changed in the web app: "css" can be swapped in without a reload. */
 export type PageChange = "css" | "page";
 
-/** Everything outside <style> blocks: if that's unchanged, an edit only touched styles. */
-const withoutStyles = (html: string) => html.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "<style></style>");
-
-export class PageWatcher {
-  /** Changes on every start, so a browser can tell the server was restarted. */
-  readonly boot = crypto.randomBytes(6).toString("hex");
-  private last: string;
-  private watcher: fs.FSWatcher | null = null;
-  private timer: ReturnType<typeof setTimeout> | null = null;
-
-  constructor(private file: string, onChange: (kind: PageChange) => void) {
-    this.last = fs.readFileSync(file, "utf8");
-    // watch the folder, not the file: editors often save by replacing the file
-    this.watcher = fs.watch(path.dirname(file), (_ev, name) => {
-      if (name && path.basename(String(name)) !== path.basename(file)) return;
-      if (this.timer) clearTimeout(this.timer);
-      this.timer = setTimeout(() => {
-        let now: string;
-        try {
-          now = fs.readFileSync(file, "utf8");
-        } catch {
-          return; // mid-save; the next event brings the new file
-        }
-        if (now === this.last || !now.trim()) return;
-        const kind: PageChange = withoutStyles(now) === withoutStyles(this.last) ? "css" : "page";
-        this.last = now;
-        onChange(kind);
-      }, 60);
-    });
-  }
-
-  page(): string {
-    return this.last;
-  }
-
-  stop(): void {
-    this.watcher?.close();
-    if (this.timer) clearTimeout(this.timer);
-  }
-}
+/** Changes on every start of the server, so an open page can tell it was restarted (and reload). */
+export const newBoot = () => crypto.randomBytes(6).toString("hex");
 
 /**
  * Runs "ferry ui" (these args, minus --dev) as a child and restarts it when a
