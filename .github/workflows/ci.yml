@@ -23,7 +23,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun test
-      # build a standalone binary for this runner and make sure it really runs
+      # build a standalone binary for this runner (with the web app in it) and make sure it really runs
+      - run: bun run build:web
       - run: bun build src/main.ts --compile --outfile dist/ferry
       - name: Smoke-test the binary
         shell: bash
@@ -34,3 +35,10 @@ jobs:
           ./dist/ferry --once "$RUNNER_TEMP/s" "$RUNNER_TEMP/t"
           test "$(cat "$RUNNER_TEMP/t/a.txt")" = hi
           ./dist/ferry status --json
+          # the web app is in the binary: the page, its script and its styles
+          ./dist/ferry ui --no-open --port 7979 > "$RUNNER_TEMP/ui.log" 2>&1 &
+          for i in $(seq 1 50); do curl -sf http://127.0.0.1:7979/ > "$RUNNER_TEMP/page.html" && break; sleep 0.2; done
+          grep -q '<script type="module" src="/app.js">' "$RUNNER_TEMP/page.html"
+          curl -sf -o /dev/null http://127.0.0.1:7979/app.js
+          curl -sf -o /dev/null http://127.0.0.1:7979/app.css
+          kill %1

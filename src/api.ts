@@ -18,7 +18,7 @@
 //   GET  /pairs/{name}/plan          what the next pass would do (JSON)
 //
 // With the web app on (ferry ui, or --serve), also:
-//   GET  /                           the web app
+//   GET  /                           the web app (and /app.js, /app.css, built from web/)
 //   GET  /info                       version, and whether pairs can be added
 //   GET  /fs?path=…                  sub-folders of a folder (the folder picker)
 //   POST /pairs                      add a pair (config-file keys, JSON)
@@ -35,15 +35,14 @@ import { statusJSON } from "./engine/engine.ts";
 import { batchesSince } from "./engine/journal.ts";
 import { eventJSON, parseChoice, type Event } from "./engine/types.ts";
 import { MAX_DIFF_LINES } from "./gitclient.ts";
-import type { PageChange, PageWatcher } from "./devreload.ts";
-import { serveNext } from "./webnext.ts";
+import type { PageChange } from "./devreload.ts";
+import { isPublicAsset, serveApp } from "./webapp.ts";
 import { GitApi, type RepoManager } from "./gitapi.ts";
 import * as conn from "./integrations.ts";
 import { readSettings, saveGit, SettingsError } from "./settingsapi.ts";
 import { errMsg, parseWhen } from "./util.ts";
 import { COMMIT, DATE as BUILD_DATE, VERSION } from "./cli/common.ts";
 import * as release from "./release.ts";
-import webPage from "./web/index.html" with { type: "text" };
 import logoSVG from "../assets/logo/icon.svg" with { type: "text" };
 import mascot_relay from "../assets/mascot/relay.svg" with { type: "text" };
 import mascot_happy from "../assets/mascot/relay-happy.svg" with { type: "text" };
@@ -76,7 +75,6 @@ const MASCOT: Record<string, string> = {
   comparing: mascot_comparing as unknown as string,
 };
 
-const PAGE = webPage as unknown as string;
 
 /** Adds and removes pairs while ferry runs (provided by "ferry ui"). */
 export interface PairManager {
@@ -90,8 +88,8 @@ export interface ApiOptions {
   version?: string;
   manager?: PairManager | null;
   repos?: RepoManager | null;
-  /** ferry ui --dev: the page comes from the source tree and browsers are told when it changes */
-  dev?: PageWatcher | null;
+  /** ferry ui --dev: changes on every start, so an open page can tell the server was restarted */
+  dev?: { boot: string } | null;
 }
 
 type Sub = (chunk: string) => void;
@@ -126,8 +124,8 @@ export class ApiServer {
   }
 
   /** ferry ui --dev: tells open pages that the page changed ("css" can be swapped in without a reload). */
-  pageChanged(kind: PageChange, app: "current" | "next" = "current"): void {
-    const chunk = `event: dev\ndata: ${JSON.stringify({ kind, app })}\n\n`;
+  pageChanged(kind: PageChange): void {
+    const chunk = `event: dev\ndata: ${JSON.stringify({ kind })}\n\n`;
     for (const s of this.subs) s(chunk);
   }
 
@@ -162,16 +160,9 @@ export class ApiServer {
     } catch {
       return text("bad path", 400);
     }
-    if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
-      return new Response(this.opts.dev ? this.opts.dev.page() : PAGE, {
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-store",
-          // the page is self-contained: no outside scripts, styles or frames
-          "Content-Security-Policy": "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
-          "X-Content-Type-Options": "nosniff",
-        },
-      });
+    if (req.method === "GET") {
+      const page = await serveApp(url); // the web app: /, /app.js, /app.css
+      if (page) return page;
     }
     if (req.method === "GET" && (url.pathname === "/logo.svg" || url.pathname === "/favicon.ico")) {
       return new Response(logoSVG as unknown as string, {
@@ -187,10 +178,6 @@ export class ApiServer {
     }
     if (req.method === "GET" && url.pathname === "/status") {
       return json(this.engines.map((e) => statusJSON(e.getStatus())));
-    }
-    if (req.method === "GET") {
-      const next = await serveNext(url); // the new web app (Svelte), while it's being built
-      if (next) return next;
     }
     if (req.method === "GET" && url.pathname === "/info") {
       const m = this.opts.manager;
@@ -245,6 +232,7 @@ export class ApiServer {
 
   private guard(req: Request, url: URL): Response | null {
     if (this.token !== "") {
+      if (req.method === "GET" && isPublicAsset(url.pathname)) return null;
       let got = (req.headers.get("Authorization") ?? "").replace(/^Bearer /, "");
       if (got === "") got = url.searchParams.get("token") ?? "";
       if (got !== this.token) return text("missing or wrong token", 401);

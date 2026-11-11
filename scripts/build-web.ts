@@ -1,5 +1,5 @@
-// Builds the web app (web/: Svelte 5, TypeScript, SCSS) into src/web/next/,
-// which Ferry serves at /next and embeds in the compiled binary.
+// Builds the web app (web/: Svelte 5, TypeScript, SCSS) into src/web/app/,
+// which Ferry serves at / and embeds in the compiled binary.
 //
 //   bun scripts/build-web.ts          build once (minified)
 //   bun scripts/build-web.ts --dev    build once, readable, with dev checks
@@ -18,7 +18,7 @@ import { compile, compileModule, preprocess } from "svelte/compiler";
 
 const ROOT = path.resolve(import.meta.dir, "..");
 export const WEB_SRC = path.join(ROOT, "web");
-export const WEB_OUT = path.join(ROOT, "src", "web", "next");
+export const WEB_OUT = path.join(ROOT, "src", "web", "app");
 const STYLES = path.join(WEB_SRC, "styles");
 
 function scss(source: string, file: string): string {
@@ -50,7 +50,7 @@ function sveltePlugin(dev: boolean, styles: Map<string, string>): BunPlugin {
   };
 }
 
-/** Builds web/ into src/web/next/ (index.html, app.js, app.css). Returns what changed. */
+/** Builds web/ into src/web/app/ (index.html, app.js, app.css). Returns what changed. */
 export async function buildWeb(o: { dev?: boolean } = {}): Promise<{ js: boolean; css: boolean; ms: number }> {
   const t0 = performance.now();
   const dev = !!o.dev;
@@ -86,7 +86,7 @@ export async function buildWeb(o: { dev?: boolean } = {}): Promise<{ js: boolean
   return { js: changedJS || changedHTML, css: changedCSS, ms: Math.round(performance.now() - t0) };
 }
 
-/** True when src/web/next is missing or older than anything in web/. */
+/** True when src/web/app is missing or older than anything in web/. */
 export function webOutdated(): boolean {
   const out = path.join(WEB_OUT, "app.js");
   if (!fs.existsSync(out)) return true;

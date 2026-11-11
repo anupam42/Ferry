@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { ApiServer, type PairManager } from "../api.ts";
-import { CHILD_ENV, PageWatcher, PORT_FILE_ENV, sourcePage, supervise } from "../devreload.ts";
+import { CHILD_ENV, newBoot, PORT_FILE_ENV, runningFromSource, supervise } from "../devreload.ts";
 import {
   appendPairToFile, checkOverlaps, dataDir, setRepoInFile, expandHome, isRemoteSpec, loadFile, normalize, pairsFromObject, removePairFromFile,
   type Pair, type Settings, emptySettings,
@@ -34,8 +34,7 @@ export async function cmdUI(args: string[]): Promise<void> {
     .string("host", "127.0.0.1", "address to listen on (anything but localhost needs --serve-token)")
     .int("port", 7878, "port for the web app (the next free one is used if it's taken)")
     .bool("no-open", false, "don't open the browser")
-    .bool("dev", false, "for working on Ferry: reload the page when src/web changes, restart when the code does")
-    .bool("next", false, "open the new web app (Svelte, being built) instead of the current page");
+    .bool("dev", false, "for working on Ferry: rebuild and reload the page when web/ changes, restart when the code does");
   f.usage = () => {
     process.stderr.write("Usage: ferry ui [flags] [--config file | <source> <target>]\n");
     f.printDefaults();
@@ -51,26 +50,22 @@ export async function cmdUI(args: string[]): Promise<void> {
   if (f.getBool("no-color")) out.color = false;
 
   // --dev: a supervisor restarts the real "ferry ui" when Ferry's code changes
-  let dev: PageWatcher | null = null;
+  let dev: { boot: string } | null = null;
   if (f.getBool("dev")) {
-    const page = sourcePage();
-    if (!page) {
+    if (!runningFromSource()) {
       println(paint("31", "error: ") + "--dev works when running Ferry from its source (bun src/main.ts ui --dev)");
       throw new ExitError(2);
     }
     if (!process.env[CHILD_ENV]) {
-      println(paint("90", "dev mode: editing src/web/index.html updates the page; editing .ts files restarts ferry"));
+      println(paint("90", "dev mode: editing web/ rebuilds and updates the page; editing .ts files restarts ferry"));
       await supervise(args.filter((a) => a !== "--dev"), (m) => println(paint("90", "dev: " + m)));
       process.exit(0);
     }
-    dev = new PageWatcher(page, (kind) => {
-      api?.pageChanged(kind);
-      println(paint("90", kind === "css" ? "dev: styles updated" : "dev: page reloaded"));
-    });
-    watchNextApp((kind) => api?.pageChanged(kind, "next"));
+    dev = { boot: newBoot() };
+    watchWebApp((kind) => api?.pageChanged(kind));
   }
-  // running from source: build the new web app (web/ → src/web/next) if it's missing or out of date
-  if (sourcePage()) await ensureNextApp(f.getBool("dev"));
+  // running from source: build the web app (web/ → src/web/app) if it's missing or out of date
+  if (runningFromSource()) await ensureWebApp(f.getBool("dev"));
 
   // where pairs come from, and where pairs added in the browser go
   let pairs: Pair[];
@@ -197,7 +192,7 @@ export async function cmdUI(args: string[]): Promise<void> {
   if (dev && process.env[PORT_FILE_ENV]) fs.writeFileSync(process.env[PORT_FILE_ENV]!, String(api.port));
 
   const shown = host === "0.0.0.0" || host === "::" ? "localhost" : host.includes(":") ? `[${host}]` : host;
-  let url = `http://${shown}:${port}/${f.getBool("next") ? "next" : ""}`;
+  let url = `http://${shown}:${port}/`;
   if (settings.serveToken !== "") url += "?token=" + encodeURIComponent(settings.serveToken);
   println(`${paint("1", "ferry " + VERSION)} web app running at ${paint("1;36", url)}`);
   println(paint("90", pairs.length === 0 ? "no folder pairs yet: add one in the browser" : `${pairs.length} pair(s) syncing`));
@@ -210,7 +205,6 @@ export async function cmdUI(args: string[]): Promise<void> {
   await new Promise<void>((r) => ctl.signal.addEventListener("abort", () => r(), { once: true }));
   await Promise.all([...stops.values()].map((s) => s.done));
   api.stop();
-  dev?.stop();
   println(paint("90", "stopped."));
   process.exit(0);
 }
@@ -256,19 +250,19 @@ async function webBuild(): Promise<WebBuild | null> {
   return (await import(file)) as WebBuild;
 }
 
-async function ensureNextApp(dev: boolean): Promise<void> {
+async function ensureWebApp(dev: boolean): Promise<void> {
   const b = await webBuild();
   if (!b || (!dev && !b.webOutdated())) return;
   try {
     const r = await b.buildWeb({ dev });
-    println(paint("90", `built the new web app in ${r.ms} ms (open /next)`));
+    println(paint("90", `built the web app in ${r.ms} ms`));
   } catch (e) {
-    println(paint("33", "! ") + "the new web app didn't build: " + (e as Error).message.split("\n").slice(0, 6).join("\n"));
+    println(paint("33", "! ") + "the web app didn't build: " + (e as Error).message.split("\n").slice(0, 6).join("\n"));
   }
 }
 
-/** ferry ui --dev: rebuild the new web app when web/ changes, and tell open pages what changed. */
-function watchNextApp(changed: (kind: "css" | "page") => void): void {
+/** ferry ui --dev: rebuild the web app when web/ changes, and tell open pages what changed. */
+function watchWebApp(changed: (kind: "css" | "page") => void): void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let running = false, again = false;
   const run = async () => {
@@ -280,7 +274,7 @@ function watchNextApp(changed: (kind: "css" | "page") => void): void {
       const r = await b.buildWeb({ dev: true });
       if (r.js) changed("page");
       else if (r.css) changed("css");
-      if (r.js || r.css) println(paint("90", `dev: rebuilt the new web app in ${r.ms} ms`));
+      if (r.js || r.css) println(paint("90", `dev: rebuilt the web app in ${r.ms} ms${r.js ? "" : " (styles only)"}`));
     } catch (e) {
       println(paint("33", "! ") + (e as Error).message.split("\n").slice(0, 8).join("\n"));
     } finally {
@@ -291,10 +285,10 @@ function watchNextApp(changed: (kind: "css" | "page") => void): void {
   const dir = path.join(import.meta.dir, "..", "..", "web");
   if (!fs.existsSync(dir)) return;
   // kept in a module variable: an unreferenced watcher can be collected and go quiet
-  nextWatcher = fs.watch(dir, { recursive: true }, () => {
+  webWatcher = fs.watch(dir, { recursive: true }, () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void run(), 80);
   });
-  println(paint("90", "dev: watching web/ for the new web app"));
+  println(paint("90", "dev: watching web/"));
 }
-let nextWatcher: fs.FSWatcher | null = null;
+let webWatcher: fs.FSWatcher | null = null;
