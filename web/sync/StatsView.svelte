@@ -3,7 +3,7 @@
   import Section from "../components/Section.svelte";
   import { api, enc } from "../lib/api.ts";
   import { act } from "../lib/app.svelte.ts";
-  import { pairURL } from "../lib/sync.svelte.ts";
+  import { pairURL, sync } from "../lib/sync.svelte.ts";
   import type { PairStatus, Stats } from "../lib/types.ts";
 
   let { p }: { p: PairStatus } = $props();
@@ -15,12 +15,21 @@
   ] as const;
   let since = $state(localStorage.getItem("ferry-stats-since") || "7d");
   let s = $state<Stats | null>(null);
+  // the pairs' status is replaced every few seconds; reload only when the pair itself changes
+  const name = $derived(p.name);
+  // ...and when a sync for it finishes, so new batches show up
+  const syncs = $derived((sync.log[name] ?? []).filter((e) => e.kind === "synced").length);
+  // a new period or pair clears the charts while they load; a refresh after a sync keeps them
+  let shownFor = "";
   $effect(() => {
     const want = since;
-    s = null;
+    void syncs;
+    const key = name + "|" + want;
+    if (key !== shownFor) s = null;
+    shownFor = key;
     localStorage.setItem("ferry-stats-since", want);
-    act(null, () => api<Stats>("GET", pairURL(p.name, "stats") + "?since=" + enc(want))).then((r) => {
-      if (since === want) s = r;
+    act(null, () => api<Stats>("GET", pairURL(name, "stats") + "?since=" + enc(want))).then((r) => {
+      if (since === want && r) s = r;
     });
   });
   const max = $derived(Math.max(1, ...(s?.perDay ?? []).map((d) => d.files)));

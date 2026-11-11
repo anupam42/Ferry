@@ -28,8 +28,8 @@
   let extra = $state<{ commits: number; branches: number } | null>(null);
   $effect(() => {
     void git.selected;
-    void st.branch;
-    void st.head;
+    void branch;
+    void head;
     void git.bump;
     api<{ commits: number; branches: number }>("GET", git.url("elsewhere")).then(
       (r) => (extra = r),
@@ -45,11 +45,14 @@
         : `Every other branch is already part of ${here}, so this shows the same commits`,
   );
 
+  // the repository's state is replaced every few seconds; reload only when these actually change
+  const branch = $derived(st.branch);
+  const head = $derived(st.head);
   $effect(() => {
-    const key = [git.selected, all, st.branch].join("|");
+    const key = [git.selected, all, branch].join("|");
     const want = limit;
     void git.bump;
-    if (!st.head) {
+    if (!head) {
       commits = [];
       return;
     }
