@@ -468,6 +468,15 @@ Features other Git apps have, or that people ask for, ordered by how often they'
 - [ ] **CI integration** — start runs and read their logs for GitHub Actions, GitLab CI and Azure Pipelines (pull requests already show check results).
 - [ ] **AI help for reviews** — write pull request descriptions, summarise changes and explain conflicts.
 
+### Wishes from developers
+
+Things people wish Git did, and how Ferry could do them.
+
+- [ ] **Device handoff** — *"I wish I could use Git like autosave; I forget to push when switching devices."* Ferry already auto-commits, pushes (`--auto-commit --push`) and pulls (`--auto-pull`). Still missing: push straight away when the computer is about to sleep, shut down or go idle, and pull as soon as it wakes or Ferry starts. Autosaves would go to a per-device work-in-progress branch (such as `wip/<device>`), so they don't clutter the real history. On the other device the mascot says "you have unpushed work from your laptop, 2 h ago" and offers to bring it over, squashed into one commit.
+- [ ] **Git dependencies** — *"I wish Git was enough as a dependency manager for simple projects."* A small `ferry.deps.yaml` lists other repositories, each pinned to a tag, branch or commit, and the folder each one goes into. Ferry copies them in with its sync engine (no submodules) and records the exact commit in a lock file. It can check for newer tags, show what changed between versions and update with one click. Local edits to a dependency are flagged, not overwritten.
+- [ ] **Clone wizard** — *"I wish I could set up a wizard for people pulling a repo."* A `.ferry/setup.yaml` in the repo asks questions the first time someone clones or opens it. In a large monorepo: which parts do you work on? Ferry then checks out only those (sparse checkout). For a template: the project name, licence and features, filled into placeholders before the first commit. It can also run setup steps (install, copy `.env.example`) and check that tools are installed. Re-run it any time from the web app.
+- [ ] **Change notices** — *"I wish I could announce my changes so people are reminded when they pull or edit those files."* An author attaches a notice to a commit (a `Notice:` trailer) or to paths in `.ferry/notices.yaml`, for example "the API client moved to `src/http/`, run `bun install`". When a pull brings the notice in, or someone opens or edits a matching file, the mascot shows it once, with a link to the commit. People can dismiss it or snooze it.
+
 ## Development
 
 Ferry is written in TypeScript and runs on [Bun](https://bun.sh). Releases are standalone executables made with `bun build --compile`, so users don't need Bun installed.
