@@ -2,8 +2,21 @@ import { plural } from "../util.ts";
 
 /** What an Event is about. */
 export type Kind =
-  | "info" | "add" | "update" | "delete" | "rename" | "conflict" | "resolved" | "skip"
-  | "warn" | "error" | "synced" | "paused" | "resumed" | "git" | "commit"
+  | "info"
+  | "add"
+  | "update"
+  | "delete"
+  | "rename"
+  | "conflict"
+  | "resolved"
+  | "skip"
+  | "warn"
+  | "error"
+  | "synced"
+  | "paused"
+  | "resumed"
+  | "git"
+  | "commit"
   | "kept"; // deleted on one side, intentionally kept on the other
 
 /** What the engine reports to the UI, logs and JSON output. */
@@ -93,11 +106,17 @@ export type Choice = "source" | "target" | "newer" | "keep-both" | "merge";
 /** Accepts the long and short spellings used on the command line, in the dashboard and the API. */
 export function parseChoice(s: string): Choice | null {
   const m: Record<string, Choice> = {
-    source: "source", s: "source",
-    target: "target", t: "target",
-    newer: "newer", n: "newer",
-    both: "keep-both", "keep-both": "keep-both", b: "keep-both",
-    merge: "merge", m: "merge",
+    source: "source",
+    s: "source",
+    target: "target",
+    t: "target",
+    newer: "newer",
+    n: "newer",
+    both: "keep-both",
+    "keep-both": "keep-both",
+    b: "keep-both",
+    merge: "merge",
+    m: "merge",
   };
   return m[s.trim().toLowerCase()] ?? null;
 }

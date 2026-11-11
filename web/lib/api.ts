@@ -10,7 +10,11 @@ export const token = sessionStorage.getItem("ferry-token") || "";
 export const enc = encodeURIComponent;
 
 export class ApiError extends Error {
-  constructor(message: string, readonly code = "", readonly status = 0) {
+  constructor(
+    message: string,
+    readonly code = "",
+    readonly status = 0,
+  ) {
     super(message);
   }
 }
@@ -23,7 +27,8 @@ export async function api<T = unknown>(method: "GET" | "POST", url: string, body
   const res = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await res.text();
   if (!res.ok) {
-    let msg = text.trim() || res.statusText, code = "";
+    let msg = text.trim() || res.statusText,
+      code = "";
     try {
       const j = JSON.parse(text) as { error?: string; code?: string };
       msg = j.error || msg;

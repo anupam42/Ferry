@@ -15,7 +15,12 @@ const scss = {
   style: ({ content, attributes, filename }) => {
     if (attributes.lang !== "scss") return undefined;
     const file = filename ?? path.join(STYLES, "component.scss");
-    const out = sass.compileString(content, { loadPaths: [STYLES, path.dirname(file)], style: "expanded", syntax: "scss", url: new URL("file://" + file) });
+    const out = sass.compileString(content, {
+      loadPaths: [STYLES, path.dirname(file)],
+      style: "expanded",
+      syntax: "scss",
+      url: new URL("file://" + file),
+    });
     return { code: out.css };
   },
 };

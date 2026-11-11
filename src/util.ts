@@ -53,8 +53,16 @@ export function parseTime(s: unknown): number {
 // ---------- durations (milliseconds) ----------
 
 const units: Record<string, number> = {
-  ns: 1e-6, us: 1e-3, "µs": 1e-3, "μs": 1e-3, ms: 1, s: 1000, m: 60_000, h: 3_600_000,
-  d: 86_400_000, w: 604_800_000,
+  ns: 1e-6,
+  us: 1e-3,
+  µs: 1e-3,
+  μs: 1e-3,
+  ms: 1,
+  s: 1000,
+  m: 60_000,
+  h: 3_600_000,
+  d: 86_400_000,
+  w: 604_800_000,
 };
 
 /** Go-style durations ("500ms", "1h30m", "2.5s") plus "d" (days) and "w" (weeks). */
@@ -115,7 +123,15 @@ export function parseSize(input: string | number): number {
   let s = input.trim().toUpperCase();
   if (s === "" || s === "0") return 0;
   let mult = 1;
-  for (const [suf, m] of [["GB", 2 ** 30], ["MB", 2 ** 20], ["KB", 2 ** 10], ["G", 2 ** 30], ["M", 2 ** 20], ["K", 2 ** 10], ["B", 1]] as const) {
+  for (const [suf, m] of [
+    ["GB", 2 ** 30],
+    ["MB", 2 ** 20],
+    ["KB", 2 ** 10],
+    ["G", 2 ** 30],
+    ["M", 2 ** 20],
+    ["K", 2 ** 10],
+    ["B", 1],
+  ] as const) {
     if (s.endsWith(suf)) {
       mult = m;
       s = s.slice(0, -suf.length).trim();

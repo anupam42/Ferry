@@ -2,7 +2,16 @@ import { describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 
-import { dataDir, defaults, inWindow, loadFile, normalize, parseDays, parseWindow, pairFromJSON } from "../src/config.ts";
+import {
+  dataDir,
+  defaults,
+  inWindow,
+  loadFile,
+  normalize,
+  parseDays,
+  parseWindow,
+  pairFromJSON,
+} from "../src/config.ts";
 import { diff } from "../src/difftext.ts";
 import { TarWriter } from "../src/engine/tar.ts";
 import * as gitx from "../src/gitx.ts";
@@ -21,7 +30,9 @@ describe("config", () => {
     fs.mkdirSync(path.join(dir, "a"));
     fs.mkdirSync(path.join(dir, "c"));
     const cfg = path.join(dir, "fs.yaml");
-    fs.writeFileSync(cfg, `
+    fs.writeFileSync(
+      cfg,
+      `
 notify: false
 defaults:
   delete: true
@@ -37,10 +48,11 @@ pairs:
     ignore: ["*.log"]
     max_size: 1.5KB
     auto_commit: {push: true}
-`);
+`,
+    );
     const { pairs, settings } = loadFile(cfg);
     expect(settings.notify).toBe(false);
-    const [one, two] = pairs as [typeof pairs[0], typeof pairs[0]];
+    const [one, two] = pairs as [(typeof pairs)[0], (typeof pairs)[0]];
     expect(one.delete).toBe(true);
     expect(two.delete).toBe(false);
     expect(one.source).toBe(path.join(dir, "a"));
@@ -115,7 +127,10 @@ pairs:
     fs.mkdirSync(path.join(dir, "src", "app"), { recursive: true });
     fs.mkdirSync(path.join(dir, "src", "docs"), { recursive: true });
     const cfg = path.join(dir, "f.yaml");
-    fs.writeFileSync(cfg, "pairs:\n  - name: mono\n    source: src\n    target: repo\n    map: {app: packages/app, docs: docs}\n");
+    fs.writeFileSync(
+      cfg,
+      "pairs:\n  - name: mono\n    source: src\n    target: repo\n    map: {app: packages/app, docs: docs}\n",
+    );
     const { pairs } = loadFile(cfg);
     expect(pairs.map((p) => p.name)).toEqual(["mono/app", "mono/docs"]);
     expect(pairs[0]!.target).toBe(path.join(dir, "repo", "packages", "app"));
@@ -135,7 +150,15 @@ pairs:
   });
 
   test("reads pairs saved by the Go version", () => {
-    const p = pairFromJSON({ Name: "n", Source: "/s", Target: "/t", Mode: "two-way", Settle: 300_000_000, EOL: "lf", AutoCommit: { Enabled: true, Interval: 600_000_000_000, Message: "m", Push: false } })!;
+    const p = pairFromJSON({
+      Name: "n",
+      Source: "/s",
+      Target: "/t",
+      Mode: "two-way",
+      Settle: 300_000_000,
+      EOL: "lf",
+      AutoCommit: { Enabled: true, Interval: 600_000_000_000, Message: "m", Push: false },
+    })!;
     expect(p).toMatchObject({ name: "n", source: "/s", mode: "two-way", settle: 300, eol: "lf" });
     expect(p.autoCommit).toEqual({ enabled: true, interval: 600_000, message: "m", push: false });
   });
@@ -143,7 +166,17 @@ pairs:
 
 describe("ignore", () => {
   test("gitignore semantics", () => {
-    const m = new Matcher("node_modules", "*.log", "!keep.log", "/build", "docs/*.md", "**/tmp/**", "cache/", "a/**/z", "file[0-9].txt");
+    const m = new Matcher(
+      "node_modules",
+      "*.log",
+      "!keep.log",
+      "/build",
+      "docs/*.md",
+      "**/tmp/**",
+      "cache/",
+      "a/**/z",
+      "file[0-9].txt",
+    );
     m.add("sub", ["local.txt", "/only-here"]);
     const cases: [string, boolean, boolean][] = [
       ["node_modules", true, true],
@@ -181,7 +214,8 @@ describe("merge", () => {
     const r = merge3(enc(b), enc(o), enc(t), l);
     return { out: r.data.toString(), n: r.conflicts };
   };
-  test("clean", () => expect(m("a\nb\nc\nd\ne\n", "a\nB\nc\nd\ne\n", "a\nb\nc\nD\ne\n")).toEqual({ out: "a\nB\nc\nD\ne\n", n: 0 }));
+  test("clean", () =>
+    expect(m("a\nb\nc\nd\ne\n", "a\nB\nc\nd\ne\n", "a\nb\nc\nD\ne\n")).toEqual({ out: "a\nB\nc\nD\ne\n", n: 0 }));
   test("same change on both sides", () => expect(m("x\ny\n", "x\nz\n", "x\nz\n")).toEqual({ out: "x\nz\n", n: 0 }));
   test("conflict markers", () => {
     const { out, n } = m("a\nb\nc\n", "a\nours\nc\n", "a\ntheirs\nc\n");

@@ -49,8 +49,20 @@ async function originURL(root: string): Promise<string> {
 
 /** Actions that rewrite files in the work tree: a pair syncing this repository is paused first. */
 const CHANGES_FILES = new Set([
-  "branch-switch", "pull", "merge", "cherry-pick", "revert", "undo", "discard", "stash", "stash-apply",
-  "resolve", "finish", "pr-checkout", "issue-start", "restore",
+  "branch-switch",
+  "pull",
+  "merge",
+  "cherry-pick",
+  "revert",
+  "undo",
+  "discard",
+  "stash",
+  "stash-apply",
+  "resolve",
+  "finish",
+  "pr-checkout",
+  "issue-start",
+  "restore",
 ]);
 
 /** Background remote checks fetch at most this often per repository; force=1 (before a push) always fetches. */
@@ -58,7 +70,10 @@ const REMOTE_CHECK_EVERY_MS = 60_000;
 
 export class GitApi {
   private lastFetch = new Map<string, number>();
-  constructor(private engines: Engine[], private repos: RepoManager | null) {}
+  constructor(
+    private engines: Engine[],
+    private repos: RepoManager | null,
+  ) {}
 
   async list(): Promise<Repo[]> {
     const out = new Map<string, Repo>();
@@ -70,7 +85,13 @@ export class GitApi {
       if (e.cfg.remote || e.cfg.cloud || !fs.existsSync(e.cfg.target)) continue;
       const root = await g.repoRoot(e.cfg.target);
       if (!root) continue;
-      const r = out.get(root) ?? { id: idOf(root), name: path.basename(root), path: root, pairs: [], standalone: false };
+      const r = out.get(root) ?? {
+        id: idOf(root),
+        name: path.basename(root),
+        path: root,
+        pairs: [],
+        standalone: false,
+      };
       r.pairs.push(e.name);
       out.set(root, r);
     }
@@ -118,20 +139,41 @@ export class GitApi {
   private async read(r: Repo, action: string, q: URLSearchParams): Promise<Response> {
     const root = r.path;
     switch (action) {
-      case "state": return json({ ...(await g.state(root)), name: r.name, pairs: r.pairs, standalone: r.standalone });
-      case "log": return json(await g.log(root, { skip: Number(q.get("skip") ?? 0), limit: Number(q.get("limit") ?? 50), ref: q.get("ref") || undefined, all: q.get("all") === "1" }));
-      case "commit": return json(await g.commitDetail(root, q.get("hash")));
-      case "commit-diff": return json(await g.commitFileDiff(root, q.get("hash"), q.get("path")));
-      case "diff": return json(await g.fileDiff(root, q.get("path"), q.get("staged") === "1"));
-      case "conflict": return json(await g.conflictDiff(root, q.get("path")));
-      case "files": return json(await g.trackedFiles(root));
-      case "folder": return json(await g.folderEntries(root, q.get("dir")));
-      case "undo-timeline": return json(await g.undoTimeline(root, Number(q.get("limit") ?? 150)));
-      case "push-check": return json(await g.prePushCheck(root));
-      case "blame": return json(await g.blame(root, q.get("path")));
-      case "file-history": return json(await g.fileHistory(root, q.get("path")));
-      case "search": return json(await g.searchHistory(root, q.get("q"), q.get("mode"), q.get("all") === "1"));
-      case "pr-conversation": return json(await reviews.conversation(root, q.get("number")));
+      case "state":
+        return json({ ...(await g.state(root)), name: r.name, pairs: r.pairs, standalone: r.standalone });
+      case "log":
+        return json(
+          await g.log(root, {
+            skip: Number(q.get("skip") ?? 0),
+            limit: Number(q.get("limit") ?? 50),
+            ref: q.get("ref") || undefined,
+            all: q.get("all") === "1",
+          }),
+        );
+      case "commit":
+        return json(await g.commitDetail(root, q.get("hash")));
+      case "commit-diff":
+        return json(await g.commitFileDiff(root, q.get("hash"), q.get("path")));
+      case "diff":
+        return json(await g.fileDiff(root, q.get("path"), q.get("staged") === "1"));
+      case "conflict":
+        return json(await g.conflictDiff(root, q.get("path")));
+      case "files":
+        return json(await g.trackedFiles(root));
+      case "folder":
+        return json(await g.folderEntries(root, q.get("dir")));
+      case "undo-timeline":
+        return json(await g.undoTimeline(root, Number(q.get("limit") ?? 150)));
+      case "push-check":
+        return json(await g.prePushCheck(root));
+      case "blame":
+        return json(await g.blame(root, q.get("path")));
+      case "file-history":
+        return json(await g.fileHistory(root, q.get("path")));
+      case "search":
+        return json(await g.searchHistory(root, q.get("q"), q.get("mode"), q.get("all") === "1"));
+      case "pr-conversation":
+        return json(await reviews.conversation(root, q.get("number")));
       case "remote-check": {
         const now = Date.now();
         const due = q.get("force") === "1" || now - (this.lastFetch.get(root) ?? 0) >= REMOTE_CHECK_EVERY_MS;
@@ -147,20 +189,32 @@ export class GitApi {
         }
         return json(await g.readFile(root, q.get("path")));
       }
-      case "branches": return json(await g.branches(root));
-      case "stashes": return json(await g.stashes(root));
-      case "tags": return json(await g.tags(root));
-      case "worktrees": return json(await g.worktrees(root));
+      case "branches":
+        return json(await g.branches(root));
+      case "stashes":
+        return json(await g.stashes(root));
+      case "tags":
+        return json(await g.tags(root));
+      case "worktrees":
+        return json(await g.worktrees(root));
       case "prs": {
         // GitHub through gh; GitLab and Azure DevOps through their APIs once connected (glab as a fallback for GitLab)
         const remote = conn.parseRemote(await originURL(root));
-        if (remote.kind === "azure") return json({ provider: "Azure DevOps", items: await conn.azurePullRequests(remote) });
-        if (remote.kind === "gitlab" && conn.status().gitlab.connected) return json({ provider: "GitLab", items: await conn.gitlabMergeRequests(remote) });
+        if (remote.kind === "azure")
+          return json({ provider: "Azure DevOps", items: await conn.azurePullRequests(remote) });
+        if (remote.kind === "gitlab" && conn.status().gitlab.connected)
+          return json({ provider: "GitLab", items: await conn.gitlabMergeRequests(remote) });
         return json(await g.pullRequests(root));
       }
-      case "issues": return json(await conn.jiraMyIssues());
-      case "shape": return json(await shaper.timeline(root, this.engines));
-      case "insights": return json({ ...(await g.insights(root, { author: q.get("author") === "me" ? "me" : "" })), sync: this.syncDays(root) });
+      case "issues":
+        return json(await conn.jiraMyIssues());
+      case "shape":
+        return json(await shaper.timeline(root, this.engines));
+      case "insights":
+        return json({
+          ...(await g.insights(root, { author: q.get("author") === "me" ? "me" : "" })),
+          sync: this.syncDays(root),
+        });
       case "ai-message": {
         const st = await g.state(root);
         const lines = st.files.filter((f) => f.staged).map((f) => `${f.x}  ${f.path}`);
@@ -179,69 +233,138 @@ export class GitApi {
     const paused = CHANGES_FILES.has(action) ? this.pausePairs(root) : [];
     const done = (extra: Record<string, unknown> = {}) => json({ ok: action, paused, ...extra });
     switch (action) {
-      case "stage": await g.stage(root, b.files); return done();
-      case "unstage": await g.unstage(root, b.files); return done();
-      case "stage-lines": return done({ lines: await g.stageLines(root, b.path, b.lines) });
-      case "discard": return done({ discarded: await g.discard(root, b.files) });
-      case "commit": return done({ commit: await g.commit(root, b.message, { amend: b.amend === true, coAuthors: b.co_authors }) });
-      case "undo": return done(await g.undoCommit(root));
-      case "fetch": await g.fetchAll(root); return done();
-      case "pull": return done(await g.pull(root, b.strategy));
-      case "restore": await g.restoreTo(root, b.hash); return done();
-      case "pr-reply": await reviews.reply(root, b.number, b.thread, b.body); return done();
-      case "pr-comment": await reviews.comment(root, b.number, b.subject, b.body); return done();
-      case "pr-resolve": await reviews.resolve(root, b.number, b.thread, b.resolved === true); return done();
-      case "branch-at": return done({ branch: await g.branchAt(root, b.name, b.hash) });
-      case "push": return done({ branch: await g.push(root, b.force === true) });
-      case "branch-create": return done({ branch: await g.createBranch(root, b.name, b.from, b.checkout !== false) });
-      case "branch-switch": return done({ branch: await g.switchBranch(root, b.name) });
-      case "branch-rename": await g.renameBranch(root, b.from, b.to); return done();
-      case "branch-delete": await g.deleteBranch(root, b.name, b.force === true); return done();
-      case "merge": return done(await g.merge(root, b.branch));
-      case "cherry-pick": return done(await g.cherryPick(root, b.hash));
-      case "revert": return done(await g.revert(root, b.hash));
-      case "tag-create": return done({ tag: await g.createTag(root, b.name, b.message, b.at) });
-      case "tag-delete": await g.deleteTag(root, b.name); return done();
-      case "tag-push": await g.pushTags(root, b.name); return done();
-      case "stash": await g.stash(root, b.message); return done();
-      case "stash-apply": await g.stashApply(root, b.ref, b.pop === true); return done();
-      case "stash-drop": await g.stashDrop(root, b.ref); return done();
+      case "stage":
+        await g.stage(root, b.files);
+        return done();
+      case "unstage":
+        await g.unstage(root, b.files);
+        return done();
+      case "stage-lines":
+        return done({ lines: await g.stageLines(root, b.path, b.lines) });
+      case "discard":
+        return done({ discarded: await g.discard(root, b.files) });
+      case "commit":
+        return done({ commit: await g.commit(root, b.message, { amend: b.amend === true, coAuthors: b.co_authors }) });
+      case "undo":
+        return done(await g.undoCommit(root));
+      case "fetch":
+        await g.fetchAll(root);
+        return done();
+      case "pull":
+        return done(await g.pull(root, b.strategy));
+      case "restore":
+        await g.restoreTo(root, b.hash);
+        return done();
+      case "pr-reply":
+        await reviews.reply(root, b.number, b.thread, b.body);
+        return done();
+      case "pr-comment":
+        await reviews.comment(root, b.number, b.subject, b.body);
+        return done();
+      case "pr-resolve":
+        await reviews.resolve(root, b.number, b.thread, b.resolved === true);
+        return done();
+      case "branch-at":
+        return done({ branch: await g.branchAt(root, b.name, b.hash) });
+      case "push":
+        return done({ branch: await g.push(root, b.force === true) });
+      case "branch-create":
+        return done({ branch: await g.createBranch(root, b.name, b.from, b.checkout !== false) });
+      case "branch-switch":
+        return done({ branch: await g.switchBranch(root, b.name) });
+      case "branch-rename":
+        await g.renameBranch(root, b.from, b.to);
+        return done();
+      case "branch-delete":
+        await g.deleteBranch(root, b.name, b.force === true);
+        return done();
+      case "merge":
+        return done(await g.merge(root, b.branch));
+      case "cherry-pick":
+        return done(await g.cherryPick(root, b.hash));
+      case "revert":
+        return done(await g.revert(root, b.hash));
+      case "tag-create":
+        return done({ tag: await g.createTag(root, b.name, b.message, b.at) });
+      case "tag-delete":
+        await g.deleteTag(root, b.name);
+        return done();
+      case "tag-push":
+        await g.pushTags(root, b.name);
+        return done();
+      case "stash":
+        await g.stash(root, b.message);
+        return done();
+      case "stash-apply":
+        await g.stashApply(root, b.ref, b.pop === true);
+        return done();
+      case "stash-drop":
+        await g.stashDrop(root, b.ref);
+        return done();
       case "worktree-add": {
         const dir = await g.addWorktree(root, b.path, b.branch, b.create === true);
         if (b.open === true) this.repos?.add(dir);
         return done({ path: dir });
       }
-      case "worktree-remove": await g.removeWorktree(root, b.path, b.force === true); return done();
-      case "resolve": await g.resolveConflict(root, b.path, b.choice); return done();
-      case "finish": await g.finishOperation(root, b.action === "abort" ? "abort" : "continue"); return done();
+      case "worktree-remove":
+        await g.removeWorktree(root, b.path, b.force === true);
+        return done();
+      case "resolve":
+        await g.resolveConflict(root, b.path, b.choice);
+        return done();
+      case "finish":
+        await g.finishOperation(root, b.action === "abort" ? "abort" : "continue");
+        return done();
       case "pr-checkout": {
         const remote = conn.parseRemote(await originURL(root));
-        if (remote.kind === "github" || (remote.kind === "gitlab" && !conn.status().gitlab.connected)) await g.checkoutPullRequest(root, b.number);
+        if (remote.kind === "github" || (remote.kind === "gitlab" && !conn.status().gitlab.connected))
+          await g.checkoutPullRequest(root, b.number);
         else return done({ branch: await g.checkoutRemoteBranch(root, b.branch) });
         return done();
       }
-      case "shape-diff": return json(await shaper.groupDiff(root, this.engines, b));
+      case "shape-diff":
+        return json(await shaper.groupDiff(root, this.engines, b));
       case "shape-message": {
         // a message for one group of syncs, from what it changed
         const t = await shaper.timeline(root, this.engines);
         const ids = new Set(Array.isArray(b.batches) ? (b.batches as unknown[]).map(String) : []);
-        const files = [...new Map(t.batches.filter((x) => ids.has(x.id)).flatMap((x) => x.files).map((f) => [f.path, f])).values()];
+        const files = [
+          ...new Map(
+            t.batches
+              .filter((x) => ids.has(x.id))
+              .flatMap((x) => x.files)
+              .map((f) => [f.path, f]),
+          ).values(),
+        ];
         if (!files.length) throw new g.GitClientError("that step isn't in the timeline any more", "stale");
         let diff = "";
         for (const f of files.slice(0, 20)) {
           const d = await shaper.groupDiff(root, this.engines, { batches: [...ids], path: f.path });
-          diff += `--- ${f.path}\n` + d.lines.slice(0, 120).map((l) => (l.op === "@" ? "@@ " : l.op) + l.text).join("\n") + "\n";
+          diff +=
+            `--- ${f.path}\n` +
+            d.lines
+              .slice(0, 120)
+              .map((l) => (l.op === "@" ? "@@ " : l.op) + l.text)
+              .join("\n") +
+            "\n";
           if (diff.length > 40_000) break;
         }
-        const { msg, error } = await ai.tryCommitMessage(files.map((f) => `${f.op === "add" ? "A" : f.op === "delete" ? "D" : "M"}  ${f.path}`), diff);
+        const { msg, error } = await ai.tryCommitMessage(
+          files.map((f) => `${f.op === "add" ? "A" : f.op === "delete" ? "D" : "M"}  ${f.path}`),
+          diff,
+        );
         if (msg === null) throw new g.GitClientError(error, "ai");
         return done({ message: msg });
       }
-      case "shape-commit": return done(await shaper.shape(root, this.engines, b));
+      case "shape-commit":
+        return done(await shaper.shape(root, this.engines, b));
       case "issue-start": {
         // a branch named after the issue, and (if asked) the issue moved to "in progress"
         const key = String(b.key ?? "");
-        const name = typeof b.branch === "string" && b.branch.trim() ? b.branch : conn.branchForIssue(key, String(b.summary ?? ""));
+        const name =
+          typeof b.branch === "string" && b.branch.trim()
+            ? b.branch
+            : conn.branchForIssue(key, String(b.summary ?? ""));
         const branch = await g.createBranch(root, name, "", true);
         const moved = b.transition === true ? await conn.jiraStartProgress(key).catch((e) => "!" + errMsg(e)) : "";
         return done({ branch, moved });

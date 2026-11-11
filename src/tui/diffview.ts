@@ -25,13 +25,35 @@ const pyLike = words(
     "lambda yield pass break continue and or not in is None True False global nonlocal async await self " +
     "then fi do done case esac function local export echo",
 );
-const sql = words("select from where insert into update delete create table drop alter join left right inner outer on group by order having limit values set and or not null as");
+const sql = words(
+  "select from where insert into update delete create table drop alter join left right inner outer on group by order having limit values set and or not null as",
+);
 
 const languages: Record<string, Language> = {};
-for (const ext of [".go", ".js", ".jsx", ".ts", ".tsx", ".java", ".kt", ".c", ".h", ".cpp", ".cc", ".hpp", ".cs", ".rs", ".swift", ".php", ".scala", ".dart"]) {
+for (const ext of [
+  ".go",
+  ".js",
+  ".jsx",
+  ".ts",
+  ".tsx",
+  ".java",
+  ".kt",
+  ".c",
+  ".h",
+  ".cpp",
+  ".cc",
+  ".hpp",
+  ".cs",
+  ".rs",
+  ".swift",
+  ".php",
+  ".scala",
+  ".dart",
+]) {
   languages[ext] = { comment: "//", keywords: cLike };
 }
-for (const ext of [".py", ".rb", ".sh", ".bash", ".zsh", ".ps1", ".r"]) languages[ext] = { comment: "#", keywords: pyLike };
+for (const ext of [".py", ".rb", ".sh", ".bash", ".zsh", ".ps1", ".r"])
+  languages[ext] = { comment: "#", keywords: pyLike };
 for (const ext of [".yaml", ".yml", ".toml"]) languages[ext] = { comment: "#", keywords: null };
 languages[".sql"] = { comment: "--", keywords: sql };
 languages[".lua"] = { comment: "--", keywords: cLike };
@@ -60,7 +82,8 @@ function commentStart(s: string, marker: string): number {
 function highlight(text: string, lang: Language | null, base: Style): string {
   const t = theme();
   if (!lang || t.name === "mono") return base.render(text);
-  let code = text, comment = "";
+  let code = text,
+    comment = "";
   if (lang.comment) {
     const i = commentStart(text, lang.comment);
     if (i >= 0) [code, comment] = [text.slice(0, i), text.slice(i)];
@@ -68,7 +91,8 @@ function highlight(text: string, lang: Language | null, base: Style): string {
   const kw = new Style({ fg: t.purple, bold: true });
   const str = new Style({ fg: t.yellow });
   const num = new Style({ fg: t.cyan });
-  let out = "", last = 0;
+  let out = "",
+    last = 0;
   for (const m of code.matchAll(reToken)) {
     const tok = m[0];
     const c = tok[0]!;
@@ -92,7 +116,10 @@ export function renderDiff(lines: Line[], file: string, sideBySide: boolean, wid
   const t = theme();
   if (lines.length === 0) return t.muted.render("no differences");
   const lang = langFor(file);
-  const add = new Style({ fg: t.green }), del = new Style({ fg: t.red }), hunk = new Style({ fg: t.cyan }), plain = new Style();
+  const add = new Style({ fg: t.green }),
+    del = new Style({ fg: t.red }),
+    hunk = new Style({ fg: t.cyan }),
+    plain = new Style();
   if (sideBySide) return renderSideBySide(lines, lang, width, add, del, hunk, plain);
   const out: string[] = [];
   for (const l of lines) {
@@ -105,13 +132,22 @@ export function renderDiff(lines: Line[], file: string, sideBySide: boolean, wid
   return out.join("\n");
 }
 
-function renderSideBySide(lines: Line[], lang: Language | null, width: number, add: Style, del: Style, hunk: Style, plain: Style): string {
+function renderSideBySide(
+  lines: Line[],
+  lang: Language | null,
+  width: number,
+  add: Style,
+  del: Style,
+  hunk: Style,
+  plain: Style,
+): string {
   const col = Math.max(10, Math.floor((width - 3) / 2));
   const sep = theme().muted.render(" │ ");
   const cell = (text: string, st: Style) => fit(highlight(expandTabs(text), lang, st), col);
   const blank = " ".repeat(col);
   const out: string[] = [];
-  let dels: string[] = [], adds: string[] = [];
+  let dels: string[] = [],
+    adds: string[] = [];
   const flush = () => {
     for (let i = 0; i < dels.length || i < adds.length; i++) {
       const left = i < dels.length ? cell(dels[i]!, del) : blank;

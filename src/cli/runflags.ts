@@ -2,7 +2,16 @@
 // plus a config file into pairs.
 import fs from "node:fs";
 
-import { checkOverlaps, defaults, expandTargets, loadFile, normalize, emptySettings, type Pair, type Settings } from "../config.ts";
+import {
+  checkOverlaps,
+  defaults,
+  expandTargets,
+  loadFile,
+  normalize,
+  emptySettings,
+  type Pair,
+  type Settings,
+} from "../config.ts";
 import { ExitError, parseDuration, parseSize } from "../util.ts";
 import { usage } from "./usage.ts";
 import { FlagSet } from "./flags.ts";
@@ -16,7 +25,11 @@ export function newRunFlags(name = "run"): FlagSet {
     .bool("two-way", false, "shorthand for --mode two-way")
     .bool("delete", false, "shorthand for --on-delete propagate")
     .string("on-delete", "keep", "file deleted on one side: keep | restore (two-way) | propagate")
-    .string("headless-conflict", d.headlessConflict, "conflicts when nobody can be asked: hold | keep-both | source | target | newer")
+    .string(
+      "headless-conflict",
+      d.headlessConflict,
+      "conflicts when nobody can be asked: hold | keep-both | source | target | newer",
+    )
     .bool("mirror", false, "on start, delete target files that aren't in source (asks first)")
     .bool("yes", false, "don't ask for confirmation (mirror)")
     .string("conflict", d.conflict, "two-way conflicts: ask | hold | source | target | newer | keep-both")
@@ -26,7 +39,11 @@ export function newRunFlags(name = "run"): FlagSet {
     .bool("no-gitignore", false, "don't read .gitignore files")
     .bool("no-default-ignores", false, "don't apply the built-in ignore list")
     .string("branch", "", "switch to (or create) this branch in the target first")
-    .string("auto-commit", "", "enable auto-commit with this message template ({summary} {count} {files} {source} {datetime})")
+    .string(
+      "auto-commit",
+      "",
+      "enable auto-commit with this message template ({summary} {count} {files} {source} {datetime})",
+    )
     .duration("auto-commit-interval", d.autoCommit.interval, "auto-commit interval")
     .bool("push", false, "push after auto-commit")
     .bool("pull-rebase", false, "pull --rebase before pushing")
@@ -43,7 +60,10 @@ export function newRunFlags(name = "run"): FlagSet {
     .bool("lfs", false, "track large and binary files with git LFS instead of skipping them")
     .string("secrets", d.secrets, "files that look like credentials: warn | block | redact (one-way) | off")
     .multi("secret-allow", "glob never flagged as a secret (repeatable)")
-    .multi("transform", 'pipe matching files through a command on the way to the target: "GLOB=CMD" (repeatable, one-way)')
+    .multi(
+      "transform",
+      'pipe matching files through a command on the way to the target: "GLOB=CMD" (repeatable, one-way)',
+    )
     .string("eol", d.eol, "line endings of text files written to the target: keep | lf | crlf")
     .string("symlinks", d.symlinks, "skip | follow | link")
     .int("batch-limit", d.batchLimit, "batches bigger than this wait for activity to settle")
@@ -82,68 +102,157 @@ export function applyFlags(f: FlagSet, p: Pair): void {
   const b = (n: string) => f.getBool(n);
   for (const name of f.setFlags()) {
     switch (name) {
-      case "mode": p.mode = s(name); break;
-      case "two-way": if (b(name)) p.mode = "two-way"; break;
+      case "mode":
+        p.mode = s(name);
+        break;
+      case "two-way":
+        if (b(name)) p.mode = "two-way";
+        break;
       case "delete":
         p.delete = b(name);
         if (p.delete) p.onDelete = "propagate";
         else if (p.onDelete === "propagate") p.onDelete = "keep";
         break;
-      case "on-delete": p.onDelete = s(name); break;
-      case "headless-conflict": p.headlessConflict = s(name); break;
-      case "mirror": p.mirror = b(name); break;
-      case "conflict": p.conflict = s(name); break;
-      case "merge": p.merge = b(name); break;
-      case "ignore": p.ignore = [...p.ignore, ...f.getMulti(name)]; break;
-      case "only": p.only = [...f.getMulti(name)]; break;
-      case "no-gitignore": p.useGitignore = !b(name); break;
-      case "no-default-ignores": p.defaultIgnores = !b(name); break;
-      case "branch": p.branch = s(name); break;
+      case "on-delete":
+        p.onDelete = s(name);
+        break;
+      case "headless-conflict":
+        p.headlessConflict = s(name);
+        break;
+      case "mirror":
+        p.mirror = b(name);
+        break;
+      case "conflict":
+        p.conflict = s(name);
+        break;
+      case "merge":
+        p.merge = b(name);
+        break;
+      case "ignore":
+        p.ignore = [...p.ignore, ...f.getMulti(name)];
+        break;
+      case "only":
+        p.only = [...f.getMulti(name)];
+        break;
+      case "no-gitignore":
+        p.useGitignore = !b(name);
+        break;
+      case "no-default-ignores":
+        p.defaultIgnores = !b(name);
+        break;
+      case "branch":
+        p.branch = s(name);
+        break;
       case "auto-commit":
         p.autoCommit.enabled = true;
         p.autoCommit.message = s(name);
         break;
-      case "auto-commit-interval": p.autoCommit.interval = f.getDuration(name); break;
-      case "push": p.autoCommit.push = b(name); break;
-      case "pull-rebase": p.pullRebase = b(name); break;
-      case "pr": p.pr = b(name); break;
-      case "pr-base": p.prBase = s(name); break;
-      case "before-commit": p.beforeCommit = s(name); break;
-      case "sign": p.signCommits = b(name); break;
-      case "author": p.commitAuthor = s(name); break;
-      case "check-upstream": p.checkUpstream = f.getDuration(name); break;
-      case "auto-pull": p.autoPull = b(name); break;
-      case "no-guard": p.gitGuard = !b(name); break;
-      case "max-size": p.maxSize = parseSize(s(name)); break;
-      case "binary": p.binary = s(name); break;
-      case "lfs": p.lfs = b(name); break;
-      case "secrets": p.secrets = s(name); break;
-      case "secret-allow": p.secretAllow = [...p.secretAllow, ...f.getMulti(name)]; break;
+      case "auto-commit-interval":
+        p.autoCommit.interval = f.getDuration(name);
+        break;
+      case "push":
+        p.autoCommit.push = b(name);
+        break;
+      case "pull-rebase":
+        p.pullRebase = b(name);
+        break;
+      case "pr":
+        p.pr = b(name);
+        break;
+      case "pr-base":
+        p.prBase = s(name);
+        break;
+      case "before-commit":
+        p.beforeCommit = s(name);
+        break;
+      case "sign":
+        p.signCommits = b(name);
+        break;
+      case "author":
+        p.commitAuthor = s(name);
+        break;
+      case "check-upstream":
+        p.checkUpstream = f.getDuration(name);
+        break;
+      case "auto-pull":
+        p.autoPull = b(name);
+        break;
+      case "no-guard":
+        p.gitGuard = !b(name);
+        break;
+      case "max-size":
+        p.maxSize = parseSize(s(name));
+        break;
+      case "binary":
+        p.binary = s(name);
+        break;
+      case "lfs":
+        p.lfs = b(name);
+        break;
+      case "secrets":
+        p.secrets = s(name);
+        break;
+      case "secret-allow":
+        p.secretAllow = [...p.secretAllow, ...f.getMulti(name)];
+        break;
       case "transform": {
         p.transform = { ...(p.transform ?? {}) };
         for (const t of f.getMulti(name)) {
           const i = t.indexOf("=");
-          if (i <= 0 || i === t.length - 1) throw new Error(`--transform "${t}": expected GLOB=COMMAND, e.g. "*.ts=prettier --stdin-filepath {path}"`);
+          if (i <= 0 || i === t.length - 1)
+            throw new Error(`--transform "${t}": expected GLOB=COMMAND, e.g. "*.ts=prettier --stdin-filepath {path}"`);
           p.transform[t.slice(0, i).trim()] = t.slice(i + 1).trim();
         }
         break;
       }
-      case "eol": p.eol = s(name); break;
-      case "symlinks": p.symlinks = s(name); break;
-      case "batch-limit": p.batchLimit = f.getInt(name); break;
-      case "batch-action": p.batchAction = s(name); break;
-      case "batch-settle": p.batchSettle = f.getDuration(name); break;
-      case "max-ops": p.maxOpsPerSec = f.getInt(name); break;
-      case "backups": p.backups = f.getInt(name); break;
-      case "backup-max-age": p.backupMaxAge = parseDuration(s(name)); break;
-      case "backup-max-size": p.backupMaxSize = parseSize(s(name)); break;
-      case "trash": p.trash = b(name); break;
-      case "watcher": p.watcher = s(name); break;
-      case "interval": p.interval = f.getDuration(name); break;
-      case "settle": p.settle = f.getDuration(name); break;
-      case "every": p.every = parseDuration(s(name)); break;
-      case "window": p.window = s(name); break;
-      case "days": p.days = s(name).split(","); break;
+      case "eol":
+        p.eol = s(name);
+        break;
+      case "symlinks":
+        p.symlinks = s(name);
+        break;
+      case "batch-limit":
+        p.batchLimit = f.getInt(name);
+        break;
+      case "batch-action":
+        p.batchAction = s(name);
+        break;
+      case "batch-settle":
+        p.batchSettle = f.getDuration(name);
+        break;
+      case "max-ops":
+        p.maxOpsPerSec = f.getInt(name);
+        break;
+      case "backups":
+        p.backups = f.getInt(name);
+        break;
+      case "backup-max-age":
+        p.backupMaxAge = parseDuration(s(name));
+        break;
+      case "backup-max-size":
+        p.backupMaxSize = parseSize(s(name));
+        break;
+      case "trash":
+        p.trash = b(name);
+        break;
+      case "watcher":
+        p.watcher = s(name);
+        break;
+      case "interval":
+        p.interval = f.getDuration(name);
+        break;
+      case "settle":
+        p.settle = f.getDuration(name);
+        break;
+      case "every":
+        p.every = parseDuration(s(name));
+        break;
+      case "window":
+        p.window = s(name);
+        break;
+      case "days":
+        p.days = s(name).split(",");
+        break;
     }
   }
   p.dryRun = f.getBool("dry-run");

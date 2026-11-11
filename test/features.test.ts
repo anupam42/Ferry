@@ -8,7 +8,14 @@ import path from "node:path";
 import { ApiServer, type PairManager } from "../src/api.ts";
 import * as cloud from "../src/cloud.ts";
 import {
-  appendPairToFile, dataDir, defaults, expandTargets, loadFile, normalize, pairsFromObject, removePairFromFile,
+  appendPairToFile,
+  dataDir,
+  defaults,
+  expandTargets,
+  loadFile,
+  normalize,
+  pairsFromObject,
+  removePairFromFile,
 } from "../src/config.ts";
 import { Engine, runTransform } from "../src/engine/engine.ts";
 import { history, restoreTo, stats } from "../src/engine/journal.ts";
@@ -134,7 +141,10 @@ describe("secrets: redact", () => {
     expect(env.data.toString()).toBe("# comment\nAPI_KEY=<REDACTED:value>\nEMPTY=\nexport TOKEN=<REDACTED:value>\n");
     expect(env.count).toBe(2);
 
-    const code = redactSecrets("config.ts", Buffer.from(`const k = "AKIAABCDEFGHIJKLMNOP";\nconst password = "hunter2hunter2";\n`));
+    const code = redactSecrets(
+      "config.ts",
+      Buffer.from(`const k = "AKIAABCDEFGHIJKLMNOP";\nconst password = "hunter2hunter2";\n`),
+    );
     const out = code.data.toString();
     expect(out).toContain("<REDACTED:aws-key>");
     expect(out).toContain(`password = "<REDACTED:secret>"`);
@@ -280,7 +290,11 @@ describe("web app API", () => {
     const api = new ApiServer(engines, "", { version: "9.9", manager });
     const call = (p: string, init?: RequestInit) => api.handle(new Request("http://127.0.0.1:7878" + p, init));
     const post = (p: string, body?: unknown) =>
-      call(p, { method: "POST", headers: { "X-Ferry": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
+      call(p, {
+        method: "POST",
+        headers: { "X-Ferry": "1" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
 
     const page = await call("/");
     expect(page.headers.get("Content-Type")).toContain("text/html");
@@ -292,7 +306,10 @@ describe("web app API", () => {
     expect(await (await call(`/pairs/${name}/stats?since=all`)).json()).toMatchObject({ batches: 1, added: 1 });
     expect((await call(`/pairs/${name}/stats?since=bogus`)).status).toBe(400);
     expect(await (await post(`/pairs/${name}/ignore`, { path: "a.txt" })).json()).toMatchObject({ rule: "/a.txt" });
-    expect(await (await post(`/pairs/${name}/restore`, { at: "1h ago", dry_run: true })).json()).toMatchObject({ batches: 1, files: ["a.txt"] });
+    expect(await (await post(`/pairs/${name}/restore`, { at: "1h ago", dry_run: true })).json()).toMatchObject({
+      batches: 1,
+      files: ["a.txt"],
+    });
     expect((await post(`/pairs/${name}/restore`, { at: "in a bit" })).status).toBe(400);
 
     expect((await post("/pairs", { source: "/x", target: "/y" })).status).toBe(200);
@@ -305,20 +322,38 @@ describe("web app API", () => {
     fs.mkdirSync(path.join(dir, "child"));
     fs.mkdirSync(path.join(dir, ".hidden"));
     fs.writeFileSync(path.join(dir, "file.txt"), "");
-    expect(((await (await call("/fs?path=" + encodeURIComponent(dir))).json()) as { dirs: string[] }).dirs).toEqual(["child"]);
+    expect(((await (await call("/fs?path=" + encodeURIComponent(dir))).json()) as { dirs: string[] }).dirs).toEqual([
+      "child",
+    ]);
 
     // without a manager, adding is refused
     const plain = new ApiServer(engines, "");
-    expect((await plain.handle(new Request("http://127.0.0.1/pairs", { method: "POST", headers: { "X-Ferry": "1" }, body: "{}" }))).status).toBe(405);
+    expect(
+      (
+        await plain.handle(
+          new Request("http://127.0.0.1/pairs", { method: "POST", headers: { "X-Ferry": "1" }, body: "{}" }),
+        )
+      ).status,
+    ).toBe(405);
   });
 
   test("pairsFromObject validates like a config file; config files are edited in place", () => {
     const dir = tempDir();
     fs.mkdirSync(path.join(dir, "a"));
-    const ps = pairsFromObject({ name: "w", source: path.join(dir, "a"), target: path.join(dir, "b"), mode: "two-way", merge: true });
+    const ps = pairsFromObject({
+      name: "w",
+      source: path.join(dir, "a"),
+      target: path.join(dir, "b"),
+      mode: "two-way",
+      merge: true,
+    });
     expect(ps[0]!).toMatchObject({ name: "w", mode: "two-way", merge: true });
-    expect(() => pairsFromObject({ source: path.join(dir, "a"), target: path.join(dir, "b"), mode: "sideways" })).toThrow(/mode/);
-    expect(() => pairsFromObject({ source: path.join(dir, "missing"), target: path.join(dir, "b") })).toThrow(/not a folder/);
+    expect(() =>
+      pairsFromObject({ source: path.join(dir, "a"), target: path.join(dir, "b"), mode: "sideways" }),
+    ).toThrow(/mode/);
+    expect(() => pairsFromObject({ source: path.join(dir, "missing"), target: path.join(dir, "b") })).toThrow(
+      /not a folder/,
+    );
 
     const cfg = path.join(dir, "ferry.yaml");
     fs.writeFileSync(cfg, "# keep me\nnotify: false\npairs:\n  - name: old\n    source: a\n    target: b\n");
@@ -337,7 +372,10 @@ describe("web app config repairs", () => {
     const dir = tempDir();
     for (const d of ["src", "src/sub", "dst"]) fs.mkdirSync(path.join(dir, d), { recursive: true });
     const cfg = path.join(dir, "ui.yaml");
-    fs.writeFileSync(cfg, `pairs:\n  - source: ${path.join(dir, "src")}\n    target: ./dst\n  - source: ./src/sub\n    target: ${path.join(dir, "dst")}\n`);
+    fs.writeFileSync(
+      cfg,
+      `pairs:\n  - source: ${path.join(dir, "src")}\n    target: ./dst\n  - source: ./src/sub\n    target: ${path.join(dir, "dst")}\n`,
+    );
     const { pairs, dropped } = loadFile(cfg, { lenient: true });
     // the later entry wins the clash over the shared target
     expect(pairs.map((p) => p.source)).toEqual([path.join(dir, "src/sub")]);
@@ -410,8 +448,13 @@ describe("web app redesign", () => {
       expect(r.headers.get("Content-Type")).toBe("image/svg+xml");
     }
     expect((await get("/mascot/../../etc/passwd.svg")).status).toBe(404);
-    const j = (await (await get(`/pairs/${encodeURIComponent(e.name)}/diff?format=json&path=a.txt&conflict=1`)).json()) as {
-      kind: string; before: string; after: string; lines: { op: string }[];
+    const j = (await (
+      await get(`/pairs/${encodeURIComponent(e.name)}/diff?format=json&path=a.txt&conflict=1`)
+    ).json()) as {
+      kind: string;
+      before: string;
+      after: string;
+      lines: { op: string }[];
     };
     expect(j.kind).toBe("sides");
     expect(j.before).toBe("In the target");
@@ -450,7 +493,13 @@ describe("targets inside a bigger repository", () => {
 describe("notifications", () => {
   test("the server keeps recent notable events, skipping per-file noise, up to a limit", async () => {
     const api = new ApiServer([], "");
-    const ev = (kind: string, i: number) => ({ time: Date.now() + i, pair: "p", kind: kind as never, path: "f" + i, msg: "m" + i });
+    const ev = (kind: string, i: number) => ({
+      time: Date.now() + i,
+      pair: "p",
+      kind: kind as never,
+      path: "f" + i,
+      msg: "m" + i,
+    });
     api.broadcast(ev("add", 0)); // a single copied file: summed up by "synced", not kept
     api.broadcast(ev("conflict", 1));
     api.broadcast(ev("synced", 2));

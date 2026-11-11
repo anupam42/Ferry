@@ -36,7 +36,10 @@ export default ts.config(
   {
     rules: {
       // `_` marks a value that's deliberately unused (a skipped tuple slot, a required parameter)
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none" }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none" },
+      ],
       // `catch {}` is how an expected, harmless failure is ignored (a file that may not exist); other empty blocks are still flagged
       "no-empty": ["error", { allowEmptyCatch: true }],
       // {"a\nb"} is how an attribute gets a real newline

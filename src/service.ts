@@ -24,7 +24,19 @@ async function runCmd(...cmd: string[]): Promise<string> {
 }
 
 function runArgs(cfg: string): string[] {
-  return [...selfCommand(), "run", "--config", cfg, "--ui", "plain", "--no-color", "--log", logPath(), "--pidfile", pidPath()];
+  return [
+    ...selfCommand(),
+    "run",
+    "--config",
+    cfg,
+    "--ui",
+    "plain",
+    "--no-color",
+    "--log",
+    logPath(),
+    "--pidfile",
+    pidPath(),
+  ];
 }
 
 const userConfigDir = () => process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
@@ -46,7 +58,9 @@ export async function install(cfg: string): Promise<string> {
     case "linux": {
       const p = unitFile();
       fs.mkdirSync(path.dirname(p), { recursive: true });
-      fs.writeFileSync(p, `[Unit]
+      fs.writeFileSync(
+        p,
+        `[Unit]
 Description=ferry - mirror folders into git repos
 After=default.target
 
@@ -58,7 +72,8 @@ RestartSec=5
 
 [Install]
 WantedBy=default.target
-`);
+`,
+      );
       await runCmd("systemctl", "--user", "daemon-reload");
       await runCmd("systemctl", "--user", "enable", "--now", UNIT);
       return p;
@@ -67,7 +82,9 @@ WantedBy=default.target
       const p = plistFile();
       fs.mkdirSync(path.dirname(p), { recursive: true });
       const argXML = args.map((a) => `    <string>${xmlEscape(a)}</string>\n`).join("");
-      fs.writeFileSync(p, `<?xml version="1.0" encoding="UTF-8"?>
+      fs.writeFileSync(
+        p,
+        `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -81,7 +98,8 @@ ${argXML}  </array>
   <key>StandardErrorPath</key><string>${xmlEscape(logPath() + ".stderr")}</string>
 </dict>
 </plist>
-`);
+`,
+      );
       await exec(["launchctl", "unload", p]);
       await runCmd("launchctl", "load", "-w", p);
       return p;
@@ -91,7 +109,19 @@ ${argXML}  </array>
       const vbs = vbsFile();
       const q = args.map((a) => `""${a}""`).join(" ");
       fs.writeFileSync(vbs, `CreateObject("WScript.Shell").Run "${q}", 0, False\r\n`);
-      await runCmd("schtasks", "/Create", "/TN", TASK, "/TR", `wscript.exe "${vbs}"`, "/SC", "ONLOGON", "/RL", "LIMITED", "/F");
+      await runCmd(
+        "schtasks",
+        "/Create",
+        "/TN",
+        TASK,
+        "/TR",
+        `wscript.exe "${vbs}"`,
+        "/SC",
+        "ONLOGON",
+        "/RL",
+        "LIMITED",
+        "/F",
+      );
       await runCmd("schtasks", "/Run", "/TN", TASK);
       return vbs;
     }

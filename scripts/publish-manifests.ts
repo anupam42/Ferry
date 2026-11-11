@@ -16,10 +16,14 @@ process.chdir(path.join(import.meta.dir, ".."));
 const version = (process.env.VERSION ?? "").replace(/^v/, "");
 if (!version) throw new Error("set VERSION");
 const sums = new Map(
-  fs.readFileSync("dist/checksums.txt", "utf8").trim().split("\n").map((l) => {
-    const [h, f] = l.split(/\s+/);
-    return [f!, h!] as const;
-  }),
+  fs
+    .readFileSync("dist/checksums.txt", "utf8")
+    .trim()
+    .split("\n")
+    .map((l) => {
+      const [h, f] = l.split(/\s+/);
+      return [f!, h!] as const;
+    }),
 );
 const asset = (osName: string, arch: string) => {
   const file = `ferry_${version}_${osName}_${arch}.${osName === "windows" ? "zip" : "tar.gz"}`;
@@ -110,7 +114,17 @@ async function publish(repo: string, token: string | undefined, file: string, de
   fs.mkdirSync(path.dirname(path.join(dir, dest)), { recursive: true });
   fs.copyFileSync(file, path.join(dir, dest));
   await git(dir, "add", "--", dest);
-  await git(dir, "-c", "user.name=ferry-release", "-c", "user.email=ferry-release@users.noreply.github.com", "commit", "-m", `ferry ${version}`, "--allow-empty");
+  await git(
+    dir,
+    "-c",
+    "user.name=ferry-release",
+    "-c",
+    "user.email=ferry-release@users.noreply.github.com",
+    "commit",
+    "-m",
+    `ferry ${version}`,
+    "--allow-empty",
+  );
   await git(dir, "push");
   console.log(`updated ${OWNER}/${repo}/${dest}`);
 }

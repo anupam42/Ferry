@@ -5,10 +5,17 @@ import path from "node:path";
 const SCAN_MAX = 2 << 20; // only the first 2MB of a file are scanned
 
 const secretFileNames: Record<string, string> = {
-  id_rsa: "SSH private key", id_dsa: "SSH private key", id_ecdsa: "SSH private key",
-  id_ed25519: "SSH private key", ".pgpass": "PostgreSQL password file", ".netrc": "netrc credentials",
-  "credentials.json": "credentials file", "service-account.json": "service account key",
-  ".htpasswd": "password file", "secrets.yml": "secrets file", "secrets.yaml": "secrets file",
+  id_rsa: "SSH private key",
+  id_dsa: "SSH private key",
+  id_ecdsa: "SSH private key",
+  id_ed25519: "SSH private key",
+  ".pgpass": "PostgreSQL password file",
+  ".netrc": "netrc credentials",
+  "credentials.json": "credentials file",
+  "service-account.json": "service account key",
+  ".htpasswd": "password file",
+  "secrets.yml": "secrets file",
+  "secrets.yaml": "secrets file",
 };
 
 const secretExts = [".pem", ".key", ".p12", ".pfx", ".keystore", ".jks", ".ppk", ".kdbx"];

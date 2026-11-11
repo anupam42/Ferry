@@ -6,7 +6,9 @@
 
 // ---------- GitHub (gh) ----------
 
-export interface GhUser { login: string }
+export interface GhUser {
+  login: string;
+}
 
 /** One check on a pull request (a check run, or an older commit status). */
 export interface GhCheck {
@@ -56,7 +58,9 @@ export interface GhConversation {
         headRefName: string;
         baseRefName: string;
         comments: { nodes: GhComment[] };
-        reviews: { nodes: { author?: GhUser | null; state: string; body?: string | null; submittedAt?: string | null }[] };
+        reviews: {
+          nodes: { author?: GhUser | null; state: string; body?: string | null; submittedAt?: string | null }[];
+        };
         reviewThreads: {
           nodes: {
             id: string;
@@ -76,11 +80,16 @@ export interface GhConversation {
 }
 
 /** Any GraphQL answer, for its errors. */
-export interface GhGraphQLResult { errors?: { message?: string }[] }
+export interface GhGraphQLResult {
+  errors?: { message?: string }[];
+}
 
 // ---------- GitLab ----------
 
-export interface GlUser { username: string; name?: string }
+export interface GlUser {
+  username: string;
+  name?: string;
+}
 
 export interface GlMergeRequest {
   iid: number;
@@ -95,9 +104,15 @@ export interface GlMergeRequest {
   updated_at: string;
 }
 
-export interface GlPipeline { id: number; status: string; web_url?: string | null }
+export interface GlPipeline {
+  id: number;
+  status: string;
+  web_url?: string | null;
+}
 
-export interface GlApprovals { approved?: boolean }
+export interface GlApprovals {
+  approved?: boolean;
+}
 
 export interface GlNote {
   id: number;
@@ -107,14 +122,24 @@ export interface GlNote {
   system?: boolean;
   resolvable?: boolean;
   resolved?: boolean;
-  position?: { new_path?: string | null; old_path?: string | null; new_line?: number | null; old_line?: number | null } | null;
+  position?: {
+    new_path?: string | null;
+    old_path?: string | null;
+    new_line?: number | null;
+    old_line?: number | null;
+  } | null;
 }
 
-export interface GlDiscussion { id: string; notes?: GlNote[] }
+export interface GlDiscussion {
+  id: string;
+  notes?: GlNote[];
+}
 
 // ---------- Azure DevOps ----------
 
-export interface AzIdentity { displayName?: string }
+export interface AzIdentity {
+  displayName?: string;
+}
 
 export interface AzPullRequest {
   pullRequestId: number;
@@ -137,18 +162,31 @@ export interface AzStatus {
   context?: { genre?: string; name?: string } | null;
 }
 
-export interface AzComment { id: number; content?: string | null; author?: AzIdentity | null; publishedDate: string; commentType?: string; isDeleted?: boolean }
+export interface AzComment {
+  id: number;
+  content?: string | null;
+  author?: AzIdentity | null;
+  publishedDate: string;
+  commentType?: string;
+  isDeleted?: boolean;
+}
 
 export interface AzThread {
   id: number;
   status?: string;
   isDeleted?: boolean;
   comments?: AzComment[];
-  threadContext?: { filePath?: string; rightFileStart?: { line: number } | null; leftFileStart?: { line: number } | null } | null;
+  threadContext?: {
+    filePath?: string;
+    rightFileStart?: { line: number } | null;
+    leftFileStart?: { line: number } | null;
+  } | null;
 }
 
 /** Azure DevOps wraps lists. */
-export interface AzList<T> { value: T[] }
+export interface AzList<T> {
+  value: T[];
+}
 
 // ---------- Jira ----------
 

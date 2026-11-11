@@ -21,14 +21,35 @@ afterAll(() => {
 
 const repos = { list: () => [], add() {}, remove() {} };
 const post = (api: ApiServer, body: unknown) =>
-  api.handle(new Request("http://127.0.0.1/settings/git", { method: "POST", headers: { "X-Ferry": "1" }, body: JSON.stringify(body) }));
+  api.handle(
+    new Request("http://127.0.0.1/settings/git", {
+      method: "POST",
+      headers: { "X-Ferry": "1" },
+      body: JSON.stringify(body),
+    }),
+  );
 
 test("reads and saves your git identity and defaults", async () => {
   const api = new ApiServer([], "", { repos });
-  const res = await post(api, { name: "Anupam Udupi", email: "anupam@example.com", default_branch: "main", pull: "rebase", sign: true });
+  const res = await post(api, {
+    name: "Anupam Udupi",
+    email: "anupam@example.com",
+    default_branch: "main",
+    pull: "rebase",
+    sign: true,
+  });
   expect(res.status).toBe(200);
-  const got = (await (await api.handle(new Request("http://127.0.0.1/settings"))).json()) as { git: Record<string, unknown>; data_dir: string };
-  expect(got.git).toEqual({ name: "Anupam Udupi", email: "anupam@example.com", default_branch: "main", pull: "rebase", sign: true });
+  const got = (await (await api.handle(new Request("http://127.0.0.1/settings"))).json()) as {
+    git: Record<string, unknown>;
+    data_dir: string;
+  };
+  expect(got.git).toEqual({
+    name: "Anupam Udupi",
+    email: "anupam@example.com",
+    default_branch: "main",
+    pull: "rebase",
+    sign: true,
+  });
   expect(got.data_dir).toBeTruthy();
   const text = fs.readFileSync(cfg, "utf8");
   expect(text).toContain("defaultBranch = main");
@@ -45,7 +66,14 @@ test("reads and saves your git identity and defaults", async () => {
 
 test("refuses values git would choke on, and needs ferry ui to change anything", async () => {
   const api = new ApiServer([], "", { repos });
-  for (const bad of [{ name: "" }, { email: "not an email" }, { name: "two\nlines" }, { default_branch: "bad..name" }, { default_branch: "-x" }, { pull: "squash" }]) {
+  for (const bad of [
+    { name: "" },
+    { email: "not an email" },
+    { name: "two\nlines" },
+    { default_branch: "bad..name" },
+    { default_branch: "-x" },
+    { pull: "squash" },
+  ]) {
     const r = await post(api, bad);
     expect(r.status).toBe(400);
   }

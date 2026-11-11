@@ -6,7 +6,28 @@ import { SUBCOMMANDS } from "./usage.ts";
 /** Every run flag, plus the flags of the other subcommands. */
 function flagNames(): string[] {
   const seen = new Set(newRunFlags().names());
-  for (const n of ["keep", "all", "diff", "sides", "format", "batch", "n", "version", "to", "older-than", "m", "running", "help", "at", "since", "ai", "port", "host", "no-open"]) seen.add(n);
+  for (const n of [
+    "keep",
+    "all",
+    "diff",
+    "sides",
+    "format",
+    "batch",
+    "n",
+    "version",
+    "to",
+    "older-than",
+    "m",
+    "running",
+    "help",
+    "at",
+    "since",
+    "ai",
+    "port",
+    "host",
+    "no-open",
+  ])
+    seen.add(n);
   return [...seen].sort();
 }
 
@@ -14,7 +35,9 @@ export function cmdCompletion(args: string[]): void {
   const usage = new Error("usage: ferry completion bash|zsh|fish|powershell");
   if (args.length !== 1) throw usage;
   const cmds = SUBCOMMANDS.join(" ");
-  const flags = flagNames().map((n) => "--" + n).join(" ");
+  const flags = flagNames()
+    .map((n) => "--" + n)
+    .join(" ");
   switch (args[0]) {
     case "bash":
       println(`# ferry bash completion — add to ~/.bashrc:  source <(ferry completion bash)

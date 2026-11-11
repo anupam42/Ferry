@@ -4,7 +4,14 @@ import path from "node:path";
 
 import { dataDir, type Pair } from "../src/config.ts";
 import {
-  Engine, expandMessage, pendingRequests, queueResolve, readStatuses, resolveOffline, savedPairs, summarizeStatus,
+  Engine,
+  expandMessage,
+  pendingRequests,
+  queueResolve,
+  readStatuses,
+  resolveOffline,
+  savedPairs,
+  summarizeStatus,
 } from "../src/engine/engine.ts";
 import { listBackups } from "../src/engine/fsops.ts";
 import { history, undo } from "../src/engine/journal.ts";
@@ -410,7 +417,9 @@ describe("two-way", () => {
 describe("helpers", () => {
   test("expandMessage", () => {
     const p = { name: "x", source: "/a/work", target: "/b/repo", remote: "" } as Pair;
-    expect(expandMessage("sync {count} from {source}: {files}", p, [" M a.go", "?? b.go"])).toBe("sync 2 from work: a.go, b.go");
+    expect(expandMessage("sync {count} from {source}: {files}", p, [" M a.go", "?? b.go"])).toBe(
+      "sync 2 from work: a.go, b.go",
+    );
   });
 
   test("summarizeStatus", () => {

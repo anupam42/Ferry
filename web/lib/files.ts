@@ -1,6 +1,9 @@
 // Files view helpers (plain TypeScript, unit-tested).
 
-export interface Folder { dirs: Set<string>; files: string[] }
+export interface Folder {
+  dirs: Set<string>;
+  files: string[];
+}
 
 /** folder → its sub-folders and files, from the flat list of tracked paths. */
 export function folderTree(paths: string[]): Map<string, Folder> {
@@ -20,26 +23,53 @@ export function folderTree(paths: string[]): Map<string, Folder> {
 }
 
 const KINDS: [RegExp, string][] = [
-  [/\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|cs|cpp|cc|c|h|hpp|rb|php|swift|scala|sh|ps1|bat|cmd|sql|vue|svelte)$/i, "code"],
+  [
+    /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|cs|cpp|cc|c|h|hpp|rb|php|swift|scala|sh|ps1|bat|cmd|sql|vue|svelte)$/i,
+    "code",
+  ],
   [/\.(md|markdown|mdown|mkd|txt|rst|adoc|pdf|docx?)$/i, "doc"],
   [/\.(png|jpe?g|gif|svg|webp|ico|bmp|avif)$/i, "img"],
-  [/\.(json|ya?ml|toml|ini|env|xml|lock|config|conf|editorconfig|npmrc|prettierrc|eslintrc|gitignore|gitattributes)$|^\.[^.]+$/i, "conf"],
+  [
+    /\.(json|ya?ml|toml|ini|env|xml|lock|config|conf|editorconfig|npmrc|prettierrc|eslintrc|gitignore|gitattributes)$|^\.[^.]+$/i,
+    "conf",
+  ],
   [/\.(css|scss|sass|less|html?)$/i, "web"],
 ];
 export const fileKind = (name: string) => (KINDS.find(([re]) => re.test(name)) ?? [null, "other"])[1];
-export const fileExt = (name: string) => { const m = /\.([^.]+)$/.exec(name); return m && m.index > 0 ? m[1]!.slice(0, 4) : ""; };
-export const fileSize = (n: number | null) => n == null ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB" : (n / 1048576).toFixed(1) + " MB";
+export const fileExt = (name: string) => {
+  const m = /\.([^.]+)$/.exec(name);
+  return m && m.index > 0 ? m[1]!.slice(0, 4) : "";
+};
+export const fileSize = (n: number | null) =>
+  n == null
+    ? ""
+    : n < 1024
+      ? n + " B"
+      : n < 1048576
+        ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB"
+        : (n / 1048576).toFixed(1) + " MB";
 export const README = /^readme(\.(md|markdown|mdown|mkd|txt|rst))?$/i;
 /** The folder's README, preferring markdown. */
-export const readmeOf = (files: string[]) => files.filter((f) => README.test(f)).sort((a, b) => (/\.md$/i.test(b) ? 1 : 0) - (/\.md$/i.test(a) ? 1 : 0))[0];
+export const readmeOf = (files: string[]) =>
+  files.filter((f) => README.test(f)).sort((a, b) => (/\.md$/i.test(b) ? 1 : 0) - (/\.md$/i.test(a) ? 1 : 0))[0];
 
 /** "3 days ago", in the words a file browser uses. */
 export function since(iso: string, now = Date.now()): string {
   const t = Date.parse(iso);
   if (!t) return "";
   const s = (now - t) / 1000;
-  for (const [sec, u] of [[31536000, "year"], [2592000, "month"], [604800, "week"], [86400, "day"], [3600, "hour"], [60, "minute"]] as const) {
-    if (s >= sec) { const n = Math.floor(s / sec); return `${n} ${u}${n > 1 ? "s" : ""} ago`; }
+  for (const [sec, u] of [
+    [31536000, "year"],
+    [2592000, "month"],
+    [604800, "week"],
+    [86400, "day"],
+    [3600, "hour"],
+    [60, "minute"],
+  ] as const) {
+    if (s >= sec) {
+      const n = Math.floor(s / sec);
+      return `${n} ${u}${n > 1 ? "s" : ""} ago`;
+    }
   }
   return "just now";
 }
@@ -48,6 +78,11 @@ export function since(iso: string, now = Date.now()): string {
 export function findFiles(paths: string[], query: string, max = 100): string[] {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return [];
-  return paths.filter((p) => { const l = p.toLowerCase(); return terms.every((t) => l.includes(t)); })
-    .sort((a, b) => a.split("/").length - b.split("/").length || a.length - b.length).slice(0, max);
+  return paths
+    .filter((p) => {
+      const l = p.toLowerCase();
+      return terms.every((t) => l.includes(t));
+    })
+    .sort((a, b) => a.split("/").length - b.split("/").length || a.length - b.length)
+    .slice(0, max);
 }

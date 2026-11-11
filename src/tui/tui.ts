@@ -5,7 +5,15 @@ import path from "node:path";
 import type { Line } from "../difftext.ts";
 import { summarizeStatus, type Engine } from "../engine/engine.ts";
 import { counts, type Batch } from "../engine/journal.ts";
-import { isPaused, parseChoice, stateOf, type ChangedFile, type Event, type Kind, type Status } from "../engine/types.ts";
+import {
+  isPaused,
+  parseChoice,
+  stateOf,
+  type ChangedFile,
+  type Event,
+  type Kind,
+  type Status,
+} from "../engine/types.ts";
 import * as gitx from "../gitx.ts";
 import { execInteractive, isMac, isWindows, startDetached, which } from "../proc.ts";
 import { comparingArt, type ArtStyle } from "../relayart.ts";
@@ -30,18 +38,33 @@ function kindStyle(k: Kind): [string, Style] {
   const t = theme();
   const s = (fg: typeof t.green, bold = false) => new Style({ fg, bold });
   switch (k) {
-    case "add": return ["+", s(t.green)];
-    case "update": return ["~", s(t.yellow)];
-    case "delete": return ["-", s(t.red)];
-    case "rename": return ["↻", s(t.purple)];
-    case "conflict": return ["!", s(t.red, true)];
-    case "resolved": case "resumed": return ["✓", s(t.green)];
-    case "error": return ["✗", s(t.red, true)];
-    case "warn": case "paused": return ["⚠", s(t.yellow)];
-    case "skip": return ["·", t.muted];
-    case "kept": return ["◇", s(t.cyan)];
-    case "commit": return ["●", s(t.green, true)];
-    case "synced": case "git": return ["⇄", s(t.cyan)];
+    case "add":
+      return ["+", s(t.green)];
+    case "update":
+      return ["~", s(t.yellow)];
+    case "delete":
+      return ["-", s(t.red)];
+    case "rename":
+      return ["↻", s(t.purple)];
+    case "conflict":
+      return ["!", s(t.red, true)];
+    case "resolved":
+    case "resumed":
+      return ["✓", s(t.green)];
+    case "error":
+      return ["✗", s(t.red, true)];
+    case "warn":
+    case "paused":
+      return ["⚠", s(t.yellow)];
+    case "skip":
+      return ["·", t.muted];
+    case "kept":
+      return ["◇", s(t.cyan)];
+    case "commit":
+      return ["●", s(t.green, true)];
+    case "synced":
+    case "git":
+      return ["⇄", s(t.cyan)];
   }
   return ["•", s(t.accent)];
 }
@@ -86,7 +109,14 @@ export function buildRows(st: Status, filter: string): Row[] {
         rows.push({ text: part + "/", path: "", kind: "info", dir: "", conflict: false, depth: i });
       }
     });
-    rows.push({ text: parts[parts.length - 1]!, path: p, kind: f.kind, dir: f.dir, conflict: false, depth: dirs.length });
+    rows.push({
+      text: parts[parts.length - 1]!,
+      path: p,
+      kind: f.kind,
+      dir: f.dir,
+      conflict: false,
+      depth: dirs.length,
+    });
   }
   return rows;
 }
@@ -156,7 +186,11 @@ export class Dashboard {
   private suspended = false;
   private quit: (() => void) | null = null;
 
-  constructor(private engines: Engine[], private version: string, themeName: string) {
+  constructor(
+    private engines: Engine[],
+    private version: string,
+    themeName: string,
+  ) {
     setTheme(themeName || "auto");
     this.refresh();
   }
@@ -460,7 +494,11 @@ export class Dashboard {
         if (!r || r.path === "") return this.say("select a file first (↑/↓)");
         try {
           const line = e.ignorePath(r.path);
-          this.say(line ? `ignoring ${r.path} from now on (added ${line} to the source's .syncignore; copies already made stay)` : `${r.path} is already in .syncignore`);
+          this.say(
+            line
+              ? `ignoring ${r.path} from now on (added ${line} to the source's .syncignore; copies already made stay)`
+              : `${r.path} is already in .syncignore`,
+          );
         } catch (err) {
           this.say("ignore: " + errMsg(err));
         }
@@ -519,14 +557,21 @@ export class Dashboard {
       return;
     }
     const code = which("code");
-    const cmd = code ? [code, "-g", p] : isMac ? ["open", p] : isWindows ? ["rundll32", "url.dll,FileProtocolHandler", p] : ["xdg-open", p];
+    const cmd = code
+      ? [code, "-g", p]
+      : isMac
+        ? ["open", p]
+        : isWindows
+          ? ["rundll32", "url.dll,FileProtocolHandler", p]
+          : ["xdg-open", p];
     this.say(startDetached(cmd) ? "opened " + path.basename(p) : "open: couldn't start " + cmd[0]);
   }
 
   // ---------- view ----------
 
   private view(): string[] {
-    const w = this.screen.width, h = this.screen.height;
+    const w = this.screen.width,
+      h = this.screen.height;
     const t = theme();
     if (this.mode === "help") {
       return [t.title.render(" ferry help") + t.muted.render("  theme: " + t.name), ...HELP.split("\n")];
@@ -534,12 +579,16 @@ export class Dashboard {
     if (this.mode === "diff") {
       const layout = this.sideBySide ? "side by side" : "unified";
       const head = t.title.render(" diff ") + " " + t.bold.render(this.title);
-      const foot = t.muted.render(` ↑/↓ PgUp/PgDn scroll · v ${layout} · esc back · ${Math.round(this.vp.scrollPercent() * 100)}%`);
+      const foot = t.muted.render(
+        ` ↑/↓ PgUp/PgDn scroll · v ${layout} · esc back · ${Math.round(this.vp.scrollPercent() * 100)}%`,
+      );
       return [head, ...box(this.vp.view(), w, t.borderActive), foot];
     }
     if (this.mode === "history") {
       const head = t.title.render(" history ") + " " + t.bold.render(this.statuses[this.sel]!.name);
-      const foot = this.flashing() ? " " + t.flash.render(this.flash) : t.muted.render(" ↑/↓ scroll · u undo newest batch · esc back");
+      const foot = this.flashing()
+        ? " " + t.flash.render(this.flash)
+        : t.muted.render(" ↑/↓ scroll · u undo newest batch · esc back");
       return [head, ...box(this.vp.view(), w, t.borderActive), foot];
     }
     const header = this.headerView(w);
@@ -565,7 +614,8 @@ export class Dashboard {
   private pairsView(w: number): string[] {
     const t = theme();
     const lines = this.statuses.map((st, i) => {
-      let icon = "●", style = new Style({ fg: t.green });
+      let icon = "●",
+        style = new Style({ fg: t.green });
       let state = stateOf(st);
       if (st.conflicts.length > 0) [icon, style] = ["!", new Style({ fg: t.red, bold: true })];
       else if (st.pendingBatch > 0) [icon, style, state] = ["?", new Style({ fg: t.yellow }), state + " (y)"];
@@ -580,7 +630,8 @@ export class Dashboard {
         cursor = t.title.render("▸ ");
         name = t.bold.render(name);
       }
-      const line = `${cursor}${style.render(icon)} ${name}  ${t.muted.render(st.mode + " · " + orDash(st.watcher))}${t.muted.render(branch)}  ` +
+      const line =
+        `${cursor}${style.render(icon)} ${name}  ${t.muted.render(st.mode + " · " + orDash(st.watcher))}${t.muted.render(branch)}  ` +
         `+${st.added} ~${st.updated} -${st.deleted} ↻${st.renamed}  ${t.muted.render("last " + last)}  ${style.render(state)}`;
       return truncate(line, w - 4);
     });
@@ -592,7 +643,8 @@ export class Dashboard {
     const st = this.statuses[this.sel]!;
     const inner = h - 2;
     const lines: string[] = [];
-    let head = t.bold.render("Changed this session") + t.muted.render(`  (${this.rows.filter((r) => r.path !== "").length})`);
+    let head =
+      t.bold.render("Changed this session") + t.muted.render(`  (${this.rows.filter((r) => r.path !== "").length})`);
     if (this.filter !== "") head += t.flash.render("  /" + this.filter) + t.muted.render(" esc clears");
     lines.push(head);
     if (st.comparing) {
@@ -603,7 +655,13 @@ export class Dashboard {
         muted: (x) => t.muted.render(x),
         bar: (x) => new Style({ fg: t.cyan }).render(x),
       };
-      for (const l of comparingArt(Math.floor(Date.now() / 160), st.comparing.done, st.comparing.total, "Relay is comparing files…", art)) {
+      for (const l of comparingArt(
+        Math.floor(Date.now() / 160),
+        st.comparing.done,
+        st.comparing.total,
+        "Relay is comparing files…",
+        art,
+      )) {
         lines.push(truncate(l, w - 4));
       }
     }
@@ -611,7 +669,11 @@ export class Dashboard {
     const gitLines = st.isGit ? Math.min(st.gitStatus.length, 6) + 2 : 0;
     const listH = Math.max(3, inner - 1 - gitLines);
     if (this.rows.length === 0) {
-      lines.push(t.muted.render(this.filter !== "" ? "  no files match the filter" : "  nothing yet — edit a file in the source"));
+      lines.push(
+        t.muted.render(
+          this.filter !== "" ? "  no files match the filter" : "  nothing yet — edit a file in the source",
+        ),
+      );
     }
     const start = this.fileSel >= listH ? this.fileSel - listH + 1 : 0;
     for (let i = start; i < this.rows.length && i < start + listH; i++) {
@@ -676,9 +738,24 @@ export class Dashboard {
       if (this.push) label += " + push";
       return t.title.render(` ${label}: `) + this.input.view(t.muted) + t.muted.render("  enter ok · esc cancel");
     }
-    if (this.mode === "search") return t.title.render(" / ") + this.search.view(t.muted) + t.muted.render("  enter keep · esc clear");
+    if (this.mode === "search")
+      return t.title.render(" / ") + this.search.view(t.muted) + t.muted.render("  enter keep · esc clear");
     if (this.flashing()) return " " + t.flash.render(this.flash);
-    const keys = ["tab pair", "↑↓ file", "/ filter", "d diff", "e edit", "i ignore", "a stage", "c commit", "p pause", "r resync", "H history", "s/t/n/b/m resolve", "? help"];
+    const keys = [
+      "tab pair",
+      "↑↓ file",
+      "/ filter",
+      "d diff",
+      "e edit",
+      "i ignore",
+      "a stage",
+      "c commit",
+      "p pause",
+      "r resync",
+      "H history",
+      "s/t/n/b/m resolve",
+      "? help",
+    ];
     return truncate(t.muted.render(" " + keys.join(" · ")), w);
   }
 
@@ -701,7 +778,9 @@ export class Dashboard {
       out.push(line);
       bt.entries.slice(0, 6).forEach((en) => {
         const [sym, style] = opStyle(en.op);
-        out.push("    " + style.render(sym) + " " + en.path + (en.to ? " → " + en.to : "") + t.muted.render(` (${en.side})`));
+        out.push(
+          "    " + style.render(sym) + " " + en.path + (en.to ? " → " + en.to : "") + t.muted.render(` (${en.side})`),
+        );
       });
       if (bt.entries.length > 6) out.push(t.muted.render(`      … ${bt.entries.length - 6} more`));
     }

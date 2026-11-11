@@ -1,8 +1,25 @@
 import { VERSION } from "./common.ts";
 
 export const SUBCOMMANDS = [
-  "run", "init", "status", "commit", "diff", "plan", "conflicts", "resolve", "history", "undo", "restore", "stats", "ui",
-  "backups", "doctor", "service", "completion", "version", "help",
+  "run",
+  "init",
+  "status",
+  "commit",
+  "diff",
+  "plan",
+  "conflicts",
+  "resolve",
+  "history",
+  "undo",
+  "restore",
+  "stats",
+  "ui",
+  "backups",
+  "doctor",
+  "service",
+  "completion",
+  "version",
+  "help",
 ];
 
 export function usage(): void {

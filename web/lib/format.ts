@@ -4,7 +4,13 @@
 export function ago(iso: string): string {
   const t = Date.parse(iso);
   if (!t || iso.startsWith("0001")) return "never";
-  if (typeof localStorage !== "undefined" && localStorage.getItem("ferry-time") === "exact") return new Date(t).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  if (typeof localStorage !== "undefined" && localStorage.getItem("ferry-time") === "exact")
+    return new Date(t).toLocaleString(undefined, {
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   const d = (Date.now() - t) / 1000;
   if (d < 45) return "just now";
   if (d < 3600) return Math.round(d / 60) + " min ago";

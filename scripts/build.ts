@@ -30,7 +30,9 @@ const targets: [string, string, string][] = [
 const args = process.argv.slice(2);
 const archive = args.includes("--archive");
 const only = args.filter((a) => !a.startsWith("--"));
-const chosen = only.length ? targets.filter(([t, os, arch]) => only.some((o) => t === o || t === "bun-" + o || `${os}-${arch}` === o)) : targets;
+const chosen = only.length
+  ? targets.filter(([t, os, arch]) => only.some((o) => t === o || t === "bun-" + o || `${os}-${arch}` === o))
+  : targets;
 if (chosen.length === 0) throw new Error(`unknown target ${only.join(" ")}; use e.g. linux-x64 or windows-amd64`);
 
 // the web app is embedded in every binary: build it first, so a binary never ships without it
@@ -49,10 +51,20 @@ for (const [target, os, arch] of chosen) {
   const ext = os === "windows" ? ".exe" : "";
   const out = path.join("dist", `ferry-${os}-${arch}${ext}`);
   const cmd = [
-    process.execPath, "build", "src/main.ts", "--compile", "--minify", `--target=${target}`, "--outfile", out,
-    "--define", `FERRY_VERSION=${JSON.stringify(version)}`,
-    "--define", `FERRY_COMMIT=${JSON.stringify(commit)}`,
-    "--define", `FERRY_DATE=${JSON.stringify(date)}`,
+    process.execPath,
+    "build",
+    "src/main.ts",
+    "--compile",
+    "--minify",
+    `--target=${target}`,
+    "--outfile",
+    out,
+    "--define",
+    `FERRY_VERSION=${JSON.stringify(version)}`,
+    "--define",
+    `FERRY_COMMIT=${JSON.stringify(commit)}`,
+    "--define",
+    `FERRY_DATE=${JSON.stringify(date)}`,
   ];
   await run(cmd);
   console.log(`built ${out}`);
@@ -67,10 +79,14 @@ for (const [target, os, arch] of chosen) {
   for (const f of ["README.md", "LICENSE", "ferry.example.yaml"]) fs.copyFileSync(f, path.join(stage, f));
   const file = os === "windows" ? `${name}.zip` : `${name}.tar.gz`;
   fs.rmSync(path.join("dist", file), { force: true });
-  if (os === "windows") await run(["zip", "-q", "-j", file, ...fs.readdirSync(stage).map((f) => path.join(name, f))], "dist");
+  if (os === "windows")
+    await run(["zip", "-q", "-j", file, ...fs.readdirSync(stage).map((f) => path.join(name, f))], "dist");
   else await run(["tar", "-czf", file, "-C", name, "."], "dist");
   fs.rmSync(stage, { recursive: true, force: true });
-  const hash = crypto.createHash("sha256").update(fs.readFileSync(path.join("dist", file))).digest("hex");
+  const hash = crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(path.join("dist", file)))
+    .digest("hex");
   sums.push(`${hash}  ${file}`);
   console.log(`packed dist/${file}`);
 }

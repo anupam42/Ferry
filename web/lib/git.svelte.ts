@@ -4,7 +4,18 @@ import { act, app, ask, toast } from "./app.svelte.ts";
 import { plural } from "./format.ts";
 import type { PullRequest, PushIssue, RemoteCheckResponse, RepoEntry, RepoStateResponse } from "./types.ts";
 
-export type GitView = "files" | "changes" | "history" | "insights" | "branches" | "stashes" | "prs" | "issues" | "tags" | "worktrees" | "undo";
+export type GitView =
+  | "files"
+  | "changes"
+  | "history"
+  | "insights"
+  | "branches"
+  | "stashes"
+  | "prs"
+  | "issues"
+  | "tags"
+  | "worktrees"
+  | "undo";
 export type RemoteJob = "" | "fetch" | "pull" | "push";
 
 class Git {
@@ -58,13 +69,22 @@ class Git {
     }
     this.loaded = true;
     if (!this.repos.some((r) => r.id === this.selected)) this.selected = this.repos[0]?.id ?? "";
-    if (!this.selected) { this.state = null; return; }
+    if (!this.selected) {
+      this.state = null;
+      return;
+    }
     const id = this.selected;
     try {
       const st = await api<RepoStateResponse>("GET", this.url("state"));
-      if (id === this.selected) { this.state = st; this.error = ""; }
+      if (id === this.selected) {
+        this.state = st;
+        this.error = "";
+      }
     } catch (e) {
-      if (id === this.selected) { this.state = null; this.error = (e as Error).message; }
+      if (id === this.selected) {
+        this.state = null;
+        this.error = (e as Error).message;
+      }
     }
   }
 
@@ -72,13 +92,25 @@ class Git {
    * Runs a Git action, says how it went, and refreshes. Throws on failure
    * (with the server's code, e.g. "diverged"), after refreshing.
    */
-  async act<T extends Record<string, unknown>>(action: string, body: Record<string, unknown> = {}, ok?: string | ((r: T) => string), mood = "happy"): Promise<T> {
+  async act<T extends Record<string, unknown>>(
+    action: string,
+    body: Record<string, unknown> = {},
+    ok?: string | ((r: T) => string),
+    mood = "happy",
+  ): Promise<T> {
     try {
       const r = await api<T & { paused?: string[]; conflicts?: string[] }>("POST", this.url(action), body);
       const text = typeof ok === "function" ? ok(r) : ok;
       if (text) toast(text, { mood });
-      if (r.paused?.length) toast(`I paused syncing ${r.paused.join(", ")} while you do this. Resume it when you're ready.`, { mood: "sleepy" });
-      if (r.conflicts?.length) toast(`${plural(r.conflicts.length, "file")} need your decision: see the top of the page.`, { error: true, mood: "worried" });
+      if (r.paused?.length)
+        toast(`I paused syncing ${r.paused.join(", ")} while you do this. Resume it when you're ready.`, {
+          mood: "sleepy",
+        });
+      if (r.conflicts?.length)
+        toast(`${plural(r.conflicts.length, "file")} need your decision: see the top of the page.`, {
+          error: true,
+          mood: "worried",
+        });
       return r;
     } finally {
       this.bump++;
@@ -87,7 +119,12 @@ class Git {
   }
 
   /** act(), but failures become a toast and null. */
-  async try<T extends Record<string, unknown>>(action: string, body: Record<string, unknown> = {}, ok?: string | ((r: T) => string), mood = "happy"): Promise<T | null> {
+  async try<T extends Record<string, unknown>>(
+    action: string,
+    body: Record<string, unknown> = {},
+    ok?: string | ((r: T) => string),
+    mood = "happy",
+  ): Promise<T | null> {
     try {
       return await this.act<T>(action, body, ok, mood);
     } catch (e) {
@@ -110,7 +147,10 @@ class Git {
     this.remote[id] = r;
     if (!quiet && prev && r.behind > prev.behind && this.selected === id) {
       const fresh = r.incoming.slice(0, r.behind - prev.behind);
-      toast(`${whoPushed(fresh)} pushed ${plural(r.behind - prev.behind, "commit")} to ${r.upstream}. Pull to stay in step.`, { mood: "surprised" });
+      toast(
+        `${whoPushed(fresh)} pushed ${plural(r.behind - prev.behind, "commit")} to ${r.upstream}. Pull to stay in step.`,
+        { mood: "surprised" },
+      );
     }
     if (this.selected === id && this.state && (this.state.behind !== r.behind || this.state.ahead !== r.ahead)) {
       this.state = { ...this.state, behind: r.behind, ahead: r.ahead };
@@ -122,10 +162,16 @@ class Git {
     void this.refresh().then(() => this.checkRemote(false));
     // only while the Git client is on screen
     const onScreen = () => !document.hidden && app.mode === "git";
-    setInterval(() => { if (onScreen()) void this.refresh(); }, 3000);
+    setInterval(() => {
+      if (onScreen()) void this.refresh();
+    }, 3000);
     // keep an eye on the remote while a repository is open
-    setInterval(() => { if (onScreen() && !this.busy) void this.checkRemote(false); }, 90_000);
-    document.addEventListener("visibilitychange", () => { if (onScreen()) void this.checkRemote(false); });
+    setInterval(() => {
+      if (onScreen() && !this.busy) void this.checkRemote(false);
+    }, 90_000);
+    document.addEventListener("visibilitychange", () => {
+      if (onScreen()) void this.checkRemote(false);
+    });
   }
 }
 
@@ -147,7 +193,9 @@ export async function remoteJob(job: Exclude<RemoteJob, "">, run: () => Promise<
     git.busy = "";
     if (ok) {
       git.done = { job, until: Date.now() + 1600 };
-      setTimeout(() => { if (git.done?.job === job) git.done = null; }, 1700);
+      setTimeout(() => {
+        if (git.done?.job === job) git.done = null;
+      }, 1700);
     }
   }
 }
@@ -163,8 +211,12 @@ async function afterRemote(): Promise<boolean> {
   const now = git.state;
   await git.checkRemote(false, true);
   if (now && (now.operation || now.files.some((f) => f.conflicted))) {
-    toast(now.operation ? "Some files need your decision before you carry on: see the top of the page."
-      : "Pulled. Some of your edits overlap what came in: pick what to keep at the top of the page.", { error: true, mood: "worried" });
+    toast(
+      now.operation
+        ? "Some files need your decision before you carry on: see the top of the page."
+        : "Pulled. Some of your edits overlap what came in: pick what to keep at the top of the page.",
+      { error: true, mood: "worried" },
+    );
     return false;
   }
   return true;
@@ -172,13 +224,20 @@ async function afterRemote(): Promise<boolean> {
 
 /** Pull: warns first when incoming commits touch files you're editing (the server sets those edits aside and puts them back). */
 export async function doPull(strategy = "", quiet = false): Promise<boolean> {
-  const st = git.state, rc = git.remote[git.selected];
+  const st = git.state,
+    rc = git.remote[git.selected];
   if (!strategy && !quiet && st && rc) {
     const dirty = rc.overlap.filter((p) => st.files.some((f) => f.path === p));
     if (dirty.length) {
-      const ok = await ask({ mood: "thinking", title: "Incoming changes touch files you're editing",
+      const ok = await ask({
+        mood: "thinking",
+        title: "Incoming changes touch files you're editing",
         text: `${fileList(dirty)} ${dirty.length === 1 ? "was" : "were"} also changed on ${rc.upstream}. I'll set your uncommitted edits aside, pull, then put them back. If both sides changed the same lines, you'll pick what to keep.`,
-        yes: "Pull safely", no: "Not now", yesMood: "wink", primary: "yes" });
+        yes: "Pull safely",
+        no: "Not now",
+        yesMood: "wink",
+        primary: "yes",
+      });
       if (!ok) return false;
     }
   }
@@ -187,10 +246,22 @@ export async function doPull(strategy = "", quiet = false): Promise<boolean> {
     return await afterRemote();
   } catch (e) {
     if (e instanceof ApiError && e.code === "diverged") {
-      const rebase = await ask({ mood: "thinking", title: "Both sides have new commits.", primary: "yes",
+      const rebase = await ask({
+        mood: "thinking",
+        title: "Both sides have new commits.",
+        primary: "yes",
         text: "Your branch and the remote have each moved on. Rebase replays your commits on top of the remote's, for a straight line (usually what you want). Merge keeps both histories as they are.",
-        yes: "Rebase my commits", no: "Merge them", yesMood: "wink", noMood: "thinking" });
-      const r = await git.try("pull", { strategy: rebase ? "rebase" : "merge" }, quiet ? "" : "Caught up with the remote", "party");
+        yes: "Rebase my commits",
+        no: "Merge them",
+        yesMood: "wink",
+        noMood: "thinking",
+      });
+      const r = await git.try(
+        "pull",
+        { strategy: rebase ? "rebase" : "merge" },
+        quiet ? "" : "Caught up with the remote",
+        "party",
+      );
       return r ? await afterRemote() : false;
     }
     if (!(e instanceof ApiError && e.code === "conflicts")) toast((e as Error).message, { error: true });
@@ -198,22 +269,43 @@ export async function doPull(strategy = "", quiet = false): Promise<boolean> {
   }
 }
 
-const ISSUE: Record<PushIssue["kind"], string> = { secret: "Possible secret", "env-file": "Secret file", "conflict-marker": "Conflict marker", "large-file": "Large file", debug: "Leftover debugging" };
+const ISSUE: Record<PushIssue["kind"], string> = {
+  secret: "Possible secret",
+  "env-file": "Secret file",
+  "conflict-marker": "Conflict marker",
+  "large-file": "Large file",
+  debug: "Leftover debugging",
+};
 
 /** Before anything leaves the machine: secrets, .env files, conflict markers, huge files, leftover debugging. */
 async function pushPreflight(): Promise<boolean> {
   let r: { issues: PushIssue[] };
-  try { r = await api("GET", git.url("push-check")); } catch { return true; } // a failed check shouldn't stop a push
+  try {
+    r = await api("GET", git.url("push-check"));
+  } catch {
+    return true;
+  } // a failed check shouldn't stop a push
   if (!r.issues.length) return true;
   const blocks = r.issues.filter((i) => i.level === "block");
   return ask({
     mood: blocks.length ? "worried" : "thinking",
-    title: blocks.length ? `Hold on: ${plural(blocks.length, "thing")} in this push can't be taken back` : `${plural(r.issues.length, "small thing")} to look at before pushing`,
-    text: blocks.length ? "Once these are pushed, everyone with access has them, and they stay in history even if you delete them later. Fix them (or undo the commit), then push."
+    title: blocks.length
+      ? `Hold on: ${plural(blocks.length, "thing")} in this push can't be taken back`
+      : `${plural(r.issues.length, "small thing")} to look at before pushing`,
+    text: blocks.length
+      ? "Once these are pushed, everyone with access has them, and they stay in history even if you delete them later. Fix them (or undo the commit), then push."
       : "Nothing dangerous, just things people usually don't mean to share.",
-    items: r.issues.slice(0, 6).map((i) => ({ label: ISSUE[i.kind] ?? i.kind, where: i.file + (i.line ? ":" + i.line : ""), text: i.text, level: i.level })),
+    items: r.issues.slice(0, 6).map((i) => ({
+      label: ISSUE[i.kind] ?? i.kind,
+      where: i.file + (i.line ? ":" + i.line : ""),
+      text: i.text,
+      level: i.level,
+    })),
     more: Math.max(0, r.issues.length - 6),
-    yes: "Push anyway", no: blocks.length ? "Don't push" : "Fix first", hold: blocks.length > 0, yesMood: "worried",
+    yes: "Push anyway",
+    no: blocks.length ? "Don't push" : "Fix first",
+    hold: blocks.length > 0,
+    yesMood: "worried",
   });
 }
 
@@ -223,13 +315,30 @@ export async function doPush(force = false): Promise<boolean> {
   if (!force && st && (st.ahead || !st.upstream) && !(await pushPreflight())) return false;
   if (!force && st?.upstream) {
     const rc = await git.checkRemote(true, true);
-    if (rc?.error) toast("I couldn't check the remote (" + rc.error + "). Trying the push anyway.", { error: true, mood: "worried" });
+    if (rc?.error)
+      toast("I couldn't check the remote (" + rc.error + "). Trying the push anyway.", {
+        error: true,
+        mood: "worried",
+      });
     if (rc && rc.behind > 0) {
       const both = rc.ahead > 0;
-      const text = `${whoPushed(rc.incoming)} pushed ${plural(rc.behind, "commit")} to ${rc.upstream} since you last pulled, so a push now would bounce. `
-        + (both ? `I'll replay your ${plural(rc.ahead, "commit")} on top of theirs (a rebase, your edits stay safe), then push.` : "I'll pull them in first, then push.")
-        + (rc.overlap.length ? ` Heads-up: ${fileList(rc.overlap)} changed on both sides, so you may need to pick what to keep.` : " Their changes don't touch your files, so this should be smooth.");
-      const ok = await ask({ mood: rc.overlap.length ? "worried" : "thinking", title: "The remote moved on. Pull first?", text, yes: "Pull, then push", no: "Cancel", yesMood: "wink", primary: "yes" });
+      const text =
+        `${whoPushed(rc.incoming)} pushed ${plural(rc.behind, "commit")} to ${rc.upstream} since you last pulled, so a push now would bounce. ` +
+        (both
+          ? `I'll replay your ${plural(rc.ahead, "commit")} on top of theirs (a rebase, your edits stay safe), then push.`
+          : "I'll pull them in first, then push.") +
+        (rc.overlap.length
+          ? ` Heads-up: ${fileList(rc.overlap)} changed on both sides, so you may need to pick what to keep.`
+          : " Their changes don't touch your files, so this should be smooth.");
+      const ok = await ask({
+        mood: rc.overlap.length ? "worried" : "thinking",
+        title: "The remote moved on. Pull first?",
+        text,
+        yes: "Pull, then push",
+        no: "Cancel",
+        yesMood: "wink",
+        primary: "yes",
+      });
       if (!ok) return false;
       if (!(await doPull(both ? "rebase" : "", true))) return false;
     }
@@ -241,8 +350,16 @@ export async function doPush(force = false): Promise<boolean> {
   } catch (e) {
     if (e instanceof ApiError && e.code === "rejected" && !force) {
       const rewrote = git.state?.lastCommit?.pushed === false;
-      const ok = await ask({ mood: "worried", title: "The remote has commits you don't have.", yes: "Pull now", no: "Not now", primary: "yes",
-        text: rewrote ? "Pull first to bring them in. If you rewrote commits on purpose (amend, undo), you can force-push instead, which replaces the remote's version." : "Pull first to bring them in, then push again." });
+      const ok = await ask({
+        mood: "worried",
+        title: "The remote has commits you don't have.",
+        yes: "Pull now",
+        no: "Not now",
+        primary: "yes",
+        text: rewrote
+          ? "Pull first to bring them in. If you rewrote commits on purpose (amend, undo), you can force-push instead, which replaces the remote's version."
+          : "Pull first to bring them in, then push again.",
+      });
       if (ok) return doPull();
     } else toast((e as Error).message, { error: true });
     return false;
@@ -252,13 +369,32 @@ export async function doPush(force = false): Promise<boolean> {
 // ---------- other actions several views share ----------
 
 export async function discardFiles(files: string[], label: string): Promise<void> {
-  const ok = await ask({ mood: "worried", hold: files.length === 0, title: `Discard ${files.length ? label : "every change"}?`, yes: "Discard", no: "Keep my changes", yesMood: "sad",
-    text: "The file goes back to how it was in the last commit. Your current version goes to the Trash, so you can still get it back." });
-  if (ok) await git.try<{ discarded: number }>("discard", { files }, (r) => `Discarded ${plural(r.discarded, "file")} (copies are in the Trash)`, "wink");
+  const ok = await ask({
+    mood: "worried",
+    hold: files.length === 0,
+    title: `Discard ${files.length ? label : "every change"}?`,
+    yes: "Discard",
+    no: "Keep my changes",
+    yesMood: "sad",
+    text: "The file goes back to how it was in the last commit. Your current version goes to the Trash, so you can still get it back.",
+  });
+  if (ok)
+    await git.try<{ discarded: number }>(
+      "discard",
+      { files },
+      (r) => `Discarded ${plural(r.discarded, "file")} (copies are in the Trash)`,
+      "wink",
+    );
 }
 
 export async function removeRepo(r: RepoEntry): Promise<void> {
-  const ok = await ask({ mood: "thinking", title: `Remove ${r.name} from the list?`, text: "Only the list entry goes. The repository and its files stay exactly where they are.", yes: "Remove", no: "Keep it" });
+  const ok = await ask({
+    mood: "thinking",
+    title: `Remove ${r.name} from the list?`,
+    text: "Only the list entry goes. The repository and its files stay exactly where they are.",
+    yes: "Remove",
+    no: "Keep it",
+  });
   if (!ok) return;
   await act("Removed from the list", () => api("POST", "/git/repos/remove", { id: r.id }), "wink");
   git.selected = "";
@@ -266,6 +402,8 @@ export async function removeRepo(r: RepoEntry): Promise<void> {
 }
 
 /** Settles one conflicted file. */
-export const resolveFile = (path: string, choice: "ours" | "theirs" | "both" | "done", text: string) => git.try("resolve", { path, choice }, `${path}: ${text}`);
+export const resolveFile = (path: string, choice: "ours" | "theirs" | "both" | "done", text: string) =>
+  git.try("resolve", { path, choice }, `${path}: ${text}`);
 
-export const fileURL = (action: string, path: string, staged = false) => git.url(action) + "?path=" + enc(path) + (staged ? "&staged=1" : "");
+export const fileURL = (action: string, path: string, staged = false) =>
+  git.url(action) + "?path=" + enc(path) + (staged ? "&staged=1" : "");

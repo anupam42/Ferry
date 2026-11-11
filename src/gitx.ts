@@ -85,7 +85,11 @@ export async function configGet(dir: string, key: string): Promise<string> {
 export async function status(dir: string): Promise<string[]> {
   const out = await run(dir, "status", "--porcelain=v1", "--untracked-files=all", "--", ".");
   const pre = await prefix(dir);
-  return out.replace(/\n+$/, "").split("\n").filter((l) => l !== "").map((l) => relativeLine(l, pre));
+  return out
+    .replace(/\n+$/, "")
+    .split("\n")
+    .filter((l) => l !== "")
+    .map((l) => relativeLine(l, pre));
 }
 
 const prefixes = new Map<string, string>();
@@ -284,7 +288,14 @@ function lastLine(s: string): string {
 export async function showHead(dir: string, rel: string): Promise<Buffer | null> {
   const cmd = command(dir, ["show", "HEAD:./" + slash(rel)]);
   try {
-    const p = Bun.spawn({ cmd, env: gitEnv() as Record<string, string>, stdout: "pipe", stderr: "ignore", stdin: "ignore", windowsHide: true });
+    const p = Bun.spawn({
+      cmd,
+      env: gitEnv() as Record<string, string>,
+      stdout: "pipe",
+      stderr: "ignore",
+      stdin: "ignore",
+      windowsHide: true,
+    });
     const [buf, code] = await Promise.all([new Response(p.stdout).arrayBuffer(), p.exited]);
     return code === 0 ? Buffer.from(buf) : null;
   } catch {

@@ -5,10 +5,32 @@ import type { Info } from "./types.ts";
 import type { FerryEvent } from "./types.ts";
 export type { FerryEvent } from "./types.ts";
 
-const KINDS = ["info", "add", "update", "delete", "rename", "conflict", "resolved", "skip", "warn", "error", "synced", "paused", "resumed", "git", "commit", "kept"];
+const KINDS = [
+  "info",
+  "add",
+  "update",
+  "delete",
+  "rename",
+  "conflict",
+  "resolved",
+  "skip",
+  "warn",
+  "error",
+  "synced",
+  "paused",
+  "resumed",
+  "git",
+  "commit",
+  "kept",
+];
 
 /** reload: how a dev reload happens (main.ts passes one that keeps your place). */
-export function connectEvents(o: { info: Info | null; onEvent: (ev: FerryEvent) => void; onOnline: (up: boolean) => void; reload?: () => void }): () => void {
+export function connectEvents(o: {
+  info: Info | null;
+  onEvent: (ev: FerryEvent) => void;
+  onOnline: (up: boolean) => void;
+  reload?: () => void;
+}): () => void {
   const reload = o.reload ?? (() => location.reload());
   const es = new EventSource("/events" + (token ? "?token=" + enc(token) : ""));
   const onEv = (m: MessageEvent) => {

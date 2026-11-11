@@ -53,9 +53,7 @@ export function format(h: Webhook): string {
 
 /** The human-readable line used by chat formats. */
 export function text(ev: Event): string {
-  const what = ev.to
-    ? `${ev.path ?? ""} → ${ev.to} ${ev.msg ?? ""}`.trim()
-    : `${ev.path ?? ""} ${ev.msg ?? ""}`.trim();
+  const what = ev.to ? `${ev.path ?? ""} → ${ev.to} ${ev.msg ?? ""}`.trim() : `${ev.path ?? ""} ${ev.msg ?? ""}`.trim();
   return `ferry [${ev.pair}] ${ev.kind}: ${what}`;
 }
 

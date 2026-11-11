@@ -7,10 +7,14 @@ import { newBoot, runningFromSource } from "../src/devreload.ts";
 test("in dev mode /info carries the boot id, so a page can tell the server restarted", async () => {
   const dev = { boot: newBoot() };
   const api = new ApiServer([], "", { dev });
-  expect(((await (await api.handle(new Request("http://127.0.0.1/info"))).json()) as { dev?: unknown }).dev).toEqual({ boot: dev.boot });
+  expect(((await (await api.handle(new Request("http://127.0.0.1/info"))).json()) as { dev?: unknown }).dev).toEqual({
+    boot: dev.boot,
+  });
   expect(newBoot()).not.toBe(dev.boot);
   const plain = new ApiServer([], "");
-  expect(((await (await plain.handle(new Request("http://127.0.0.1/info"))).json()) as { dev?: unknown }).dev).toBeUndefined();
+  expect(
+    ((await (await plain.handle(new Request("http://127.0.0.1/info"))).json()) as { dev?: unknown }).dev,
+  ).toBeUndefined();
 });
 
 test("open pages hear what changed in the web app", async () => {

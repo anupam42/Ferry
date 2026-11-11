@@ -36,12 +36,25 @@ export const HARD_IGNORES = [".git", ".ferry-*", ".ferry"];
 
 /** The built-in list (turn off with default_ignores: false). */
 export const DEFAULT_IGNORES = [
-  "node_modules", ".DS_Store", "Thumbs.db", "desktop.ini", ".syncignore",
-  "*.swp", "*.swo", "*~", ".#*", "*.tmp", "~$*",
+  "node_modules",
+  ".DS_Store",
+  "Thumbs.db",
+  "desktop.ini",
+  ".syncignore",
+  "*.swp",
+  "*.swo",
+  "*~",
+  ".#*",
+  "*.tmp",
+  "~$*",
 ];
 
 export function statOf(st: fs.BigIntStats, link = false): FileStat {
-  return { size: Number(st.size), mod: Number(st.mtimeNs), mode: (Number(st.mode) & 0o777) | (link ? MODE_SYMLINK : 0) };
+  return {
+    size: Number(st.size),
+    mod: Number(st.mtimeNs),
+    mode: (Number(st.mode) & 0o777) | (link ? MODE_SYMLINK : 0),
+  };
 }
 
 export function stat(p: string): fs.BigIntStats | null {
@@ -66,7 +79,13 @@ export const mtimeNs = (st: fs.BigIntStats) => Number(st.mtimeNs);
  * Walks root, applying base plus any nested .gitignore files. When only is
  * set, files must also match it. symlinks is skip | follow | link.
  */
-export function scanDir(root: string, base: Matcher, nestedGitignore: boolean, only: Matcher | null, symlinks: string): Snapshot {
+export function scanDir(
+  root: string,
+  base: Matcher,
+  nestedGitignore: boolean,
+  only: Matcher | null,
+  symlinks: string,
+): Snapshot {
   const m = base.clone();
   const snap: Snapshot = new Map();
   const rootStat = fs.statSync(root); // throws if the root is missing
@@ -347,7 +366,12 @@ export function listBackups(dataDir: string, pairID: string, filter: string): Ba
       const all = [...parts, d.name];
       if (all.length < 3) continue;
       const b: Backup = {
-        side: all[0]!, rel: all.slice(1, -1).join("/"), version: all[all.length - 1]!, path: p, time: 0, size: 0,
+        side: all[0]!,
+        rel: all.slice(1, -1).join("/"),
+        version: all[all.length - 1]!,
+        path: p,
+        time: 0,
+        size: 0,
       };
       if (filter !== "" && b.rel !== want) continue;
       b.time = parseStamp(b.version);
@@ -370,8 +394,14 @@ export function restoreBackup(dataDir: string, pairID: string, b: Backup, dest: 
  * Deletes versions older than maxAgeMs, then the oldest versions until the
  * pair's backups fit in maxSize. Zero disables either limit.
  */
-export function pruneBackups(dataDir: string, pairID: string, maxAgeMs: number, maxSize: number): { removed: number; freed: number } {
-  let removed = 0, freed = 0;
+export function pruneBackups(
+  dataDir: string,
+  pairID: string,
+  maxAgeMs: number,
+  maxSize: number,
+): { removed: number; freed: number } {
+  let removed = 0,
+    freed = 0;
   if (maxAgeMs <= 0 && maxSize <= 0) return { removed, freed };
   const list = listBackups(dataDir, pairID, "");
   list.sort((a, b) => (a.time || 0) - (b.time || 0)); // oldest first

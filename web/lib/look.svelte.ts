@@ -71,5 +71,7 @@ export { ago, plural } from "./format.ts";
 
 /** A transition's duration, or 0 when motion is reduced (by the system, or Settings → Motion). */
 export function ms(duration: number): number {
-  return document.documentElement.dataset.motion === "reduce" || matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : duration;
+  return document.documentElement.dataset.motion === "reduce" || matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? 0
+    : duration;
 }

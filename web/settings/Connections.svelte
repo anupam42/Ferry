@@ -14,15 +14,24 @@
 </Row>
 {#each SERVICES as s (s.id)}
   {@const c = app.conns?.[s.id]}
-  <Row label={s.name} hint={c?.connected ? `Connected as ${c.user}${c.fromEnv ? " (from an environment variable)" : ""}` : s.what}>
+  <Row
+    label={s.name}
+    hint={c?.connected ? `Connected as ${c.user}${c.fromEnv ? " (from an environment variable)" : ""}` : s.what}
+  >
     <div class="inline">
       <span class="pill" class:green={c?.connected}>{c?.connected ? "Connected" : "Not connected"}</span>
-      <button class="btn small" onclick={() => (app.connectionsOpen = true)}>{c?.connected ? "Manage" : "Connect"}</button>
+      <button class="btn small" onclick={() => (app.connectionsOpen = true)}
+        >{c?.connected ? "Manage" : "Connect"}</button
+      >
     </div>
   </Row>
 {/each}
 
 <style lang="scss">
   @use "tokens" as *;
-  .inline { display: flex; align-items: center; gap: space(2) + 2; }
+  .inline {
+    display: flex;
+    align-items: center;
+    gap: space(2) + 2;
+  }
 </style>

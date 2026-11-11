@@ -105,13 +105,33 @@ export interface Branch {
 }
 
 /** GET /git/{id}/branches */
-export interface BranchList { local: Branch[]; remote: { name: string; date: string; subject: string }[] }
+export interface BranchList {
+  local: Branch[];
+  remote: { name: string; date: string; subject: string }[];
+}
 /** GET /git/{id}/stashes */
-export interface Stash { ref: string; message: string; when: string; branch: string }
+export interface Stash {
+  ref: string;
+  message: string;
+  when: string;
+  branch: string;
+}
 /** GET /git/{id}/tags */
-export interface Tag { name: string; commit: string; date: string; message: string }
+export interface Tag {
+  name: string;
+  commit: string;
+  date: string;
+  message: string;
+}
 /** GET /git/{id}/worktrees */
-export interface Worktree { path: string; branch: string; head: string; main: boolean; locked: boolean; detached: boolean }
+export interface Worktree {
+  path: string;
+  branch: string;
+  head: string;
+  main: boolean;
+  locked: boolean;
+  detached: boolean;
+}
 
 export interface ReflogEntry {
   hash: string;
@@ -172,11 +192,22 @@ export interface FileContent {
 }
 
 /** GET /git/{id}/folder */
-export interface FolderListing { dir: string; entries: FolderEntry[] }
+export interface FolderListing {
+  dir: string;
+  entries: FolderEntry[];
+}
 /** GET /git/{id}/blame */
-export interface Blame { path: string; chunks: BlameChunk[]; truncated: boolean }
+export interface Blame {
+  path: string;
+  chunks: BlameChunk[];
+  truncated: boolean;
+}
 /** GET /git/{id}/undo-timeline */
-export interface UndoTimeline { entries: ReflogEntry[]; lost: LostBranch[]; branch: string }
+export interface UndoTimeline {
+  entries: ReflogEntry[];
+  lost: LostBranch[];
+  branch: string;
+}
 
 export interface PullRequest {
   number: number;
@@ -253,9 +284,15 @@ export interface Issue {
 }
 
 /** GET /git/{id}/prs */
-export interface PullRequestList { provider: string; items: PullRequest[] }
+export interface PullRequestList {
+  provider: string;
+  items: PullRequest[];
+}
 /** GET /git/{id}/issues */
-export interface IssueList { site: string; issues: Issue[] }
+export interface IssueList {
+  site: string;
+  issues: Issue[];
+}
 
 // ---------- insights: heatmaps of commits and files ----------
 
@@ -317,4 +354,7 @@ export interface ShapeTimeline {
 }
 
 /** POST /git/{id}/shape-commit */
-export interface ShapeResult { commits: { hash: string; message: string; files: number }[]; skipped: number }
+export interface ShapeResult {
+  commits: { hash: string; message: string; files: number }[];
+  skipped: number;
+}

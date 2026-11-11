@@ -18,7 +18,8 @@ export class HashCache {
 
   get(p: string): string {
     const st = fs.statSync(p, { bigint: true });
-    const size = Number(st.size), mod = Number(st.mtimeNs);
+    const size = Number(st.size),
+      mod = Number(st.mtimeNs);
     const en = this.m.get(p);
     if (en && en.s === size && en.m === mod) {
       en.used = true;

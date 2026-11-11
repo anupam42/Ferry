@@ -24,9 +24,23 @@ import { exec } from "./proc.ts";
 
 const baseEnv = () => ({ ...process.env, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" });
 
-async function git(root: string, args: string[], o: { env?: Record<string, string>; stdin?: Uint8Array | string } = {}): Promise<string> {
-  const r = await exec(["git", "-C", root, ...args], { env: { ...baseEnv(), ...(o.env ?? {}) }, stdin: o.stdin, timeoutMs: 120_000 });
-  if (r.code !== 0) throw new GitClientError((r.stderr || r.stdout || r.error || "git failed").trim().split("\n")[0]!.replace(/^(error|fatal): /, ""));
+async function git(
+  root: string,
+  args: string[],
+  o: { env?: Record<string, string>; stdin?: Uint8Array | string } = {},
+): Promise<string> {
+  const r = await exec(["git", "-C", root, ...args], {
+    env: { ...baseEnv(), ...(o.env ?? {}) },
+    stdin: o.stdin,
+    timeoutMs: 120_000,
+  });
+  if (r.code !== 0)
+    throw new GitClientError(
+      (r.stderr || r.stdout || r.error || "git failed")
+        .trim()
+        .split("\n")[0]!
+        .replace(/^(error|fatal): /, ""),
+    );
   return r.stdout;
 }
 
@@ -64,7 +78,8 @@ async function load(root: string, engines: Engine[]): Promise<{ t: ShapeTimeline
   const raw: Raw[] = [];
   for (const e of pairs) {
     const prefix = toPosix(path.relative(root, path.resolve(e.cfg.target)));
-    for (const b of history(e.dataDir, e.id)) if (!b.undone && batchTime(b) > since) raw.push({ b, prefix, pair: e.name });
+    for (const b of history(e.dataDir, e.id))
+      if (!b.undone && batchTime(b) > since) raw.push({ b, prefix, pair: e.name });
   }
   raw.sort((x, y) => batchTime(x.b) - batchTime(y.b));
 
@@ -98,7 +113,14 @@ async function load(root: string, engines: Engine[]): Promise<{ t: ShapeTimeline
   }
   const recorded = new Set(events.keys());
   return {
-    t: { head, branch: st.branch, since: since ? new Date(since).toISOString() : "", batches, unrecorded: [...changed].filter((p) => !recorded.has(p)).sort(), pairs: pairs.map((e) => e.name) },
+    t: {
+      head,
+      branch: st.branch,
+      since: since ? new Date(since).toISOString() : "",
+      batches,
+      unrecorded: [...changed].filter((p) => !recorded.has(p)).sort(),
+      pairs: pairs.map((e) => e.name),
+    },
     events,
   };
 }
@@ -110,7 +132,10 @@ export async function timeline(root: string, engines: Engine[]): Promise<ShapeTi
 
 /** Works out each file's content after any sync, from backups and the files as they are now. */
 class Versions {
-  constructor(private root: string, private events: Map<string, Event[]>) {}
+  constructor(
+    private root: string,
+    private events: Map<string, Event[]>,
+  ) {}
 
   /** The content after event i of this file. */
   private after(file: string, i: number): Content {
@@ -151,33 +176,62 @@ function checkGroups(t: ShapeTimeline, groups: unknown): string[][] {
   if (!Array.isArray(groups) || !groups.length) throw new GitClientError("there's nothing to commit");
   const out = groups.map((g) => {
     const ids = (g as { batches?: unknown })?.batches;
-    if (!Array.isArray(ids) || !ids.length || ids.some((x) => typeof x !== "string")) throw new GitClientError("each commit needs at least one sync");
+    if (!Array.isArray(ids) || !ids.length || ids.some((x) => typeof x !== "string"))
+      throw new GitClientError("each commit needs at least one sync");
     return ids as string[];
   });
   const flat = out.flat();
   if (flat.length !== t.batches.length || flat.some((id, i) => id !== t.batches[i]!.id)) {
-    throw new GitClientError("the timeline changed while you were shaping it (Ferry synced again); have another look", "stale");
+    throw new GitClientError(
+      "the timeline changed while you were shaping it (Ferry synced again); have another look",
+      "stale",
+    );
   }
   return out;
 }
 
 /** What one group changed in one file (for the web app's preview of a step). */
-export async function groupDiff(root: string, engines: Engine[], body: { batches?: unknown; path?: unknown }): Promise<{ lines: Line[]; before: string; after: string }> {
+export async function groupDiff(
+  root: string,
+  engines: Engine[],
+  body: { batches?: unknown; path?: unknown },
+): Promise<{ lines: Line[]; before: string; after: string }> {
   const { t, events } = await load(root, engines);
   const ids = Array.isArray(body.batches) ? (body.batches as unknown[]).map(String) : [];
   const idx = ids.map((id) => t.batches.findIndex((b) => b.id === id)).filter((i) => i >= 0);
   const file = String(body.path ?? "");
   if (!idx.length || !events.has(file)) throw new GitClientError("that change isn't in the timeline any more", "stale");
   const v = new Versions(root, events);
-  const first = Math.min(...idx), last = Math.max(...idx);
+  const first = Math.min(...idx),
+    last = Math.max(...idx);
   const before = await contentBefore(root, t, v, file, first);
   const after = v.at(file, last);
-  if (before === "unknown" || after === "unknown") return { lines: [{ op: "@", text: "Ferry doesn't have a copy of this step (backups were off or pruned); it'll land in a later commit" }], before: "", after: "" };
-  return { lines: lineDiff(before ?? Buffer.alloc(0), after ?? Buffer.alloc(0), 3), before: first === 0 ? "Last commit" : "Before this step", after: "After this step" };
+  if (before === "unknown" || after === "unknown")
+    return {
+      lines: [
+        {
+          op: "@",
+          text: "Ferry doesn't have a copy of this step (backups were off or pruned); it'll land in a later commit",
+        },
+      ],
+      before: "",
+      after: "",
+    };
+  return {
+    lines: lineDiff(before ?? Buffer.alloc(0), after ?? Buffer.alloc(0), 3),
+    before: first === 0 ? "Last commit" : "Before this step",
+    after: "After this step",
+  };
 }
 
 /** The file before batch `first`: its state after an earlier sync, or as it is in the last commit. */
-async function contentBefore(root: string, t: ShapeTimeline, v: Versions, file: string, first: number): Promise<Content> {
+async function contentBefore(
+  root: string,
+  t: ShapeTimeline,
+  v: Versions,
+  file: string,
+  first: number,
+): Promise<Content> {
   const prev = first > 0 ? v.at(file, first - 1) : undefined;
   if (prev !== undefined) return prev;
   if (!t.head) return null;
@@ -191,9 +245,14 @@ export interface ShapePlan {
 }
 
 /** Makes one commit per group, then moves the branch to the last one. Returns the new commits, oldest first. */
-export async function shape(root: string, engines: Engine[], plan: ShapePlan): Promise<{ commits: { hash: string; message: string; files: number }[]; skipped: number }> {
+export async function shape(
+  root: string,
+  engines: Engine[],
+  plan: ShapePlan,
+): Promise<{ commits: { hash: string; message: string; files: number }[]; skipped: number }> {
   const { t, events } = await load(root, engines);
-  if (String(plan.head ?? "") !== t.head) throw new GitClientError("the branch has moved since you opened this (a new commit?); have another look", "stale");
+  if (String(plan.head ?? "") !== t.head)
+    throw new GitClientError("the branch has moved since you opened this (a new commit?); have another look", "stale");
   const groups = checkGroups(t, plan.groups);
   const messages = (plan.groups as { message?: unknown }[]).map((g, i) => {
     const m = typeof g.message === "string" ? g.message.trim() : "";
@@ -201,7 +260,9 @@ export async function shape(root: string, engines: Engine[], plan: ShapePlan): P
     return m;
   });
   const v = new Versions(root, events);
-  const sign = (await exec(["git", "-C", root, "config", "--bool", "commit.gpgsign"], { env: baseEnv() })).stdout.trim() === "true";
+  const sign =
+    (await exec(["git", "-C", root, "config", "--bool", "commit.gpgsign"], { env: baseEnv() })).stdout.trim() ===
+    "true";
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ferry-shape-"));
   const env = { GIT_INDEX_FILE: path.join(tmp, "index") };
@@ -224,9 +285,11 @@ export async function shape(root: string, engines: Engine[], plan: ShapePlan): P
       modes.set(file, m);
       return m;
     };
-    let parent = t.head, parentTree = t.head ? (await git(root, ["rev-parse", `${t.head}^{tree}`])).trim() : "";
+    let parent = t.head,
+      parentTree = t.head ? (await git(root, ["rev-parse", `${t.head}^{tree}`])).trim() : "";
     const commits: { hash: string; message: string; files: number }[] = [];
-    let skipped = 0, end = -1;
+    let skipped = 0,
+      end = -1;
     const written = new Map<string, Content>(); // what the scratch index holds for each file, to skip no-ops
     for (let g = 0; g < groups.length; g++) {
       end += groups[g]!.length;
@@ -245,7 +308,10 @@ export async function shape(root: string, engines: Engine[], plan: ShapePlan): P
         touched++;
       }
       const tree = (await git(root, ["write-tree"], { env })).trim();
-      if (tree === parentTree) { skipped++; continue; } // this step changed nothing in the end (e.g. undone in the same group)
+      if (tree === parentTree) {
+        skipped++;
+        continue;
+      } // this step changed nothing in the end (e.g. undone in the same group)
       const when = t.batches[end]!.time; // the author date is when the work happened
       const args = ["commit-tree", tree, ...(parent ? ["-p", parent] : []), ...(sign ? ["-S"] : []), "-F", "-"];
       const hash = (await git(root, args, { stdin: messages[g]! + "\n", env: { GIT_AUTHOR_DATE: when } })).trim();
@@ -256,10 +322,20 @@ export async function shape(root: string, engines: Engine[], plan: ShapePlan): P
     if (!commits.length) throw new GitClientError("those steps add up to no change from the last commit");
     // move the branch, but only if nobody else moved it meanwhile
     const ref = "refs/heads/" + t.branch;
-    await git(root, ["update-ref", "-m", `ferry: shaped ${commits.length} commit(s)`, ref, parent, t.head || "0".repeat(40)]);
+    await git(root, [
+      "update-ref",
+      "-m",
+      `ferry: shaped ${commits.length} commit(s)`,
+      ref,
+      parent,
+      t.head || "0".repeat(40),
+    ]);
     // the shaped files now match the new commit; other staged or unstaged changes are left alone
     const files = [...events.keys()];
-    if (files.length) await git(root, ["reset", "-q", parent, "--pathspec-from-file=-", "--pathspec-file-nul"], { stdin: files.join("\0") });
+    if (files.length)
+      await git(root, ["reset", "-q", parent, "--pathspec-from-file=-", "--pathspec-file-nul"], {
+        stdin: files.join("\0"),
+      });
     return { commits, skipped };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

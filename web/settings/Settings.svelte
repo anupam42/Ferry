@@ -34,13 +34,20 @@
   <div class="grid">
     <nav aria-label="Settings sections">
       {#each SECTIONS as s (s.id)}
-        <button class:on={s.id === current.id} aria-current={s.id === current.id ? "page" : undefined} onclick={() => pick(s.id)}>
+        <button
+          class:on={s.id === current.id}
+          aria-current={s.id === current.id ? "page" : undefined}
+          onclick={() => pick(s.id)}
+        >
           <Icon name={s.icon} size={18} />{s.name}
         </button>
       {/each}
     </nav>
     <section class="card panel" aria-labelledby="set-title">
-      <header><span class="chip"><Icon name={current.icon} size={18} /></span><h2 id="set-title">{current.name}</h2></header>
+      <header>
+        <span class="chip"><Icon name={current.icon} size={18} /></span>
+        <h2 id="set-title">{current.name}</h2>
+      </header>
       {#if current.needs && !app.settings && !app.settingsError}
         <RelayLoading say="Looking at your settings" card={false} />
       {:else if current.needs && app.settingsError}
@@ -56,33 +63,105 @@
   @use "tokens" as *;
   @use "mixins" as *;
 
-  .page { max-width: 1120px; margin: 0 auto; padding: space(3) + 2 space(6) space(10); }
-  .eyebrow {
-    display: flex; align-items: center; gap: space(2); color: var(--muted);
-    font-size: fs(sm); font-weight: $weight-bold; letter-spacing: .08em; text-transform: uppercase;
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: space(3) + 2 space(6) space(10);
   }
-  h1 { margin: space(2) 0 space(1); font-size: fs(xxl); letter-spacing: -.01em; }
-  .sub { margin: 0 0 space(5) + 2; color: var(--muted); }
-  .grid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: space(6); align-items: start; }
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: space(2);
+    color: var(--muted);
+    font-size: fs(sm);
+    font-weight: $weight-bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: space(2) 0 space(1);
+    font-size: fs(xxl);
+    letter-spacing: -0.01em;
+  }
+  .sub {
+    margin: 0 0 space(5) + 2;
+    color: var(--muted);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: space(6);
+    align-items: start;
+  }
   nav {
-    display: flex; flex-direction: column; gap: space(1); position: sticky; top: space(4) + 2;
+    display: flex;
+    flex-direction: column;
+    gap: space(1);
+    position: sticky;
+    top: space(4) + 2;
     button {
-      display: flex; align-items: center; gap: space(3); padding: space(2) + 2 space(3) + 2; border: 0; border-radius: $radius-md;
-      background: none; color: var(--muted); font-size: fs(md); font-weight: $weight-medium; text-align: left; cursor: pointer;
-      &:hover { background: var(--card2); color: var(--text); }
-      &.on { background: var(--accent-soft); color: var(--accent); font-weight: $weight-semibold; }
+      display: flex;
+      align-items: center;
+      gap: space(3);
+      padding: space(2) + 2 space(3) + 2;
+      border: 0;
+      border-radius: $radius-md;
+      background: none;
+      color: var(--muted);
+      font-size: fs(md);
+      font-weight: $weight-medium;
+      text-align: left;
+      cursor: pointer;
+      &:hover {
+        background: var(--card2);
+        color: var(--text);
+      }
+      &.on {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: $weight-semibold;
+      }
     }
   }
-  .panel { overflow: hidden; }
+  .panel {
+    overflow: hidden;
+  }
   header {
-    display: flex; align-items: center; gap: space(3); padding: space(4) space(5) + 2; border-bottom: 1px solid var(--line);
-    h2 { font-size: fs(lg); }
+    display: flex;
+    align-items: center;
+    gap: space(3);
+    padding: space(4) space(5) + 2;
+    border-bottom: 1px solid var(--line);
+    h2 {
+      font-size: fs(lg);
+    }
   }
-  .chip { width: 34px; height: 34px; border-radius: $radius-md - 2; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
-  .error { padding: space(4) space(5) + 2; color: var(--red); }
+  .chip {
+    width: 34px;
+    height: 34px;
+    border-radius: $radius-md - 2;
+    display: grid;
+    place-items: center;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .error {
+    padding: space(4) space(5) + 2;
+    color: var(--red);
+  }
   @include below(tablet) {
-    .grid { grid-template-columns: 1fr; }
-    nav { position: static; flex-direction: row; flex-wrap: wrap; }
+    .grid {
+      grid-template-columns: 1fr;
+    }
+    nav {
+      position: static;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
   }
-  @include below(phone) { .page { padding: space(1) + 2 space(1) space(8); } }
+  @include below(phone) {
+    .page {
+      padding: space(1) + 2 space(1) space(8);
+    }
+  }
 </style>

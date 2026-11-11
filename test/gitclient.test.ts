@@ -7,7 +7,15 @@ import * as g from "../src/gitclient.ts";
 import { tempDir } from "./helpers.ts";
 
 const sh = (dir: string, ...args: string[]) => {
-  const r = Bun.spawnSync(["git", "-C", dir, ...args], { env: { ...process.env, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.com" } });
+  const r = Bun.spawnSync(["git", "-C", dir, ...args], {
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: "T",
+      GIT_AUTHOR_EMAIL: "t@example.com",
+      GIT_COMMITTER_NAME: "T",
+      GIT_COMMITTER_EMAIL: "t@example.com",
+    },
+  });
   if (r.exitCode !== 0) throw new Error(r.stderr.toString());
   return r.stdout.toString();
 };
@@ -51,7 +59,12 @@ describe("git client", () => {
     const u = await g.undoCommit(d);
     expect(u.subject).toBe("second, amended");
     st = await g.state(d);
-    expect(st.files.filter((f) => f.staged).map((f) => f.path).sort()).toEqual(["a.txt", "new.txt"]);
+    expect(
+      st.files
+        .filter((f) => f.staged)
+        .map((f) => f.path)
+        .sort(),
+    ).toEqual(["a.txt", "new.txt"]);
     expect(st.lastCommit!.subject).toBe("first");
   });
 
@@ -60,7 +73,9 @@ describe("git client", () => {
     put(d, "a.txt", "zero\none\nTWO\nthree\nfour\n");
     const { lines } = await g.fileDiff(d, "a.txt", false);
     // pick only the edit of line two: the "-two" and "+TWO" lines
-    const pick = lines.map((l, i) => ((l.op === "-" && l.text === "two") || (l.op === "+" && l.text === "TWO") ? i : -1)).filter((i) => i >= 0);
+    const pick = lines
+      .map((l, i) => ((l.op === "-" && l.text === "two") || (l.op === "+" && l.text === "TWO") ? i : -1))
+      .filter((i) => i >= 0);
     expect(pick.length).toBe(2);
     await g.stageLines(d, "a.txt", pick);
     expect(sh(d, "show", ":a.txt")).toBe("one\nTWO\nthree\n");
@@ -272,14 +287,29 @@ describe("git client over HTTP", () => {
     const { setup, write, runOnce } = await import("./helpers.ts");
     const d = await repo();
     const opened: string[] = [d];
-    const repos = { list: () => opened, add: (x: string) => void opened.push(x), remove: (x: string) => void opened.splice(opened.indexOf(x), 1) };
+    const repos = {
+      list: () => opened,
+      add: (x: string) => void opened.push(x),
+      remove: (x: string) => void opened.splice(opened.indexOf(x), 1),
+    };
     const { e, s } = setup((p) => (p.target = path.join(d, "site")));
     write(s, "index.html", "<h1>hi</h1>");
     await runOnce(e);
     const api = new ApiServer([e], "", { repos });
-    const call = (p: string, body?: unknown) => api.handle(new Request("http://127.0.0.1" + p, body === undefined ? undefined : { method: "POST", headers: { "X-Ferry": "1" }, body: JSON.stringify(body) }));
+    const call = (p: string, body?: unknown) =>
+      api.handle(
+        new Request(
+          "http://127.0.0.1" + p,
+          body === undefined ? undefined : { method: "POST", headers: { "X-Ferry": "1" }, body: JSON.stringify(body) },
+        ),
+      );
 
-    const list = (await (await call("/git/repos")).json()) as { id: string; path: string; pairs: string[]; standalone: boolean }[];
+    const list = (await (await call("/git/repos")).json()) as {
+      id: string;
+      path: string;
+      pairs: string[];
+      standalone: boolean;
+    }[];
     expect(list).toHaveLength(1); // the pair's target is inside the same repository
     expect(list[0]!.pairs).toEqual([e.name]);
     const id = list[0]!.id;
@@ -287,10 +317,15 @@ describe("git client over HTTP", () => {
     expect(st.files.map((f) => f.path)).toEqual(["site/index.html"]);
 
     expect((await call(`/git/${id}/stage`, { files: ["site/index.html"] })).status).toBe(200);
-    const c = (await (await call(`/git/${id}/commit`, { message: "add site" })).json()) as { commit: string; paused: string[] };
+    const c = (await (await call(`/git/${id}/commit`, { message: "add site" })).json()) as {
+      commit: string;
+      paused: string[];
+    };
     expect(c.commit).toMatch(/^[0-9a-f]+$/);
     expect(c.paused).toEqual([]); // committing doesn't touch the files
-    const sw = (await (await call(`/git/${id}/branch-create`, { name: "next", checkout: true })).json()) as { branch: string };
+    const sw = (await (await call(`/git/${id}/branch-create`, { name: "next", checkout: true })).json()) as {
+      branch: string;
+    };
     expect(sw.branch).toBe("next");
     const back = (await (await call(`/git/${id}/branch-switch`, { name: "main" })).json()) as { paused: string[] };
     expect(back.paused).toEqual([e.name]); // switching branches rewrites files: the pair is paused first
@@ -301,7 +336,9 @@ describe("git client over HTTP", () => {
     expect(bad.status).toBe(409);
     expect(((await bad.json()) as { error: string }).error).toContain("can't start");
     expect((await call("/git/nope/state")).status).toBe(404);
-    const noPost = await api.handle(new Request("http://127.0.0.1/git/" + id + "/stage", { method: "POST", body: "{}" }));
+    const noPost = await api.handle(
+      new Request("http://127.0.0.1/git/" + id + "/stage", { method: "POST", body: "{}" }),
+    );
     expect(noPost.status).toBe(403); // the X-Ferry header is still required
   });
 });
@@ -336,7 +373,17 @@ describe("insights", () => {
       put(d, file, `${file} ${when.getTime()}\n`);
       sh(d, "add", "-A");
       const iso = when.toISOString();
-      Bun.spawnSync(["git", "-C", d, "commit", "-q", "-m", "work on " + file], { env: { ...process.env, GIT_AUTHOR_NAME: "X", GIT_AUTHOR_EMAIL: email, GIT_AUTHOR_DATE: iso, GIT_COMMITTER_NAME: "X", GIT_COMMITTER_EMAIL: email, GIT_COMMITTER_DATE: iso } });
+      Bun.spawnSync(["git", "-C", d, "commit", "-q", "-m", "work on " + file], {
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: "X",
+          GIT_AUTHOR_EMAIL: email,
+          GIT_AUTHOR_DATE: iso,
+          GIT_COMMITTER_NAME: "X",
+          GIT_COMMITTER_EMAIL: email,
+          GIT_COMMITTER_DATE: iso,
+        },
+      });
     };
     commitAt(at(1, 10), "b.txt");
     commitAt(at(2, 10), "b.txt");
@@ -364,7 +411,11 @@ describe("insights", () => {
 
     const mine = await g.insights(d, { author: "me" });
     expect(mine.total).toBe(6);
-    expect(Object.values(mine.dayCommits).flat().every((c) => c.author !== "X" || c.subject !== "work on c.txt")).toBe(true);
+    expect(
+      Object.values(mine.dayCommits)
+        .flat()
+        .every((c) => c.author !== "X" || c.subject !== "work on c.txt"),
+    ).toBe(true);
   });
 
   test("browsing the work tree: tracked files and file contents", async () => {

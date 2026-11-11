@@ -22,7 +22,11 @@ async function scene() {
   await g.stage(d, []);
   await g.commit(d, "first");
   await Bun.sleep(1100); // syncs must come after the commit's (whole-second) time
-  const { e, s } = setup((p) => { p.target = d; p.onDelete = "propagate"; p.delete = false; }); // syncs straight into the repository, deletes too
+  const { e, s } = setup((p) => {
+    p.target = d;
+    p.onDelete = "propagate";
+    p.delete = false;
+  }); // syncs straight into the repository, deletes too
   write(s, "README.md", "hello\n");
   write(s, "old.txt", "going away\n");
   await runOnce(e); // nothing to copy: both sides match
@@ -70,7 +74,10 @@ test("groups of syncs become commits with the content from that moment; your fol
   const before = sh(d, "rev-parse", "HEAD").trim();
   const r = await shaper.shape(d, [e], {
     head: t.head,
-    groups: [{ batches: [t.batches[0]!.id], message: "Start a.txt" }, { batches: [t.batches[1]!.id, t.batches[2]!.id], message: "Add b.txt, finish a.txt\n\nAnd retire old.txt." }],
+    groups: [
+      { batches: [t.batches[0]!.id], message: "Start a.txt" },
+      { batches: [t.batches[1]!.id, t.batches[2]!.id], message: "Add b.txt, finish a.txt\n\nAnd retire old.txt." },
+    ],
   });
   expect(r.commits.map((c) => c.message)).toEqual(["Start a.txt", "Add b.txt, finish a.txt"]);
   const [c1, c2] = r.commits.map((c) => c.hash);
@@ -95,8 +102,12 @@ test("refuses a plan that no longer matches: a new commit, or a sync that arrive
   const t = await shaper.timeline(d, [e]);
   const groups = [{ batches: t.batches.map((b) => b.id), message: "All of it" }];
   await expect(shaper.shape(d, [e], { head: "0".repeat(40), groups })).rejects.toThrow(/branch has moved/);
-  await expect(shaper.shape(d, [e], { head: t.head, groups: [{ batches: t.batches.slice(1).map((b) => b.id), message: "x" }] })).rejects.toThrow(/timeline changed/);
-  await expect(shaper.shape(d, [e], { head: t.head, groups: [{ batches: t.batches.map((b) => b.id), message: " " }] })).rejects.toThrow(/needs a message/);
+  await expect(
+    shaper.shape(d, [e], { head: t.head, groups: [{ batches: t.batches.slice(1).map((b) => b.id), message: "x" }] }),
+  ).rejects.toThrow(/timeline changed/);
+  await expect(
+    shaper.shape(d, [e], { head: t.head, groups: [{ batches: t.batches.map((b) => b.id), message: " " }] }),
+  ).rejects.toThrow(/needs a message/);
   expect(sh(d, "rev-parse", "HEAD").trim()).toBe(t.head); // nothing moved
 });
 
@@ -105,7 +116,10 @@ test("a step whose backup is gone rolls into the next commit instead of being gu
   const t = await shaper.timeline(d, [e]);
   // remove every backup: a.txt's in-between versions (v1, v2) are no longer known
   fs.rmSync(path.join(e.dataDir, e.id, "backups"), { recursive: true, force: true });
-  const r = await shaper.shape(d, [e], { head: t.head, groups: t.batches.map((b, i) => ({ batches: [b.id], message: "step " + (i + 1) })) });
+  const r = await shaper.shape(d, [e], {
+    head: t.head,
+    groups: t.batches.map((b, i) => ({ batches: [b.id], message: "step " + (i + 1) })),
+  });
   const last = r.commits[r.commits.length - 1]!.hash;
   expect(show(d, last, "a.txt")).toBe("v3\n");
   // no commit claims a version Ferry can't vouch for: a.txt only ever appears as v3
@@ -118,7 +132,12 @@ test("over HTTP: the web app's timeline, step preview and commit calls", async (
   const { d, e } = await scene();
   const api = new ApiServer([e], "", { repos: { list: () => [d], add() {}, remove() {} } });
   const call = async (p: string, body?: unknown) => {
-    const res = await api.handle(new Request("http://127.0.0.1" + p, body === undefined ? undefined : { method: "POST", headers: { "X-Ferry": "1" }, body: JSON.stringify(body) }));
+    const res = await api.handle(
+      new Request(
+        "http://127.0.0.1" + p,
+        body === undefined ? undefined : { method: "POST", headers: { "X-Ferry": "1" }, body: JSON.stringify(body) },
+      ),
+    );
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   };
   const id = ((await call("/git/repos")).body as unknown as { id: string }[])[0]!.id;
@@ -126,10 +145,16 @@ test("over HTTP: the web app's timeline, step preview and commit calls", async (
   expect(t.batches).toHaveLength(3);
   const diff = await call(`/git/${id}/shape-diff`, { batches: [t.batches[2]!.id], path: "old.txt" });
   expect(JSON.stringify(diff.body.lines)).toContain("going away");
-  const made = await call(`/git/${id}/shape-commit`, { head: t.head, groups: [{ batches: t.batches.map((b) => b.id), message: "Everything at once" }] });
+  const made = await call(`/git/${id}/shape-commit`, {
+    head: t.head,
+    groups: [{ batches: t.batches.map((b) => b.id), message: "Everything at once" }],
+  });
   expect(made.status).toBe(200);
   expect((made.body.commits as { message: string }[]).map((c) => c.message)).toEqual(["Everything at once"]);
-  const again = await call(`/git/${id}/shape-commit`, { head: t.head, groups: [{ batches: t.batches.map((b) => b.id), message: "twice" }] });
+  const again = await call(`/git/${id}/shape-commit`, {
+    head: t.head,
+    groups: [{ batches: t.batches.map((b) => b.id), message: "twice" }],
+  });
   expect(again.status).toBe(409); // the branch moved: the old plan is refused
   expect(again.body.code).toBe("stale");
 });

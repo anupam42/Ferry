@@ -16,11 +16,13 @@ async function getGlobal(key: string): Promise<string> {
 }
 
 async function setGlobal(key: string, value: string | null): Promise<void> {
-  const r = value === null
-    ? await exec(["git", "config", "--global", "--unset", key], { env: env() })
-    : await exec(["git", "config", "--global", key, value], { env: env() });
+  const r =
+    value === null
+      ? await exec(["git", "config", "--global", "--unset", key], { env: env() })
+      : await exec(["git", "config", "--global", key, value], { env: env() });
   // exit 5 from --unset means it wasn't set: that's fine
-  if (r.code !== 0 && !(value === null && r.code === 5)) throw new SettingsError(`couldn't save ${key}: ${(r.stderr || r.error || "").trim()}`);
+  if (r.code !== 0 && !(value === null && r.code === 5))
+    throw new SettingsError(`couldn't save ${key}: ${(r.stderr || r.error || "").trim()}`);
 }
 
 export class SettingsError extends Error {}
@@ -28,9 +30,17 @@ export class SettingsError extends Error {}
 export type { GitSettings } from "./shared/settings.ts";
 
 export async function readSettings(configFile: string): Promise<SettingsResponse> {
-  const [name, email, branch, rebase, sign] = await Promise.all(["user.name", "user.email", "init.defaultBranch", "pull.rebase", "commit.gpgsign"].map(getGlobal));
+  const [name, email, branch, rebase, sign] = await Promise.all(
+    ["user.name", "user.email", "init.defaultBranch", "pull.rebase", "commit.gpgsign"].map(getGlobal),
+  );
   return {
-    git: { name: name!, email: email!, default_branch: branch!, pull: rebase === "true" ? "rebase" : rebase === "false" ? "merge" : "", sign: sign === "true" },
+    git: {
+      name: name!,
+      email: email!,
+      default_branch: branch!,
+      pull: rebase === "true" ? "rebase" : rebase === "false" ? "merge" : "",
+      sign: sign === "true",
+    },
     ai: { configured: !!process.env.ANTHROPIC_API_KEY },
     data_dir: dataDir(),
     config_file: configFile,

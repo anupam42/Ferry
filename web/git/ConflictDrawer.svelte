@@ -14,9 +14,17 @@
   let d = $state<FileDiff | null>(null);
   let error = $state("");
   let nav = $state<StoryNav>();
-  $effect(() => { api<FileDiff>("GET", fileURL("conflict", path)).then((r) => (d = r), (e) => (error = (e as Error).message)); });
+  $effect(() => {
+    api<FileDiff>("GET", fileURL("conflict", path)).then(
+      (r) => (d = r),
+      (e) => (error = (e as Error).message),
+    );
+  });
   const close = () => (git.conflict = null);
-  const pick = (choice: "ours" | "theirs" | "both", text: string) => { void resolveFile(path, choice, text); close(); };
+  const pick = (choice: "ours" | "theirs" | "both", text: string) => {
+    void resolveFile(path, choice, text);
+    close();
+  };
 </script>
 
 <Drawer title={name} sub="Changed on both branches" wide onclose={close}>
@@ -27,7 +35,9 @@
     {#if nav && nav.count}
       <span class="left muted">Change {nav.at + 1} of {nav.count}</span>
       <button class="btn small" disabled={nav.at === 0} onclick={() => nav!.go(nav!.at - 1)}>↑ Previous</button>
-      <button class="btn small" disabled={nav.at === nav.count - 1} onclick={() => nav!.go(nav!.at + 1)}>Next change ↓</button>
+      <button class="btn small" disabled={nav.at === nav.count - 1} onclick={() => nav!.go(nav!.at + 1)}
+        >Next change ↓</button
+      >
     {/if}
     {#if clash}
       <button class="btn small" onclick={() => pick("theirs", "kept your edits")}>Keep my edits</button>

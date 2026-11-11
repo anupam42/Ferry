@@ -28,7 +28,18 @@ async function start() {
   releases.start();
   restorePlace(); // after a dev reload: the same section, view and scroll
   mount(App, { target: document.getElementById("app")! });
-  connectEvents({ info: app.info, reload: reloadHere, onEvent: (ev) => { sync.onEvent(ev); notes.add(ev); relay.onEvent(ev); }, onOnline: (up) => { if (up) sync.soon(); } });
+  connectEvents({
+    info: app.info,
+    reload: reloadHere,
+    onEvent: (ev) => {
+      sync.onEvent(ev);
+      notes.add(ev);
+      relay.onEvent(ev);
+    },
+    onOnline: (up) => {
+      if (up) sync.soon();
+    },
+  });
 }
 
 void start();

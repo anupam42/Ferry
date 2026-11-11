@@ -75,7 +75,6 @@ const MASCOT: Record<string, string> = {
   comparing: mascot_comparing as unknown as string,
 };
 
-
 /** Adds and removes pairs while ferry runs (provided by "ferry ui"). */
 export interface PairManager {
   /** Where added pairs are saved, or "" if they only last for this session. */
@@ -95,7 +94,18 @@ export interface ApiOptions {
 type Sub = (chunk: string) => void;
 
 /** Event kinds kept for the web app's notifications (per-file copies are summed up by "synced"). */
-const NOTABLE = new Set(["conflict", "resolved", "error", "warn", "skip", "commit", "synced", "paused", "resumed", "info"]);
+const NOTABLE = new Set([
+  "conflict",
+  "resolved",
+  "error",
+  "warn",
+  "skip",
+  "commit",
+  "synced",
+  "paused",
+  "resumed",
+  "info",
+]);
 const RECENT_MAX = 300;
 
 const enc = new TextEncoder();
@@ -107,7 +117,11 @@ export class ApiServer {
 
   private git: GitApi;
 
-  constructor(private engines: Engine[], private token: string, private opts: ApiOptions = {}) {
+  constructor(
+    private engines: Engine[],
+    private token: string,
+    private opts: ApiOptions = {},
+  ) {
     this.git = new GitApi(engines, opts.repos ?? null);
   }
 
@@ -166,14 +180,23 @@ export class ApiServer {
     }
     if (req.method === "GET" && (url.pathname === "/logo.svg" || url.pathname === "/favicon.ico")) {
       return new Response(logoSVG as unknown as string, {
-        headers: { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=86400", "X-Content-Type-Options": "nosniff" },
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Cache-Control": "max-age=86400",
+          "X-Content-Type-Options": "nosniff",
+        },
       });
     }
-    const mascotName = /^\/mascot\/([a-z]+)\.svg$/.exec(url.pathname)?.[1]
-      ?? (url.pathname === "/relay.svg" ? "relay" : url.pathname === "/relay-comparing.svg" ? "comparing" : "");
+    const mascotName =
+      /^\/mascot\/([a-z]+)\.svg$/.exec(url.pathname)?.[1] ??
+      (url.pathname === "/relay.svg" ? "relay" : url.pathname === "/relay-comparing.svg" ? "comparing" : "");
     if (req.method === "GET" && mascotName && MASCOT[mascotName]) {
       return new Response(MASCOT[mascotName], {
-        headers: { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=86400", "X-Content-Type-Options": "nosniff" },
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Cache-Control": "max-age=86400",
+          "X-Content-Type-Options": "nosniff",
+        },
       });
     }
     if (req.method === "GET" && url.pathname === "/status") {
@@ -182,16 +205,29 @@ export class ApiServer {
     if (req.method === "GET" && url.pathname === "/info") {
       const m = this.opts.manager;
       return json({
-        version: this.opts.version ?? "", can_add: !!m, can_open_repos: !!this.opts.repos, config_file: m?.configFile ?? "",
-        home: os.homedir(), platform: process.platform, sep: path.sep, ...(this.opts.dev ? { dev: { boot: this.opts.dev.boot } } : {}),
+        version: this.opts.version ?? "",
+        can_add: !!m,
+        can_open_repos: !!this.opts.repos,
+        config_file: m?.configFile ?? "",
+        home: os.homedir(),
+        platform: process.platform,
+        sep: path.sep,
+        ...(this.opts.dev ? { dev: { boot: this.opts.dev.boot } } : {}),
       });
     }
     if (req.method === "GET" && url.pathname === "/fs") return this.listDir(url);
     // release notes and release info (Settings → Updates and About, "What's new")
     if (req.method === "GET" && url.pathname === "/release") {
       return json({
-        version: this.opts.version || VERSION, commit: COMMIT, built: BUILD_DATE, dev: !!this.opts.dev, install: release.installMethod(),
-        platform: process.platform, arch: process.arch, bun: Bun.version, releases: release.releases(),
+        version: this.opts.version || VERSION,
+        commit: COMMIT,
+        built: BUILD_DATE,
+        dev: !!this.opts.dev,
+        install: release.installMethod(),
+        platform: process.platform,
+        arch: process.arch,
+        bun: Bun.version,
+        releases: release.releases(),
       });
     }
     if (req.method === "GET" && url.pathname === "/release/health") return json(await release.health());
@@ -200,7 +236,11 @@ export class ApiServer {
       try {
         const latest = await release.latestRelease();
         const current = this.opts.version || VERSION;
-        return json({ ...latest, current, newer: !!latest.version && release.compareVersions(latest.version, current) > 0 });
+        return json({
+          ...latest,
+          current,
+          newer: !!latest.version && release.compareVersions(latest.version, current) > 0,
+        });
       } catch (err) {
         return text(errMsg(err), 502);
       }
@@ -283,14 +323,23 @@ export class ApiServer {
     const { title, lines } = await e.diff(rel, conflict);
     if (url.searchParams.get("format") === "json") {
       // what the two sides are, in plain words, for the web app's change viewer
-      const kind = conflict || title.startsWith("target ↔ source") ? "sides" : title.startsWith("new file") ? "new" : "head";
+      const kind =
+        conflict || title.startsWith("target ↔ source") ? "sides" : title.startsWith("new file") ? "new" : "head";
       const labels = {
         sides: ["In the target", "In your working folder"],
         head: ["Last commit", "Now in the target"],
         new: ["Not in the last commit", "Now in the target"],
       }[kind];
       const more = Math.max(0, lines.length - MAX_DIFF_LINES);
-      return json({ path: rel, title, kind, before: labels[0], after: labels[1], lines: more ? lines.slice(0, MAX_DIFF_LINES) : lines, ...(more ? { more } : {}) });
+      return json({
+        path: rel,
+        title,
+        kind,
+        before: labels[0],
+        after: labels[1],
+        lines: more ? lines.slice(0, MAX_DIFF_LINES) : lines,
+        ...(more ? { more } : {}),
+      });
     }
     let out = title + "\n";
     for (const l of lines) out += (l.op === "@" ? l.text : l.op + l.text) + "\n";
@@ -313,7 +362,8 @@ export class ApiServer {
   /** GitLab, Azure DevOps and Jira: who is connected, connect, disconnect. Tokens are never sent back. */
   private async settings(req: Request, parts: string[]): Promise<Response> {
     try {
-      if (req.method === "GET" && parts.length === 1) return json(await readSettings(this.opts.manager?.configFile ?? ""));
+      if (req.method === "GET" && parts.length === 1)
+        return json(await readSettings(this.opts.manager?.configFile ?? ""));
       if (req.method === "POST" && parts[1] === "git" && parts.length === 2) {
         // changing your global git config is for the app running on your own computer
         if (!this.opts.repos) return text("changing git settings needs ferry ui", 405);
@@ -342,7 +392,10 @@ export class ApiServer {
     try {
       return json(await conn.connect(p, await this.body(req)));
     } catch (e) {
-      return new Response(JSON.stringify({ error: errMsg(e), code: e instanceof conn.IntegrationError ? e.code : "" }) + "\n", { status: 400, headers: { "Content-Type": "application/json" } });
+      return new Response(
+        JSON.stringify({ error: errMsg(e), code: e instanceof conn.IntegrationError ? e.code : "" }) + "\n",
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
     }
   }
 
@@ -360,11 +413,22 @@ export class ApiServer {
       return text(`can't open ${dir}: ${errMsg(err)}`, 404);
     }
     const dirs = entries
-      .filter((d) => (d.isDirectory() || (d.isSymbolicLink() && isDir(path.join(dir, d.name)))) && (hidden || !(d.name.startsWith(".") || WIN_SYSTEM_DIRS.has(d.name.toLowerCase()))))
+      .filter(
+        (d) =>
+          (d.isDirectory() || (d.isSymbolicLink() && isDir(path.join(dir, d.name)))) &&
+          (hidden || !(d.name.startsWith(".") || WIN_SYSTEM_DIRS.has(d.name.toLowerCase()))),
+      )
       .map((d) => d.name)
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
     const parent = path.dirname(dir);
-    return json({ path: dir, parent: parent === dir ? "" : parent, home: os.homedir(), dirs, is_git: isDir(path.join(dir, ".git")), drives: drives() });
+    return json({
+      path: dir,
+      parent: parent === dir ? "" : parent,
+      home: os.homedir(),
+      dirs,
+      is_git: isDir(path.join(dir, ".git")),
+      drives: drives(),
+    });
   }
 
   private async addPair(req: Request): Promise<Response> {
@@ -376,7 +440,8 @@ export class ApiServer {
     } catch {
       return text("expected a JSON object with source and target", 400);
     }
-    if (!body || typeof body !== "object" || Array.isArray(body)) return text("expected a JSON object with source and target", 400);
+    if (!body || typeof body !== "object" || Array.isArray(body))
+      return text("expected a JSON object with source and target", 400);
     try {
       const names = await m.add(body as Record<string, unknown>);
       return json({ added: names, saved_to: m.configFile });
@@ -410,11 +475,21 @@ export class ApiServer {
         if (b.dry_run) {
           const bs = batchesSince(e.dataDir, e.id, t);
           const files = new Set(bs.flatMap((x) => x.entries.map((en) => en.path)));
-          return json({ restored_to: new Date(t).toISOString(), batches: bs.length, files: [...files].sort(), dry_run: true });
+          return json({
+            restored_to: new Date(t).toISOString(),
+            batches: bs.length,
+            files: [...files].sort(),
+            dry_run: true,
+          });
         }
         try {
           const r = e.restoreTo(t);
-          return json({ restored_to: new Date(t).toISOString(), batches: r.batches.length, reverted: r.done.length, problems: r.problems });
+          return json({
+            restored_to: new Date(t).toISOString(),
+            batches: r.batches.length,
+            reverted: r.done.length,
+            problems: r.problems,
+          });
         } catch (err) {
           return text(errMsg(err), 409);
         }
