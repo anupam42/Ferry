@@ -81,3 +81,4 @@ export type {
   Worktree,
 } from "../../src/shared/git.ts";
 export type { ChangeItem, ChangeKind, Health, LatestRelease, Release, ReleaseInfo } from "../../src/shared/release.ts";
+export type { Language, LanguageShare } from "../../src/shared/languages.ts";

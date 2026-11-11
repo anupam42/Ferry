@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@iconify-json/material-icon-theme": "^1.2.77",
     "@types/bun": "^1.4.4",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",

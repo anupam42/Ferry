@@ -45,6 +45,8 @@
   // break anywhere first); only a very long name wraps, rather than pushing the table out of its card
   .file { font-weight: $weight-semibold; min-width: 160px; overflow-wrap: anywhere; small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; } }
   .when { white-space: nowrap; }
+  // a file's icon beside its name and folder
+  .fi { display: flex; align-items: center; gap: space(2) + 2; > span { min-width: 0; } }
   .end { text-align: right; white-space: nowrap; }
   @include below(phone) { .opt { display: none; } }
 }

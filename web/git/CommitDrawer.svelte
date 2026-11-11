@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChangeStory from "../components/ChangeStory.svelte";
   import Drawer from "../components/Drawer.svelte";
+  import FileIcon from "../components/FileIcon.svelte";
   import Icon from "../components/Icon.svelte";
   import RelayLoading from "../components/RelayLoading.svelte";
   import Section from "../components/Section.svelte";
@@ -153,6 +154,7 @@
           {@const s = STATUS[f.status] ?? [f.status, ""]}
           <button class="file" class:on={f.path === open} onclick={() => show(f.path)}>
             <span class="pill {s[1]}">{s[0]}</span>
+            <FileIcon name={f.path} size={18} />
             <span class="grow"
               >{f.path}{#if f.from}<small class="muted"> from {f.from}</small>{/if}</span
             >

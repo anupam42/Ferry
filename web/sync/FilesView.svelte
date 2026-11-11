@@ -1,4 +1,5 @@
 <script lang="ts">
+  import FileIcon from "../components/FileIcon.svelte";
   import Icon from "../components/Icon.svelte";
   import Section from "../components/Section.svelte";
   import { ago, plural } from "../lib/format.ts";
@@ -38,7 +39,11 @@
         <tbody>
           {#each conflicts as c (c)}
             <tr>
-              <td class="file">{c}<small>Changed in both folders since the last sync</small></td>
+              <td class="file"
+                ><div class="fi">
+                  <FileIcon name={c} /><span>{c}<small>Changed in both folders since the last sync</small></span>
+                </div></td
+              >
               <td class="opt"><span class="pill red">Needs a decision</span></td>
               <td class="end">
                 <button class="btn small brand" onclick={() => see(c, true)}
@@ -74,7 +79,11 @@
         {#each files.slice(0, 500) as c (c.path + c.time)}
           {@const k = KIND[c.kind] ?? [c.kind, ""]}
           <tr>
-            <td class="file">{c.path.split("/").pop()}<small>{folder(c.path)}</small></td>
+            <td class="file"
+              ><div class="fi">
+                <FileIcon name={c.path} /><span>{c.path.split("/").pop()}<small>{folder(c.path)}</small></span>
+              </div></td
+            >
             <td><span class="pill {k[1]}">{k[0]}</span></td>
             <td class="opt muted">{where(c.direction)}</td>
             <td class="opt muted when">{ago(c.time)}</td>
