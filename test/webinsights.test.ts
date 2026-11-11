@@ -1,12 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import {
+  busiest,
+  commitsIn,
   heatScale,
   hotspots,
+  monthBuckets,
   niceMax,
   rangeLabel,
   story,
   syncDays,
   ticks,
+  weekBuckets,
   weekly,
   yearCalendar,
   yearStart,
@@ -149,5 +153,50 @@ describe("syncDays", () => {
     expect(s.find((x) => x.day === "2026-11-09")).toEqual({ day: "2026-11-09", files: 5, commits: 2 });
     expect(syncDays(base())).toEqual([]);
     expect(syncDays(base({ sync: { pairs: [], days: {}, since: "" } })).length).toBe(56);
+  });
+});
+
+describe("by week and by month", () => {
+  const days = { "2026-11-10": 3, "2026-11-09": 2, "2026-11-02": 1, "2026-10-15": 4, "2025-11-10": 5 };
+  const dayCommits = {
+    "2026-11-10": [
+      { hash: "c", short: "c", subject: "newest", author: "a" },
+      { hash: "b", short: "b", subject: "same day", author: "a" },
+    ],
+    "2026-11-09": [{ hash: "a", short: "a", subject: "the day before", author: "a" }],
+  };
+  const d = base({ days, dayCommits });
+  test("53 weeks from Monday, up to today, summing their days", () => {
+    const w = weekBuckets(d);
+    expect(w.length).toBe(53);
+    expect(w[0]!.key).toBe("2025-11-10");
+    expect(w[0]!.n).toBe(5);
+    const last = w.at(-1)!;
+    expect(last.key).toBe("2026-11-09"); // the Monday of the week of the 10th
+    expect(last.days).toEqual(["2026-11-09", "2026-11-10"]); // nothing after today
+    expect(last.n).toBe(5);
+    expect(w.reduce((n, b) => n + b.n, 0)).toBe(15);
+    expect(last.long).toContain("Week of");
+  });
+  test("months the calendar covers, the first and Januaries with their year", () => {
+    const m = monthBuckets(d);
+    expect(m[0]!.key).toBe("2025-11");
+    expect(m.at(-1)!.key).toBe("2026-11");
+    expect(m.length).toBe(13);
+    expect(m.find((b) => b.key === "2026-10")!.n).toBe(4);
+    expect(m.at(-1)!.n).toBe(6);
+    expect(m[0]!.label).toMatch(/’25$/);
+    expect(m.find((b) => b.key === "2026-01")!.label).toMatch(/’26$/);
+  });
+  test("the busiest period, newest of a tie", () => {
+    expect(busiest(monthBuckets(d)).key).toBe("2026-11");
+    expect(busiest(weekBuckets(d)).key).toBe("2026-11-09"); // 5, like the first week, but newer
+  });
+  test("a period's commits: newest first, capped, with the full count", () => {
+    const all = commitsIn(d, ["2026-11-09", "2026-11-10"]);
+    expect(all.list.map((c) => c.subject)).toEqual(["newest", "same day", "the day before"]);
+    expect(all.n).toBe(5);
+    expect(commitsIn(d, ["2026-11-09", "2026-11-10"], 2).list.length).toBe(2);
+    expect(commitsIn(d, ["2026-01-01"])).toEqual({ list: [], n: 0 });
   });
 });

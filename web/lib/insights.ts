@@ -110,6 +110,91 @@ export function yearCalendar(d: Pick<InsightsResponse, "today" | "days">, scale:
   return { cells, months };
 }
 
+/** How the calendar groups commits: each day, each week (Monday to Sunday), or each month. */
+export type Period = "day" | "week" | "month";
+
+/** One week or month of the calendar. */
+export interface Bucket {
+  /** the week's Monday, or the month as YYYY-MM */
+  key: string;
+  /** short: "Nov" for the first week of a month (else ""), "Nov ’25" for a month */
+  label: string;
+  /** "Week of 3 November 2025", "November 2025" */
+  long: string;
+  /** the days in it, up to today */
+  days: string[];
+  n: number;
+}
+
+/** The calendar's 53 weeks, oldest first, with the month label on each month's first week. */
+export function weekBuckets(d: Pick<InsightsResponse, "today" | "days">): Bucket[] {
+  const first = yearStart(d.today),
+    today = noon(d.today);
+  const out: Bucket[] = [];
+  let lastMonth = -1;
+  for (let w = 0; w < 53; w++) {
+    const start = new Date(first);
+    start.setDate(first.getDate() + w * 7);
+    const days: string[] = [];
+    for (let r = 0; r < 7; r++) {
+      const t = new Date(start);
+      t.setDate(start.getDate() + r);
+      if (t <= today) days.push(ymd(t));
+    }
+    const newMonth = start.getMonth() !== lastMonth;
+    lastMonth = start.getMonth();
+    out.push({
+      key: ymd(start),
+      label: newMonth && w <= 50 ? start.toLocaleDateString(undefined, { month: "short" }) : "",
+      long: "Week of " + start.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }),
+      days,
+      n: days.reduce((n, day) => n + (d.days[day] || 0), 0),
+    });
+  }
+  return out;
+}
+
+/** Each month the calendar covers, oldest first (the first one can be partly before the year starts). */
+export function monthBuckets(d: Pick<InsightsResponse, "today" | "days">): Bucket[] {
+  const first = yearStart(d.today),
+    today = noon(d.today);
+  const by = new Map<string, string[]>();
+  for (const t = new Date(first); t <= today; t.setDate(t.getDate() + 1)) {
+    const day = ymd(t);
+    const m = day.slice(0, 7);
+    if (!by.has(m)) by.set(m, []);
+    by.get(m)!.push(day);
+  }
+  return [...by].map(([m, days], i) => {
+    const t = noon(m + "-15");
+    const name = t.toLocaleDateString(undefined, { month: "short" });
+    return {
+      key: m,
+      label: i === 0 || t.getMonth() === 0 ? `${name} ’${m.slice(2, 4)}` : name,
+      long: t.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+      days,
+      n: days.reduce((n, day) => n + (d.days[day] || 0), 0),
+    };
+  });
+}
+
+/** The week or month with the most commits (the newest of a tie): where the calendar opens. */
+export const busiest = (buckets: Bucket[]) => buckets.reduce((best, b) => (b.n >= best.n ? b : best), buckets[0]!);
+
+/**
+ * The commits of some days, newest first, at most max of them, and how many there are in all.
+ * The server sends a few per day (dayCommits), so a long period lists the newest and says how many more.
+ */
+export function commitsIn(d: Pick<InsightsResponse, "days" | "dayCommits">, days: string[], max = 12) {
+  const n = days.reduce((n, day) => n + (d.days[day] || 0), 0);
+  const list = [...days]
+    .sort()
+    .reverse()
+    .flatMap((day) => d.dayCommits[day] ?? [])
+    .slice(0, max);
+  return { list, n };
+}
+
 export interface Week {
   start: Date;
   n: number;
