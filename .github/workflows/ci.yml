@@ -53,4 +53,5 @@ jobs:
           grep -q '<script type="module" src="/app.js">' "$RUNNER_TEMP/page.html"
           curl -sf -o /dev/null http://127.0.0.1:7979/app.js
           curl -sf -o /dev/null http://127.0.0.1:7979/app.css
+          curl -sf -o /dev/null http://127.0.0.1:7979/icons.json
           kill %1

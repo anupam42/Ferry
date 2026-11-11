@@ -47,6 +47,10 @@ test("/ serves the app with a strict content policy that allows only its own scr
   expect(js.headers.get("Content-Type")).toContain("javascript");
   const css = await api.handle(new Request("http://127.0.0.1/app.css"));
   expect(css.headers.get("Content-Type")).toContain("text/css");
+  // the file-type icons: their own file, so they don't weigh down app.js
+  const icons = await api.handle(new Request("http://127.0.0.1/icons.json"));
+  expect(icons.headers.get("Content-Type")).toContain("application/json");
+  expect(Object.keys((await icons.json()) as object)).toContain("svelte");
   expect((await api.handle(new Request("http://127.0.0.1/../package.json"))).status).not.toBe(200);
 });
 
@@ -63,7 +67,8 @@ test("with an access token, the app's code and pictures load without it; the pag
   const api = new ApiServer([], "s3cret");
   const get = (p: string, auth = false) =>
     api.handle(new Request("http://example.com" + p, { headers: auth ? { Authorization: "Bearer s3cret" } : {} }));
-  for (const p of ["/app.js", "/app.css", "/logo.svg", "/mascot/happy.svg"]) expect((await get(p)).status).toBe(200);
+  for (const p of ["/app.js", "/app.css", "/icons.json", "/logo.svg", "/mascot/happy.svg"])
+    expect((await get(p)).status).toBe(200);
   for (const p of ["/", "/status", "/info", "/events/recent", "/mascot/../status"])
     expect((await get(p)).status).toBe(401);
   expect((await get("/", true)).status).toBe(200);

@@ -130,6 +130,8 @@ export interface LanguageShare {
   name: string;
   color: string;
   bytes: number;
+  /** how many files */
+  files: number;
   /** of all counted bytes, 0–1 */
   share: number;
 }
@@ -139,22 +141,25 @@ export interface LanguageShare {
  * "Other" once there are more than `max` of them, so the bar stays readable.
  */
 export function languageShares(files: { path: string; size: number }[], max = 8): LanguageShare[] {
-  const by = new Map<string, { color: string; bytes: number }>();
+  const by = new Map<string, { color: string; bytes: number; files: number }>();
   for (const f of files) {
     const l = languageOf(f.path);
     if (!l || !(f.size > 0)) continue;
     const cur = by.get(l.name);
-    if (cur) cur.bytes += f.size;
-    else by.set(l.name, { color: l.color, bytes: f.size });
+    if (cur) {
+      cur.bytes += f.size;
+      cur.files++;
+    } else by.set(l.name, { color: l.color, bytes: f.size, files: 1 });
   }
   const total = [...by.values()].reduce((n, v) => n + v.bytes, 0);
   if (!total) return [];
   const all = [...by]
-    .map(([name, v]) => ({ name, color: v.color, bytes: v.bytes, share: v.bytes / total }))
+    .map(([name, v]) => ({ name, color: v.color, bytes: v.bytes, files: v.files, share: v.bytes / total }))
     .sort((a, b) => b.bytes - a.bytes || a.name.localeCompare(b.name));
   if (all.length <= max) return all;
   const keep = all.slice(0, max - 1).filter((l) => l.share >= 0.005);
   const rest = all.slice(keep.length);
   const bytes = rest.reduce((n, l) => n + l.bytes, 0);
-  return [...keep, { name: "Other", color: "#8b949e", bytes, share: bytes / total }];
+  const count = rest.reduce((n, l) => n + l.files, 0);
+  return [...keep, { name: "Other", color: "#8b949e", bytes, files: count, share: bytes / total }];
 }

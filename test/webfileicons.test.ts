@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { languageOf, languageShares } from "../src/shared/languages.ts";
-import { FILE_ICONS } from "../web/lib/fileicons.data.ts";
+import FILE_ICONS from "../web/lib/fileicons.json";
 import { fileIcon, folderIcon, ICON_NAMES } from "../web/lib/fileicons.ts";
 
 describe("file icons", () => {
@@ -42,8 +42,9 @@ describe("file icons", () => {
     expect(folderIcon("Whatever")).toBe("folder-base");
   });
   test("every icon the mapping can return is in the generated table (run scripts/gen-file-icons.ts after adding one)", () => {
-    expect(ICON_NAMES.filter((n) => !FILE_ICONS[n])).toEqual([]);
-    for (const n of ICON_NAMES) expect(FILE_ICONS[n]!.body).toContain("<");
+    const icons = FILE_ICONS as Record<string, { body: string }>;
+    expect(ICON_NAMES.filter((n) => !icons[n])).toEqual([]);
+    for (const n of ICON_NAMES) expect(icons[n]!.body).toContain("<");
   });
 });
 

@@ -86,6 +86,8 @@ export async function buildWeb(o: { dev?: boolean } = {}): Promise<{ js: boolean
   const changedJS = write("app.js", js);
   const changedCSS = write("app.css", css);
   const changedHTML = write("index.html", html);
+  // the file-type icons, loaded by the page when it first shows a file (scripts/gen-file-icons.ts makes them)
+  write("icons.json", fs.readFileSync(path.join(WEB_SRC, "lib", "fileicons.json"), "utf8"));
   return { js: changedJS || changedHTML, css: changedCSS, ms: Math.round(performance.now() - t0) };
 }
 
