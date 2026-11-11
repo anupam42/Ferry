@@ -22,6 +22,7 @@
   const items: { mode: Mode; label: string; icon: string }[] = [
     { mode: "sync", label: "Folder pairs", icon: "home" },
     { mode: "git", label: "Git", icon: "branch" },
+    { mode: "todo", label: "Todo", icon: "todo" },
   ];
 
   let rail: HTMLElement;

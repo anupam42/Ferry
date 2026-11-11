@@ -4,7 +4,7 @@ import type { Connections, Info, Mode, Settings } from "./types.ts";
 
 const startMode = (): Mode => {
   const pick = localStorage.getItem("ferry-start") || localStorage.getItem("ferry-mode");
-  return pick === "git" || pick === "settings" ? pick : "sync";
+  return pick === "git" || pick === "todo" || pick === "settings" ? pick : "sync";
 };
 
 class App {

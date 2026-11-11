@@ -19,7 +19,8 @@
     bind:value={start}
     onchange={() => (start ? localStorage.setItem("ferry-start", start) : localStorage.removeItem("ferry-start"))}
   >
-    <option value="">Where I left off</option><option value="sync">Folder pairs</option><option value="git">Git</option>
+    <option value="">Where I left off</option><option value="sync">Folder pairs</option><option value="git">Git</option
+    ><option value="todo">Todo</option>
   </select>
 </Row>
 <Row label="Unread notifications" hint={notes.unread ? `${notes.unread} new` : "Nothing new"}>

@@ -114,6 +114,8 @@ The web app does what the terminal dashboard does, with buttons instead of keys:
 
   Repositories your pairs sync into appear on their own. A Git action that would change files there (switching branches, pulling…) pauses that pair first, and discarded changes go to the Trash.
 
+- **Todo**: each project's todo list, read from the Todo section of its README (a `## Todo`, `## To do`, `## Tasks` or `## Roadmap` heading, with `- [ ]` and `- [x]` lines, grouped by the subheadings under it). Tick items off, or give one a date: both edit that line of the README, so the list stays in the repository. A date is written into the line as `(due 2026-12-01)`; `📅 2026-12-01` is read too. Git blame says when each item was added or ticked. Relay reminds you about items past their date first, then ones due this week, then ones that have waited over a month without a date, and **Coming up** lists the dated items in order. For a repository a folder pair syncs into, edits go to the pair's working folder, which syncs them into the repository.
+
 `ferry ui --config work.yaml`, `ferry ui ./scratch ./repo` (pairs added in the browser then last only for the session), `--port 8080` and `--no-open` work as you'd expect. Keep the terminal window open while you sync; the web page talks to that process. The page and its API only answer on `localhost` unless you set `--host` together with `--serve-token`. The same page is also served by `ferry --serve 127.0.0.1:7878` (without adding or removing pairs).
 
 ## Features
@@ -441,7 +443,7 @@ Ideas being considered, roughly in priority order. Checked items are done.
 
 ### Web app
 
-- [ ] **Todo tab** — a new sidebar tab that reads the Todo section of each project's README and turns it into a checklist per project: what's open, what's done, and what was added recently. The mascot keeps you on schedule, nudging you about items that have been open for a while or are past a date you set ("this one's been waiting three weeks"). Ticking an item off updates the README checkbox, so the list stays in the repo and in sync with the app.
+- [x] **Todo tab** — a new sidebar tab that reads the Todo section of each project's README and turns it into a checklist per project: what's open, what's done, and what was added recently. The mascot keeps you on schedule, nudging you about items that have been open for a while or are past a date you set ("this one's been waiting three weeks"). Ticking an item off updates the README checkbox, so the list stays in the repo and in sync with the app.
 
 ### Git client
 
