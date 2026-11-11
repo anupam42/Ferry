@@ -10,18 +10,20 @@
   let error = $state("");
   let hidden = $state(false);
 
-  async function go(dir: string) {
+  /** Opens a folder. One that can't be opened leaves you where you were, with the reason; only the
+   *  starting folder falls back to your home folder (it may not exist yet). */
+  async function go(dir: string, first = false) {
     try {
       r = await api<FolderListing>("GET", "/fs?path=" + enc(dir) + (hidden ? "&hidden=1" : ""));
       error = "";
     } catch (e) {
       const home = app.info?.home;
-      if (home && dir !== home) return go(home);
+      if (first && home && dir !== home) return go(home);
       error = (e as Error).message;
     }
   }
   $effect(() => {
-    void go(start);
+    void go(start, true);
   });
 
   const sep = $derived(app.info?.sep || "/");
@@ -39,7 +41,7 @@
   const here = $derived(r ? r.path.split(/[\\/]/).filter(Boolean).pop() || r.path : "");
 </script>
 
-{#if error}<p class="muted">{error}</p>{/if}
+{#if error}<div class="callout amber" role="alert"><Icon name="warn" size={16} /><span>{error}</span></div>{/if}
 {#if r}
   <div class="crumbpath">
     {#each crumbs as c, i (c.full)}
@@ -85,6 +87,20 @@
 
 <style lang="scss">
   @use "tokens" as *;
+
+  .callout {
+    margin: 0 0 space(3);
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    span {
+      flex: 1;
+      min-width: 0;
+    }
+    :global(svg) {
+      flex: none;
+      margin-top: 2px;
+    }
+  }
 
   .crumbpath {
     display: flex;

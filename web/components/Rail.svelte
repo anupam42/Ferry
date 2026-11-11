@@ -22,6 +22,7 @@
   const items: { mode: Mode; label: string; icon: string }[] = [
     { mode: "sync", label: "Folder pairs", icon: "home" },
     { mode: "git", label: "Git", icon: "branch" },
+    { mode: "todo", label: "Todo", icon: "todo" },
   ];
 
   let rail: HTMLElement;
@@ -73,6 +74,7 @@
   function drawable(node: HTMLElement, icon: string) {
     if (icon === "branch")
       node.querySelectorAll("svg path, svg circle").forEach((p) => p.setAttribute("pathLength", "1"));
+    if (icon === "todo") node.querySelectorAll("svg path").forEach((p) => p.setAttribute("pathLength", "1"));
   }
 
   function key(e: KeyboardEvent) {
@@ -499,6 +501,16 @@
     [data-icon="branch"]:hover :global(svg circle:nth-of-type(3)) {
       animation-delay: 0.4s;
     }
+    // todo: the box gives a little squeeze and the tick draws itself in
+    [data-icon="todo"]:hover :global(svg rect) {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: ico-squeeze 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+    }
+    [data-icon="todo"]:hover :global(svg path) {
+      stroke-dasharray: 1;
+      animation: ico-draw 0.45s ease-out 0.12s backwards;
+    }
     // what's new: a twinkle
     [data-icon="sparkle"]:hover:not(:disabled) :global(svg) {
       animation: ico-twinkle 0.7s ease-in-out;
@@ -554,6 +566,14 @@
   @keyframes ico-draw {
     from {
       stroke-dashoffset: 1;
+    }
+  }
+  @keyframes ico-squeeze {
+    35% {
+      transform: scale(0.86);
+    }
+    70% {
+      transform: scale(1.06);
     }
   }
   @keyframes ico-dot {

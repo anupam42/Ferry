@@ -410,6 +410,14 @@ export class ApiServer {
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      // macOS privacy protection (Documents, Desktop, Downloads, iCloud Drive…) refuses with EPERM
+      if (code === "EPERM" && process.platform === "darwin")
+        return text(
+          `macOS isn't letting Ferry read ${path.basename(dir)}. Open System Settings → Privacy & Security → Files and Folders (or Full Disk Access), allow the app you started ferry from (Terminal, iTerm, VS Code…), then restart ferry ui.`,
+          403,
+        );
+      if (code === "EPERM" || code === "EACCES") return text(`You don't have permission to open ${dir}.`, 403);
       return text(`can't open ${dir}: ${errMsg(err)}`, 404);
     }
     const dirs = entries

@@ -3,11 +3,11 @@
 //   GET  /git/repos                         repositories: opened directly, and pair targets
 //   POST /git/repos                         {"action": "clone"|"create"|"add", "url", "path"}
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
-//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|conflict-parts|rewrite-plan|bisect|file|
+//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|conflict-parts|rewrite-plan|bisect|todo|file|
 //                  folder|remote-check|undo-timeline|push-check|blame|file-history|search}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
 //                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|restore|branch-at|
-//                   shape-diff|shape-message|shape-commit|rewrite|bisect-start|bisect-mark|bisect-reset}   (GET /git/{id}/shape: the timeline to shape, see shape.ts)
+//                   shape-diff|shape-message|shape-commit|rewrite|bisect-start|bisect-mark|bisect-reset|todo-edit}   (GET /git/{id}/shape: the timeline to shape, see shape.ts)
 //
 // When a repository is also the target of a folder pair, actions that change
 // its files (switching branches, pulling, merging…) pause that pair first,
@@ -23,6 +23,7 @@ import * as g from "./gitclient.ts";
 import * as conn from "./integrations.ts";
 import * as reviews from "./reviews.ts";
 import * as shaper from "./shape.ts";
+import * as todo from "./todo.ts";
 import { errMsg } from "./util.ts";
 
 export interface RepoManager {
@@ -102,6 +103,18 @@ export class GitApi {
     return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  /** Where a repository's README is edited: a folder pair's working copy when it has one (see todo.ts). */
+  private readmePlace(root: string, rel: string): todo.Place {
+    for (const e of this.engines) {
+      if (e.cfg.remote || e.cfg.cloud) continue;
+      const inTarget = path.relative(path.resolve(e.cfg.target), path.join(root, rel));
+      if (inTarget.startsWith("..") || path.isAbsolute(inTarget)) continue;
+      const src = path.join(e.cfg.source, inTarget);
+      if (fs.existsSync(src)) return { file: src, via: e.name };
+    }
+    return { file: path.join(root, rel), via: "" };
+  }
+
   async handle(req: Request, url: URL, parts: string[]): Promise<Response> {
     try {
       if (parts[1] === "repos") return await this.reposRoute(req, parts);
@@ -112,7 +125,7 @@ export class GitApi {
       if (req.method === "POST") return await this.write(repo, action, await body(req));
       return fail("method not allowed", 405);
     } catch (e) {
-      const known = e instanceof g.GitClientError || e instanceof conn.IntegrationError;
+      const known = e instanceof g.GitClientError || e instanceof conn.IntegrationError || e instanceof todo.TodoError;
       return json({ error: errMsg(e), code: known ? (e as g.GitClientError).code : "" }, known ? 409 : 500);
     }
   }
@@ -178,6 +191,10 @@ export class GitApi {
         return json(await g.trackedFiles(root));
       case "languages":
         return json(await g.languages(root));
+      case "todo": {
+        const rel = todo.findReadme(root);
+        return json(await todo.readTodo(root, rel, rel ? this.readmePlace(root, rel) : null));
+      }
       case "folder":
         return json(await g.folderEntries(root, q.get("dir")));
       case "undo-timeline":
@@ -296,6 +313,13 @@ export class GitApi {
       case "branch-delete":
         await g.deleteBranch(root, b.name, b.force === true);
         return done();
+      case "todo-edit": {
+        const rel = todo.findReadme(root);
+        if (!rel) throw new todo.TodoError("this repository has no README");
+        const place = this.readmePlace(root, rel);
+        todo.editTodo(place.file, b.line, b.raw, { done: b.done, due: b.due });
+        return done({ todo: await todo.readTodo(root, rel, place) });
+      }
       case "branch-delete-remote":
         return done(await g.deleteRemoteBranch(root, b.name));
       case "merge":

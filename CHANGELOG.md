@@ -36,6 +36,8 @@ How an entry is written:
 - **Compare branches**: what one branch has that another doesn't, and what it changed since they split, file by file. [try: git-branches]
 - **Find the commit that broke it**: say where something worked and where it's broken, test the commit Ferry checks out, and it halves the range until it names the first broken commit (git bisect). [try: git-history]
 
+- **Todo**: a new tab with each project's todo list, read from the Todo section of its README. Tick items off or give them a date, right in the README, and Relay reminds you about late ones and ones left waiting.
+
 ### Improved
 
 - **A new web app, built with Svelte**: `ferry ui` now runs a new app built with Svelte 5, TypeScript and SCSS, in place of the old single-file page. Every page moved over with the same features and your settings, and links to the old `/next` preview still work. When you reach Ferry from another computer with an access token, Relay's pictures show up now too.
