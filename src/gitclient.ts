@@ -17,6 +17,8 @@ import type {
   Comparison,
   ConflictParts,
   MergePart,
+  RewritePlan,
+  RewriteStep,
   Insights,
   PullRequest,
   Branch,
@@ -676,6 +678,145 @@ export async function commitFileDiff(root: string, hash: unknown, file: unknown)
     before: parents.length ? "Before this commit" : "Nothing (first commit)",
     after: "After this commit",
   });
+}
+
+// ---------- rewriting recent commits (interactive rebase) ----------
+
+/** The most commits one rewrite takes on. */
+const REWRITE_MAX = 100;
+
+/** The commits from `from` to HEAD, oldest first, with what stands in the way of rewriting them. */
+export async function rewritePlan(root: string, from: unknown): Promise<RewritePlan> {
+  const f = commitId(from);
+  const head = (await git(root, ["rev-parse", "HEAD"])).trim();
+  const branch = (await git(root, ["branch", "--show-current"])).trim();
+  const full = (await git(root, ["rev-parse", "--verify", f + "^{commit}"])).trim();
+  const plan: RewritePlan = { from: full, head, branch, commits: [], dirty: false, blocked: "" };
+  if (!branch) plan.blocked = "You're not on a branch (detached HEAD). Switch to a branch first.";
+  else if ((await operation(root)).kind) plan.blocked = "Finish or cancel what's in progress first.";
+  else if (!(await gitOk(root, ["merge-base", "--is-ancestor", full, head])))
+    plan.blocked = `That commit isn't part of ${branch}.`;
+  if (plan.blocked) return plan;
+  const hasParent = await gitOk(root, ["rev-parse", "--verify", "--quiet", full + "^"]);
+  const range = hasParent ? [`${full}^..${head}`] : [head];
+  const [log, merges, unpushed, status] = await Promise.all([
+    git(root, ["log", "--reverse", "--format=%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%B%x1e", ...range, "--"]),
+    git(root, ["rev-list", "--merges", "--count", ...range]),
+    git(root, ["rev-list", ...range, "--not", "--remotes"]),
+    git(root, ["status", "--porcelain", "--untracked-files=no"]),
+  ]);
+  const local = new Set(unpushed.split("\n").filter(Boolean));
+  const hasRemotes = (await git(root, ["remote"])).trim() !== "";
+  plan.commits = log
+    .split("\x1e")
+    .map((r) => r.replace(/^\n+/, ""))
+    .filter((r) => r.trim())
+    .map((r) => {
+      const [hash, short, author, date, subject, message] = r.split("\x1f");
+      return {
+        hash: hash!,
+        short: short!,
+        author: author!,
+        date: date!,
+        subject: subject ?? "",
+        message: (message ?? "").trim(),
+        pushed: hasRemotes && !local.has(hash!),
+      };
+    });
+  plan.dirty = status.trim() !== "";
+  if (Number(merges.trim()) > 0)
+    plan.blocked = "There's a merge commit in these commits. Pick a commit after the merge to rewrite from.";
+  else if (plan.commits.length > REWRITE_MAX)
+    plan.blocked = `That's ${plan.commits.length} commits; pick one closer to the top (at most ${REWRITE_MAX}).`;
+  return plan;
+}
+
+/** A path for git's sh: forward slashes, single-quoted. */
+const shQuote = (p: string) => "'" + p.replaceAll("\\", "/").replaceAll("'", "'\\''") + "'";
+
+/**
+ * Replays the commits from `from` as steps say: kept (optionally with a new
+ * message), squashed into the one before, dropped or reordered. Runs git rebase
+ * -i with a to-do list written here, so no editor opens; new messages are
+ * applied with commit --amend. Stops (and says so) if a step conflicts: settle
+ * it, then continue or cancel from the Git client like any rebase.
+ */
+export async function rewrite(
+  root: string,
+  body: { from?: unknown; head?: unknown; steps?: unknown },
+): Promise<{ commits: number; stopped: boolean; changed: boolean }> {
+  const plan = await rewritePlan(root, body.from);
+  if (plan.blocked) throw new GitClientError(plan.blocked);
+  if (body.head !== plan.head)
+    throw new GitClientError("The branch moved since you opened this; open it again.", "stale");
+  if (!Array.isArray(body.steps)) throw new GitClientError("steps are required");
+  const steps = body.steps as RewriteStep[];
+  const planned = new Map(plan.commits.map((c) => [c.hash, c]));
+  const seen = new Set<string>();
+  for (const s of steps) {
+    if (!s || typeof s.hash !== "string" || !planned.has(s.hash) || seen.has(s.hash))
+      throw new GitClientError("the steps don't match the commits", "stale");
+    seen.add(s.hash);
+    if (!["pick", "squash", "drop"].includes(s.action)) throw new GitClientError(`"${String(s.action)}" isn't a step`);
+    if (s.message !== undefined && (typeof s.message !== "string" || s.action !== "pick"))
+      throw new GitClientError("only a kept commit takes a message");
+    if (typeof s.message === "string" && !s.message.trim()) throw new GitClientError("a commit message can't be empty");
+  }
+  if (seen.size !== planned.size) throw new GitClientError("every commit needs a step", "stale");
+  const kept = steps.filter((s) => s.action !== "drop");
+  if (!kept.length) throw new GitClientError("That would drop every commit. Keep at least one.");
+  if (kept[0]!.action === "squash")
+    throw new GitClientError("The first commit you keep has nothing before it to be squashed into.");
+  const unchanged =
+    steps.every((s, i) => s.action === "pick" && s.hash === plan.commits[i]!.hash) &&
+    steps.every((s) => s.message === undefined || s.message.trim() === planned.get(s.hash)!.message);
+  if (unchanged) return { commits: plan.commits.length, stopped: false, changed: false };
+
+  // the to-do list, and a message file for every commit that gets a new message
+  const dir = await gitPath(root, "ferry-rewrite");
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const todo: string[] = [];
+  let pendingMessage = "";
+  const flush = () => {
+    if (pendingMessage) todo.push(`exec git commit --amend --only --no-verify -F ${shQuote(pendingMessage)}`);
+    pendingMessage = "";
+  };
+  steps.forEach((s, i) => {
+    if (s.action === "drop") return todo.push(`drop ${s.hash}`);
+    if (s.action === "squash") return todo.push(`fixup ${s.hash}`); // the message comes from the pick it joins
+    flush();
+    todo.push(`pick ${s.hash}`);
+    const wanted = s.message?.trim();
+    // a new message, or squashes after it: say what the commit ends up as
+    const squashedInto = steps.slice(i + 1).findIndex((n) => n.action !== "squash" && n.action !== "drop");
+    const hasSquashes = steps
+      .slice(i + 1, squashedInto < 0 ? undefined : i + 1 + squashedInto)
+      .some((n) => n.action === "squash");
+    if ((wanted && wanted !== planned.get(s.hash)!.message) || hasSquashes) {
+      const file = path.join(dir, `message-${i}.txt`);
+      fs.writeFileSync(file, (wanted ?? planned.get(s.hash)!.message) + "\n");
+      pendingMessage = file;
+    }
+  });
+  flush();
+  const todoFile = path.join(dir, "todo");
+  fs.writeFileSync(todoFile, todo.join("\n") + "\n");
+
+  const hasParent = await gitOk(root, ["rev-parse", "--verify", "--quiet", plan.from + "^"]);
+  const r = await exec(
+    ["git", "-C", root, "rebase", "-i", "--autostash", ...(hasParent ? [plan.from + "^"] : ["--root"])],
+    { env: env({ GIT_SEQUENCE_EDITOR: "cp " + shQuote(todoFile) }), timeoutMs: 10 * 60_000 },
+  );
+  if (r.code !== 0) {
+    if ((await operation(root)).kind === "rebase") return { commits: 0, stopped: true, changed: true };
+    throw new GitClientError(cleanMessage(r.stderr || r.stdout || r.error || "the rewrite failed"));
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+  const n = Number(
+    (await git(root, ["rev-list", "--count", ...(hasParent ? [`${plan.from}^..HEAD`] : ["HEAD"])])).trim(),
+  );
+  return { commits: n, stopped: false, changed: true };
 }
 
 // ---------- comparing branches ----------

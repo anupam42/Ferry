@@ -36,6 +36,108 @@ async function repo(): Promise<string> {
 }
 
 describe("git client", () => {
+  test("rewrite recent commits: reword, squash, drop and reorder, with work in progress kept", async () => {
+    const d = await repo(); // "first": a.txt
+    const add = (f: string, text: string, msg: string) => {
+      put(d, f, text);
+      sh(d, "add", f);
+      sh(d, "commit", "-m", msg);
+    };
+    add("b.txt", "b\n", "add b");
+    add("c.txt", "c\n", "add c");
+    add("c.txt", "c, fixed\n", "fix c");
+    add("d.txt", "d\n", "add d");
+    put(d, "a.txt", "work in progress\n"); // uncommitted
+    const from = sh(d, "rev-parse", "HEAD~3").trim(); // "add b"
+    const plan = await g.rewritePlan(d, from);
+    expect(plan.blocked).toBe("");
+    expect(plan.dirty).toBe(true);
+    expect(plan.commits.map((c) => c.subject)).toEqual(["add b", "add c", "fix c", "add d"]);
+    expect(plan.commits.every((c) => !c.pushed)).toBe(true); // no remote
+    const [b, c, fix, dd] = plan.commits;
+
+    // d first (reordered), c reworded with "fix c" squashed into it, b dropped
+    const r = await g.rewrite(d, {
+      from,
+      head: plan.head,
+      steps: [
+        { hash: dd!.hash, action: "pick" },
+        { hash: b!.hash, action: "drop" },
+        { hash: c!.hash, action: "pick", message: "add c (fixed)" },
+        { hash: fix!.hash, action: "squash" },
+      ],
+    });
+    expect(r).toEqual({ commits: 2, stopped: false, changed: true });
+    expect(sh(d, "log", "--format=%s").trim().split("\n")).toEqual(["add c (fixed)", "add d", "first"]);
+    expect(read(d, "c.txt")).toBe("c, fixed\n");
+    expect(fs.existsSync(path.join(d, "b.txt"))).toBe(false);
+    expect(read(d, "a.txt")).toBe("work in progress\n"); // set aside and put back
+
+    // what's refused, before anything changes
+    const now = await g.rewritePlan(d, sh(d, "rev-parse", "HEAD~1").trim());
+    const steps = now.commits.map((x) => ({ hash: x.hash, action: "pick" as const }));
+    await expect(g.rewrite(d, { from: now.from, head: "0".repeat(40), steps })).rejects.toThrow(/moved/);
+    await expect(g.rewrite(d, { from: now.from, head: now.head, steps: steps.slice(1) })).rejects.toThrow(
+      /every commit/,
+    );
+    await expect(
+      g.rewrite(d, { from: now.from, head: now.head, steps: [{ ...steps[0]!, action: "squash" }, steps[1]!] }),
+    ).rejects.toThrow(/nothing before it/);
+    await expect(
+      g.rewrite(d, { from: now.from, head: now.head, steps: steps.map((x) => ({ ...x, action: "drop" as const })) }),
+    ).rejects.toThrow(/drop every commit/);
+    await expect(
+      g.rewrite(d, { from: now.from, head: now.head, steps: [{ hash: "deadbeef", action: "pick" }, steps[1]!] }),
+    ).rejects.toThrow(/don't match/);
+    // nothing to do: nothing happens
+    expect(await g.rewrite(d, { from: now.from, head: now.head, steps })).toMatchObject({ changed: false });
+    expect(sh(d, "log", "--format=%s").trim().split("\n")).toEqual(["add c (fixed)", "add d", "first"]);
+  });
+
+  test("rewrite: merges block it, pushed commits are marked, a conflicting reorder stops for you", async () => {
+    const d = await repo();
+    const main = sh(d, "branch", "--show-current").trim();
+    // pushed: a remote that has "first"
+    const remote = path.join(tempDir(), "remote.git");
+    sh(d, "init", "--bare", remote);
+    sh(d, "remote", "add", "origin", remote);
+    sh(d, "push", "-q", "origin", main);
+    put(d, "a.txt", "one\ntwo\nthree\nfour\n");
+    sh(d, "commit", "-qam", "add four");
+    put(d, "a.txt", "one\ntwo\nthree\nfour\nfive\n");
+    sh(d, "commit", "-qam", "add five");
+    const root = sh(d, "rev-list", "--max-parents=0", "HEAD").trim();
+    const plan = await g.rewritePlan(d, root);
+    expect(plan.commits.map((c) => [c.subject, c.pushed])).toEqual([
+      ["first", true],
+      ["add four", false],
+      ["add five", false],
+    ]);
+    // "add five" before "add four" can't apply: the rebase stops on the conflict
+    const [, four, five] = plan.commits;
+    const r = await g.rewrite(d, {
+      from: four!.hash,
+      head: plan.head,
+      steps: [
+        { hash: five!.hash, action: "pick" },
+        { hash: four!.hash, action: "pick" },
+      ],
+    });
+    expect(r.stopped).toBe(true);
+    expect((await g.state(d)).operation).toBe("rebase");
+    await g.finishOperation(d, "abort");
+    expect(sh(d, "log", "--format=%s").trim().split("\n")).toEqual(["add five", "add four", "first"]);
+
+    // a merge in the range: blocked
+    sh(d, "switch", "-qc", "side");
+    put(d, "s.txt", "s\n");
+    sh(d, "add", "s.txt");
+    sh(d, "commit", "-qm", "side");
+    sh(d, "switch", "-q", main);
+    sh(d, "merge", "-q", "--no-ff", "--no-edit", "side");
+    expect((await g.rewritePlan(d, four!.hash)).blocked).toMatch(/merge commit/);
+  });
+
   test("a conflict in pieces, settled change by change", async () => {
     const d = await repo(); // a.txt: one / two / three
     const main = sh(d, "branch", "--show-current").trim();

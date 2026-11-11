@@ -102,6 +102,45 @@ export interface CommitDetail extends Commit {
   files: CommitFile[];
 }
 
+/** One commit you can rewrite: its whole message, and whether it's already on a remote. */
+export interface RewriteCommit {
+  hash: string;
+  short: string;
+  author: string;
+  date: string;
+  subject: string;
+  /** the whole message, subject and body */
+  message: string;
+  /** already on a remote: rewriting it means force-pushing */
+  pushed: boolean;
+}
+
+/** GET /git/{id}/rewrite-plan?from=hash: the commits from that one to HEAD, oldest first. */
+export interface RewritePlan {
+  /** the first commit to rewrite */
+  from: string;
+  /** HEAD when the plan was made: a rewrite of a different HEAD is refused */
+  head: string;
+  branch: string;
+  commits: RewriteCommit[];
+  /** uncommitted changes: set aside while it runs and put back after */
+  dirty: boolean;
+  /** why it can't be done (a merge commit in the range, a detached HEAD, …); "" when it can */
+  blocked: string;
+}
+
+/**
+ * POST /git/{id}/rewrite: the commits in the order they'll be replayed, each
+ * kept (pick, optionally with a new message for the commit it ends up as),
+ * folded into the commit before it (squash), or dropped.
+ */
+export interface RewriteStep {
+  hash: string;
+  action: "pick" | "squash" | "drop";
+  /** on a pick: the message of the commit it becomes (with anything squashed into it); omitted keeps git's */
+  message?: string;
+}
+
 /** A conflicted file, in pieces: text both sides agree on, and each place they don't. */
 export type MergePart =
   { kind: "same"; text: string } | { kind: "conflict"; ours: string; base: string; theirs: string };

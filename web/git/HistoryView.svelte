@@ -196,6 +196,15 @@
             >All branches{#if extra?.commits}<span class="more">+{extra.commits}</span>{/if}</button
           >
         </div>
+        {#if !all && commits.length > 1}
+          <!-- your unpushed commits, or the last five when everything's pushed -->
+          <button
+            class="btn small ghost"
+            title="Reorder, reword, squash or drop recent commits"
+            onclick={() => (git.rewrite = commits![Math.min(commits!.length - 1, (st.ahead || 5) - 1)]!.hash)}
+            ><Icon name="list" size={16} />Edit commits…</button
+          >
+        {/if}
       </div>
       <!-- at the end: the search, one field holding what to look for and (inside it) where to look -->
       <div class="end">
