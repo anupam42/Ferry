@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pageZoom } from "../../lib/look.svelte.ts";
   import type { Snippet } from "svelte";
 
   /**
@@ -15,14 +16,18 @@
       tip = null;
       return;
     }
+    // on-screen positions (cells can be SVG shapes, which have no offsetLeft), turned into the
+    // page's own pixels, which differ when Settings → Appearance → Size zooms the page
+    const z = pageZoom();
     const wr = wrap.getBoundingClientRect(),
       cr = cell.getBoundingClientRect();
-    const x = cr.left - wr.left + cr.width / 2;
+    const width = wr.width / z;
+    const x = (cr.left - wr.left + cr.width / 2) / z;
     tip = {
-      x: Math.max(8, Math.min(wr.width - 8, x)),
-      y: cr.top - wr.top - 8,
+      x: Math.max(8, Math.min(width - 8, x)),
+      y: (cr.top - wr.top) / z - 8,
       lines: cell.dataset.tip.split("\n"),
-      side: x < 120 ? "l" : x > wr.width - 120 ? "r" : "",
+      side: x < 120 ? "l" : x > width - 120 ? "r" : "",
     };
   }
 </script>

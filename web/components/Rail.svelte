@@ -2,7 +2,7 @@
   import { untrack } from "svelte";
   import { face } from "../lib/api.ts";
   import { app } from "../lib/app.svelte.ts";
-  import { look } from "../lib/look.svelte.ts";
+  import { look, pageZoom } from "../lib/look.svelte.ts";
   import { git, repoMood } from "../lib/git.svelte.ts";
   import { notes } from "../lib/notes.svelte.ts";
   import { relay } from "../lib/relay.svelte.ts";
@@ -103,7 +103,7 @@
   function begin(): Glide {
     active?.finish();
     const root = document.documentElement;
-    const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+    const zoom = pageZoom();
     const start = rail.getBoundingClientRect().width / zoom;
     const beside = [...document.querySelectorAll<HTMLElement>(".app > .content")];
     root.classList.add("rail-dragging");
@@ -169,7 +169,7 @@
       grip.setPointerCapture(e.pointerId);
     } catch {}
     const g = begin();
-    const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+    const zoom = pageZoom();
     const left = rail.getBoundingClientRect().left;
     let w = g.start,
       frame = 0;

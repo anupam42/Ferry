@@ -2,7 +2,7 @@
   import type { Snippet } from "svelte";
   import { fade, fly } from "svelte/transition";
 
-  import { ms } from "../lib/look.svelte.ts";
+  import { ms, pageZoom } from "../lib/look.svelte.ts";
   import Icon from "./Icon.svelte";
 
   /**
@@ -31,7 +31,10 @@
   // a drawer doesn't change between narrow and wide while it's open: read it once
   const key = (() => "ferry-drawer-w" + (wide ? "-wide" : ""))();
   const MIN = 380;
-  const maxW = () => window.innerWidth - 24;
+  // widths here are CSS pixels; the window, the pointer and getBoundingClientRect are on-screen
+  // pixels, which differ when Settings → Appearance → Size zooms the page
+  const maxW = () => (window.innerWidth - 24) / pageZoom();
+  const shown = () => panel.getBoundingClientRect().width / pageZoom();
   let width = $state(+(localStorage.getItem(key) || 0));
   let back = 0; // the width to return to after filling the window
   const maxed = $derived(width > 0 && width >= maxW() - 2);
@@ -43,12 +46,12 @@
   function toggleMax() {
     if (maxed) setW(back || (wide ? 900 : 560));
     else {
-      back = panel.getBoundingClientRect().width;
+      back = shown();
       setW(maxW(), false);
     }
   }
   function gripKey(e: KeyboardEvent) {
-    const w = panel.getBoundingClientRect().width;
+    const w = shown();
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       setW(w + 40);
@@ -70,10 +73,10 @@
     } catch {}
     resizing = true;
     const right = window.innerWidth - panel.getBoundingClientRect().right;
-    const move = (ev: PointerEvent) => setW(window.innerWidth - right - ev.clientX, false);
+    const move = (ev: PointerEvent) => setW((window.innerWidth - right - ev.clientX) / pageZoom(), false);
     const up = () => {
       resizing = false;
-      localStorage.setItem(key, String(Math.round(panel.getBoundingClientRect().width)));
+      localStorage.setItem(key, String(Math.round(shown())));
       grip.removeEventListener("pointermove", move);
       grip.removeEventListener("pointerup", up);
       grip.removeEventListener("pointercancel", up);

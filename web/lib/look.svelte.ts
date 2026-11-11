@@ -69,6 +69,16 @@ export const look = new Look();
 
 export { ago, plural } from "./format.ts";
 
+/**
+ * Settings → Appearance → Size zooms the page (CSS zoom on the body). Positions from
+ * getBoundingClientRect, pointer events and the window's size are in on-screen pixels;
+ * widths and positions set in CSS are in the page's own, zoomed ones. Divide the first
+ * by this to get the second.
+ */
+export function pageZoom(): number {
+  return parseFloat(getComputedStyle(document.body).zoom) || 1;
+}
+
 /** A transition's duration, or 0 when motion is reduced (by the system, or Settings → Motion). */
 export function ms(duration: number): number {
   return document.documentElement.dataset.motion === "reduce" || matchMedia("(prefers-reduced-motion: reduce)").matches

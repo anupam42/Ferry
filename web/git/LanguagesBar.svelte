@@ -55,9 +55,11 @@
   function point(i: number) {
     const s = segs[i];
     if (!s || !card) return;
-    const c = card.getBoundingClientRect(),
-      r = s.getBoundingClientRect();
-    hot = { i, at: r.left - c.left + r.width / 2, y: r.top - c.top, width: c.width };
+    // layout positions (offset*, client*), not getBoundingClientRect: Settings → Appearance → Size
+    // zooms the page, and the bounding rect is in zoomed pixels while the tooltip is placed in
+    // unzoomed ones, which put the arrow up to ~10% of the way across the bar off its segment.
+    // The bar isn't positioned, so a segment's offsetParent is the card.
+    hot = { i, at: s.offsetLeft + s.offsetWidth / 2, y: s.offsetTop, width: card.clientWidth };
   }
   // The box is centred over the segment, but kept inside the card (8px clear of its edges); the
   // arrow points at the segment wherever the box ends up, staying clear of the box's rounded corners.
