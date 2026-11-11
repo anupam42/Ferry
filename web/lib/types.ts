@@ -45,6 +45,15 @@ export interface FerryEvent {
   [k: string]: unknown;
 }
 export type {
+  BisectMark,
+  BisectState,
+  CommitFile,
+  Comparison,
+  ConflictParts,
+  MergePart,
+  RewriteCommit,
+  RewritePlan,
+  RewriteStep,
   Conversation,
   InsightsResponse,
   ShapeBatch,

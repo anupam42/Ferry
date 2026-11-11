@@ -31,6 +31,11 @@ How an entry is written:
 - **Side-by-side split diff**: before and after next to each other, a divider you can drag, and a big compare window that fills the screen.
 - **Pull to refresh**: pull the page down (mouse, trackpad or touch) and Relay refreshes what you're looking at.
 
+- **Rewrite recent commits**: reorder, reword, squash or drop them from a list (an interactive rebase), with no editor to fight. Commits already on the remote are marked and need a press-and-hold, and Undo anything takes you back. [try: git-history]
+- **Settle conflicts change by change**: for each place two branches disagree, keep yours, theirs, both, or write it yourself, and see what it was before both changes. [try: git-changes]
+- **Compare branches**: what one branch has that another doesn't, and what it changed since they split, file by file. [try: git-branches]
+- **Find the commit that broke it**: say where something worked and where it's broken, test the commit Ferry checks out, and it halves the range until it names the first broken commit (git bisect). [try: git-history]
+
 ### Improved
 
 - **A new web app, built with Svelte**: `ferry ui` now runs a new app built with Svelte 5, TypeScript and SCSS, in place of the old single-file page. Every page moved over with the same features and your settings, and links to the old `/next` preview still work. When you reach Ferry from another computer with an access token, Relay's pictures show up now too.

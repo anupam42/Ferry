@@ -13,6 +13,14 @@ import path from "node:path";
 import { diff as lineDiff, type Line } from "./difftext.ts";
 import type { GhPullRequest, GlMergeRequest } from "./apitypes.ts";
 import type {
+  BisectMark,
+  BisectState,
+  CommitFile,
+  Comparison,
+  ConflictParts,
+  MergePart,
+  RewritePlan,
+  RewriteStep,
   Insights,
   PullRequest,
   Branch,
@@ -189,6 +197,7 @@ export async function state(root: string): Promise<RepoState> {
     behind: 0,
     operation: "",
     operationBranch: "",
+    bisecting: false,
     files: [],
     stashes: 0,
     remotes: [],
@@ -240,6 +249,7 @@ export async function state(root: string): Promise<RepoState> {
   ]);
   st.operation = ops.kind;
   st.operationBranch = ops.branch;
+  st.bisecting = fs.existsSync(await gitPath(root, "BISECT_START"));
   st.stashes = stashes.split("\n").filter(Boolean).length;
   st.remotes = remotes.split("\n").filter(Boolean);
   if (last) {
@@ -564,6 +574,23 @@ export async function log(
   return parseCommits(await git(root, args));
 }
 
+/**
+ * What "All branches" adds to the current branch's history: commits on other
+ * branches (local and remote) and tags that the current branch doesn't have,
+ * and how many branches they're on. Zero when every other branch is already
+ * part of this one, so the two lists are the same.
+ */
+export async function elsewhere(root: string): Promise<{ commits: number; branches: number }> {
+  if (!(await gitOk(root, ["rev-parse", "--verify", "-q", "HEAD"]))) return { commits: 0, branches: 0 };
+  const [count, refs] = await Promise.all([
+    git(root, ["rev-list", "--count", "--branches", "--remotes", "--tags", "--not", "HEAD"]),
+    git(root, ["for-each-ref", "--no-merged", "HEAD", "--format=%(refname)", "refs/heads", "refs/remotes"]),
+  ]);
+  // origin/HEAD only points at another remote branch
+  const branches = refs.split("\n").filter((r) => r && !r.endsWith("/HEAD")).length;
+  return { commits: Number(count.trim()) || 0, branches };
+}
+
 /** Commits from `git log` with LOG_FORMAT. */
 const LOG_FORMAT = "--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b%x1e";
 function parseCommits(out: string): Commit[] {
@@ -594,13 +621,8 @@ function parseCommits(out: string): Commit[] {
     });
 }
 
-export async function commitDetail(root: string, hash: unknown): Promise<CommitDetail> {
-  const h = commitId(hash);
-  const meta = await git(root, ["show", "-s", "--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b", h]);
-  const [full, short, parents, author, email, date, subject, refs, body] = meta.split("\x1f");
-  const ps = parents ? parents.trim().split(" ").filter(Boolean) : [];
-  const range = ps.length ? [ps[0]!, full!.trim()] : ["--root", full!.trim()];
-  const diffArgs = ps.length ? ["diff", "-M", ...range] : ["diff-tree", "-r", "-M", "--no-commit-id", ...range];
+/** The files a diff changes (diffArgs: "diff A B" or "diff-tree …"), each with its status and line counts. */
+async function changedFiles(root: string, diffArgs: string[]): Promise<CommitFile[]> {
   const [names, nums] = await Promise.all([
     git(root, [...diffArgs, "--name-status"]),
     git(root, [...diffArgs, "--numstat"]),
@@ -614,7 +636,7 @@ export async function commitDetail(root: string, hash: unknown): Promise<CommitD
       .replace(/^.* => /, "");
     counts.set(p, [a === "-" ? 0 : +a!, r === "-" ? 0 : +r!]);
   }
-  const files = names
+  return names
     .split("\n")
     .filter(Boolean)
     .map((l) => {
@@ -623,6 +645,16 @@ export async function commitDetail(root: string, hash: unknown): Promise<CommitD
       const [added, removed] = counts.get(p) ?? [0, 0];
       return { path: p, from: b ? a : undefined, status: status![0]!, added, removed };
     });
+}
+
+export async function commitDetail(root: string, hash: unknown): Promise<CommitDetail> {
+  const h = commitId(hash);
+  const meta = await git(root, ["show", "-s", "--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b", h]);
+  const [full, short, parents, author, email, date, subject, refs, body] = meta.split("\x1f");
+  const ps = parents ? parents.trim().split(" ").filter(Boolean) : [];
+  const range = ps.length ? [ps[0]!, full!.trim()] : ["--root", full!.trim()];
+  const diffArgs = ps.length ? ["diff", "-M", ...range] : ["diff-tree", "-r", "-M", "--no-commit-id", ...range];
+  const files = await changedFiles(root, diffArgs);
   return {
     hash: full!.trim(),
     short: short!,
@@ -650,6 +682,278 @@ export async function commitFileDiff(root: string, hash: unknown, file: unknown)
     before: parents.length ? "Before this commit" : "Nothing (first commit)",
     after: "After this commit",
   });
+}
+
+// ---------- bisect: finding the commit that broke something ----------
+
+/** Where a bisect stands: the commit to test now, what's been marked, and the first bad commit once found. */
+export async function bisectState(root: string): Promise<BisectState> {
+  const start = await gitPath(root, "BISECT_START");
+  if (!fs.existsSync(start))
+    return { active: false, branch: "", current: null, remaining: 0, steps: 0, marks: [], found: null };
+  const branch = fs.readFileSync(start, "utf8").trim();
+  const log = await git(root, ["bisect", "log"]).catch(() => "");
+  // "# good: [hash] subject", "# bad: …", "# skip: …"
+  const marks: BisectMark[] = [];
+  for (const m of log.matchAll(/^# (good|bad|skip): \[([0-9a-f]{7,64})\] (.*)$/gm))
+    marks.push({ verdict: m[1] as BisectMark["verdict"], hash: m[2]!, subject: m[3]! });
+  const refs = await git(root, ["for-each-ref", "--format=%(refname) %(objectname)", "refs/bisect/"]).catch(() => "");
+  let bad = "";
+  const good: string[] = [];
+  for (const l of refs.split("\n").filter(Boolean)) {
+    const [name, hash] = l.split(" ");
+    if (name === "refs/bisect/bad") bad = hash!;
+    else if (name!.startsWith("refs/bisect/good-")) good.push(hash!);
+  }
+  let remaining = 0;
+  if (bad && good.length)
+    remaining = Number((await git(root, ["rev-list", "--count", bad, "--not", ...good]).catch(() => "0")).trim());
+  const one = async (rev: string) => parseCommits(await git(root, ["log", "-1", LOG_FORMAT, rev, "--"]))[0] ?? null;
+  // only the bad commit itself left in question: that's the one
+  const found = bad && good.length && remaining === 1 ? await one(bad) : null;
+  return {
+    active: true,
+    branch,
+    current: found ? null : await one("HEAD"),
+    remaining,
+    steps: remaining > 1 ? Math.ceil(Math.log2(remaining)) : 0,
+    marks,
+    found,
+  };
+}
+
+/**
+ * Starts a bisect between a commit where things work and one where they're
+ * broken (HEAD by default), and checks out the commit halfway between to test.
+ * Needs a clean work tree: testing old commits shouldn't mix with your edits.
+ */
+export async function bisectStart(root: string, good: unknown, bad: unknown): Promise<BisectState> {
+  if ((await operation(root)).kind) throw new GitClientError("Finish or cancel what's in progress first.");
+  if (fs.existsSync(await gitPath(root, "BISECT_START"))) throw new GitClientError("A bisect is already running.");
+  const dirty = (await git(root, ["status", "--porcelain", "--untracked-files=no"])).trim();
+  if (dirty)
+    throw new GitClientError(
+      "Commit or stash your changes first: testing old commits checks them out over your work.",
+      "dirty",
+    );
+  const g = await existingRef(root, good, "the commit that works");
+  const b = bad === undefined || bad === "" ? "HEAD" : await existingRef(root, bad, "the commit that's broken");
+  if (!(await gitOk(root, ["merge-base", "--is-ancestor", g, b])))
+    throw new GitClientError("The working commit has to come before the broken one.");
+  if ((await git(root, ["rev-parse", g])).trim() === (await git(root, ["rev-parse", b])).trim())
+    throw new GitClientError("Those are the same commit.");
+  await git(root, ["bisect", "start", b, g, "--"]);
+  return bisectState(root);
+}
+
+/** Marks the commit being tested: it works (good), it's broken (bad), or it can't be tested (skip). */
+export async function bisectMark(root: string, verdict: unknown): Promise<BisectState> {
+  if (verdict !== "good" && verdict !== "bad" && verdict !== "skip")
+    throw new GitClientError("verdict must be good, bad or skip");
+  if (!fs.existsSync(await gitPath(root, "BISECT_START"))) throw new GitClientError("No bisect is running.");
+  await git(root, ["bisect", verdict]);
+  return bisectState(root);
+}
+
+/** Ends the bisect and goes back to the branch it started from. */
+export async function bisectReset(root: string): Promise<void> {
+  await git(root, ["bisect", "reset"]);
+}
+
+// ---------- rewriting recent commits (interactive rebase) ----------
+
+/** The most commits one rewrite takes on. */
+const REWRITE_MAX = 100;
+
+/** The commits from `from` to HEAD, oldest first, with what stands in the way of rewriting them. */
+export async function rewritePlan(root: string, from: unknown): Promise<RewritePlan> {
+  const f = commitId(from);
+  const head = (await git(root, ["rev-parse", "HEAD"])).trim();
+  const branch = (await git(root, ["branch", "--show-current"])).trim();
+  const full = (await git(root, ["rev-parse", "--verify", f + "^{commit}"])).trim();
+  const plan: RewritePlan = { from: full, head, branch, commits: [], dirty: false, blocked: "" };
+  if (!branch) plan.blocked = "You're not on a branch (detached HEAD). Switch to a branch first.";
+  else if ((await operation(root)).kind) plan.blocked = "Finish or cancel what's in progress first.";
+  else if (!(await gitOk(root, ["merge-base", "--is-ancestor", full, head])))
+    plan.blocked = `That commit isn't part of ${branch}.`;
+  if (plan.blocked) return plan;
+  const hasParent = await gitOk(root, ["rev-parse", "--verify", "--quiet", full + "^"]);
+  const range = hasParent ? [`${full}^..${head}`] : [head];
+  const [log, merges, unpushed, status] = await Promise.all([
+    git(root, ["log", "--reverse", "--format=%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%B%x1e", ...range, "--"]),
+    git(root, ["rev-list", "--merges", "--count", ...range]),
+    git(root, ["rev-list", ...range, "--not", "--remotes"]),
+    git(root, ["status", "--porcelain", "--untracked-files=no"]),
+  ]);
+  const local = new Set(unpushed.split("\n").filter(Boolean));
+  const hasRemotes = (await git(root, ["remote"])).trim() !== "";
+  plan.commits = log
+    .split("\x1e")
+    .map((r) => r.replace(/^\n+/, ""))
+    .filter((r) => r.trim())
+    .map((r) => {
+      const [hash, short, author, date, subject, message] = r.split("\x1f");
+      return {
+        hash: hash!,
+        short: short!,
+        author: author!,
+        date: date!,
+        subject: subject ?? "",
+        message: (message ?? "").trim(),
+        pushed: hasRemotes && !local.has(hash!),
+      };
+    });
+  plan.dirty = status.trim() !== "";
+  if (Number(merges.trim()) > 0)
+    plan.blocked = "There's a merge commit in these commits. Pick a commit after the merge to rewrite from.";
+  else if (plan.commits.length > REWRITE_MAX)
+    plan.blocked = `That's ${plan.commits.length} commits; pick one closer to the top (at most ${REWRITE_MAX}).`;
+  return plan;
+}
+
+/** A path for git's sh: forward slashes, single-quoted. */
+const shQuote = (p: string) => "'" + p.replaceAll("\\", "/").replaceAll("'", "'\\''") + "'";
+
+/**
+ * Replays the commits from `from` as steps say: kept (optionally with a new
+ * message), squashed into the one before, dropped or reordered. Runs git rebase
+ * -i with a to-do list written here, so no editor opens; new messages are
+ * applied with commit --amend. Stops (and says so) if a step conflicts: settle
+ * it, then continue or cancel from the Git client like any rebase.
+ */
+export async function rewrite(
+  root: string,
+  body: { from?: unknown; head?: unknown; steps?: unknown },
+): Promise<{ commits: number; stopped: boolean; changed: boolean }> {
+  const plan = await rewritePlan(root, body.from);
+  if (plan.blocked) throw new GitClientError(plan.blocked);
+  if (body.head !== plan.head)
+    throw new GitClientError("The branch moved since you opened this; open it again.", "stale");
+  if (!Array.isArray(body.steps)) throw new GitClientError("steps are required");
+  const steps = body.steps as RewriteStep[];
+  const planned = new Map(plan.commits.map((c) => [c.hash, c]));
+  const seen = new Set<string>();
+  for (const s of steps) {
+    if (!s || typeof s.hash !== "string" || !planned.has(s.hash) || seen.has(s.hash))
+      throw new GitClientError("the steps don't match the commits", "stale");
+    seen.add(s.hash);
+    if (!["pick", "squash", "drop"].includes(s.action)) throw new GitClientError(`"${String(s.action)}" isn't a step`);
+    if (s.message !== undefined && (typeof s.message !== "string" || s.action !== "pick"))
+      throw new GitClientError("only a kept commit takes a message");
+    if (typeof s.message === "string" && !s.message.trim()) throw new GitClientError("a commit message can't be empty");
+  }
+  if (seen.size !== planned.size) throw new GitClientError("every commit needs a step", "stale");
+  const kept = steps.filter((s) => s.action !== "drop");
+  if (!kept.length) throw new GitClientError("That would drop every commit. Keep at least one.");
+  if (kept[0]!.action === "squash")
+    throw new GitClientError("The first commit you keep has nothing before it to be squashed into.");
+  const unchanged =
+    steps.every((s, i) => s.action === "pick" && s.hash === plan.commits[i]!.hash) &&
+    steps.every((s) => s.message === undefined || s.message.trim() === planned.get(s.hash)!.message);
+  if (unchanged) return { commits: plan.commits.length, stopped: false, changed: false };
+
+  // the to-do list, and a message file for every commit that gets a new message
+  const dir = await gitPath(root, "ferry-rewrite");
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const todo: string[] = [];
+  let pendingMessage = "";
+  const flush = () => {
+    if (pendingMessage) todo.push(`exec git commit --amend --only --no-verify -F ${shQuote(pendingMessage)}`);
+    pendingMessage = "";
+  };
+  steps.forEach((s, i) => {
+    if (s.action === "drop") return todo.push(`drop ${s.hash}`);
+    if (s.action === "squash") return todo.push(`fixup ${s.hash}`); // the message comes from the pick it joins
+    flush();
+    todo.push(`pick ${s.hash}`);
+    const wanted = s.message?.trim();
+    // a new message, or squashes after it: say what the commit ends up as
+    const squashedInto = steps.slice(i + 1).findIndex((n) => n.action !== "squash" && n.action !== "drop");
+    const hasSquashes = steps
+      .slice(i + 1, squashedInto < 0 ? undefined : i + 1 + squashedInto)
+      .some((n) => n.action === "squash");
+    if ((wanted && wanted !== planned.get(s.hash)!.message) || hasSquashes) {
+      const file = path.join(dir, `message-${i}.txt`);
+      fs.writeFileSync(file, (wanted ?? planned.get(s.hash)!.message) + "\n");
+      pendingMessage = file;
+    }
+  });
+  flush();
+  const todoFile = path.join(dir, "todo");
+  fs.writeFileSync(todoFile, todo.join("\n") + "\n");
+
+  const hasParent = await gitOk(root, ["rev-parse", "--verify", "--quiet", plan.from + "^"]);
+  const r = await exec(
+    ["git", "-C", root, "rebase", "-i", "--autostash", ...(hasParent ? [plan.from + "^"] : ["--root"])],
+    { env: env({ GIT_SEQUENCE_EDITOR: "cp " + shQuote(todoFile) }), timeoutMs: 10 * 60_000 },
+  );
+  if (r.code !== 0) {
+    if ((await operation(root)).kind === "rebase") return { commits: 0, stopped: true, changed: true };
+    throw new GitClientError(cleanMessage(r.stderr || r.stdout || r.error || "the rewrite failed"));
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+  const n = Number(
+    (await git(root, ["rev-list", "--count", ...(hasParent ? [`${plan.from}^..HEAD`] : ["HEAD"])])).trim(),
+  );
+  return { commits: n, stopped: false, changed: true };
+}
+
+// ---------- comparing branches ----------
+
+/** A branch, tag or commit that exists, as given; otherwise a clear error. */
+async function existingRef(root: string, v: unknown, what: string): Promise<string> {
+  const r = plain(v, what);
+  if (!(await gitOk(root, ["rev-parse", "--verify", "--quiet", r + "^{commit}"])))
+    throw new GitClientError(`there's no branch, tag or commit called "${r}"`, "bad-ref");
+  return r;
+}
+
+/**
+ * What head has that base doesn't (and the other way round), and what head
+ * changed since the two split: the same view as a pull request from head into base.
+ */
+export async function compare(root: string, base: unknown, head: unknown): Promise<Comparison> {
+  const b = await existingRef(root, base, "base"),
+    h = await existingRef(root, head, "head");
+  const mergeBase = (await git(root, ["merge-base", b, h]).catch(() => "")).trim();
+  const [counts, ahead, behind] = await Promise.all([
+    git(root, ["rev-list", "--left-right", "--count", `${b}...${h}`]),
+    git(root, ["log", "--date-order", LOG_FORMAT, "-n200", `${b}..${h}`, "--"]),
+    git(root, ["log", "--date-order", LOG_FORMAT, "-n200", `${h}..${b}`, "--"]),
+  ]);
+  const [behindCount, aheadCount] = counts.trim().split(/\s+/).map(Number);
+  // since they split; with no shared history, just the two trees against each other
+  const files = await changedFiles(root, ["diff", "-M", mergeBase ? `${b}...${h}` : b, ...(mergeBase ? [] : [h])]);
+  return {
+    base: b,
+    head: h,
+    mergeBase,
+    ahead: parseCommits(ahead),
+    aheadCount: aheadCount ?? 0,
+    behind: parseCommits(behind),
+    behindCount: behindCount ?? 0,
+    files,
+  };
+}
+
+/** One file's change in a comparison: from where base and head split, to head. */
+export async function compareFileDiff(root: string, base: unknown, head: unknown, file: unknown): Promise<FileDiff> {
+  const b = await existingRef(root, base, "base"),
+    h = await existingRef(root, head, "head");
+  const p = repoPath(root, file);
+  const split = (await git(root, ["merge-base", b, h]).catch(() => "")).trim();
+  const text = await git(root, [
+    "diff",
+    "--no-color",
+    "-M",
+    "-U3",
+    split ? `${b}...${h}` : b,
+    ...(split ? [] : [h]),
+    "--",
+    p,
+  ]);
+  return capped({ lines: parseUnified(text), before: split ? `${b}, where they split` : b, after: h });
 }
 
 // ---------- branches ----------
@@ -1257,8 +1561,106 @@ export async function conflictDiff(root: string, file: unknown): Promise<FileDif
   });
 }
 
+/**
+ * Splits git merge-file --diff3 output into pieces: text both sides agree on,
+ * and each conflict with your side, the common ancestor ("base") and theirs.
+ * Line endings are kept as they are.
+ */
+export function parseMerge(out: string): MergePart[] {
+  const parts: MergePart[] = [];
+  const lines = out.split(/(?<=\n)/);
+  let same = "";
+  let i = 0;
+  const flush = () => {
+    if (same) parts.push({ kind: "same", text: same });
+    same = "";
+  };
+  while (i < lines.length) {
+    const l = lines[i]!;
+    if (!l.startsWith("<<<<<<< ")) {
+      same += l;
+      i++;
+      continue;
+    }
+    // <<<<<<< ours … ||||||| base … ======= … >>>>>>> theirs
+    let ours = "",
+      base = "",
+      theirs = "",
+      at: "ours" | "base" | "theirs" = "ours",
+      closed = false;
+    for (i++; i < lines.length; i++) {
+      const m = lines[i]!;
+      if (at === "ours" && m.startsWith("||||||| ")) at = "base";
+      else if ((at === "ours" || at === "base") && /^=======\r?\n?$/.test(m)) at = "theirs";
+      else if (at === "theirs" && m.startsWith(">>>>>>> ")) {
+        closed = true;
+        i++;
+        break;
+      } else if (at === "ours") ours += m;
+      else if (at === "base") base += m;
+      else theirs += m;
+    }
+    if (!closed) {
+      // not a conflict after all (a line that only looks like a marker): keep it as text
+      same += l + ours + base + theirs;
+      continue;
+    }
+    flush();
+    parts.push({ kind: "conflict", ours, base, theirs });
+  }
+  flush();
+  return parts;
+}
+
+/**
+ * A conflicted file in pieces, rebuilt from the three versions git keeps while
+ * it's conflicted (the common ancestor, yours and theirs), so a half-edited file
+ * or a conflictStyle setting doesn't change what you see.
+ */
+export async function conflictParts(root: string, file: unknown): Promise<ConflictParts> {
+  const p = repoPath(root, file);
+  const show = async (n: number) => {
+    const r = await exec(["git", "-C", root, "show", `:${n}:${p}`], { env: env() });
+    return r.code === 0 ? r.stdout : null;
+  };
+  const [base, ours, theirs] = await Promise.all([show(1), show(2), show(3)]);
+  if (ours === null || theirs === null)
+    return { path: p, parts: null, reason: "It was deleted on one side, so keep one version of the whole file." };
+  if (ours.includes("\0") || theirs.includes("\0"))
+    return { path: p, parts: null, reason: "It's a binary file, so keep one version of the whole file." };
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ferry-parts-"));
+  try {
+    fs.writeFileSync(path.join(tmp, "base"), base ?? "");
+    fs.writeFileSync(path.join(tmp, "ours"), ours);
+    fs.writeFileSync(path.join(tmp, "theirs"), theirs);
+    const r = await exec(
+      [
+        "git",
+        "merge-file",
+        "-p",
+        "--diff3",
+        "-L",
+        "ours",
+        "-L",
+        "base",
+        "-L",
+        "theirs",
+        path.join(tmp, "ours"),
+        path.join(tmp, "base"),
+        path.join(tmp, "theirs"),
+      ],
+      { env: env() },
+    );
+    // merge-file exits with the number of conflicts; only a negative code is a failure
+    if (r.code < 0) throw new GitClientError(cleanMessage(r.stderr || r.error || "couldn't read the conflict"));
+    return { path: p, parts: parseMerge(r.stdout), reason: "" };
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 /** Settles one conflicted file: keep yours, keep theirs, keep both (union), or mark your own edit as done. */
-export async function resolveConflict(root: string, file: unknown, choice: unknown): Promise<void> {
+export async function resolveConflict(root: string, file: unknown, choice: unknown, text?: unknown): Promise<void> {
   const p = repoPath(root, file);
   const abs = path.join(root, p);
   switch (choice) {
@@ -1293,6 +1695,14 @@ export async function resolveConflict(root: string, file: unknown, choice: unkno
       }
       break;
     }
+    case "text": {
+      // the file as you settled it, change by change in the conflict editor
+      if (typeof text !== "string") throw new GitClientError("the settled text is missing");
+      if (/^(<{7}|>{7}) /m.test(text))
+        throw new GitClientError(`${p} still has conflict markers (<<<<<<<); settle every change first`, "markers");
+      fs.writeFileSync(abs, text);
+      break;
+    }
     case "done": {
       const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
       if (/^(<{7}|>{7}) /m.test(text))
@@ -1300,7 +1710,7 @@ export async function resolveConflict(root: string, file: unknown, choice: unkno
       break;
     }
     default:
-      throw new GitClientError("choice must be ours, theirs, both or done");
+      throw new GitClientError("choice must be ours, theirs, both, text or done");
   }
   await git(root, ["add", "--", p]);
   // outside a merge or rebase (edits put back after a pull) the file is just your uncommitted work again

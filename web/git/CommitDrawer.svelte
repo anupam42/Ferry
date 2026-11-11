@@ -180,6 +180,24 @@
       <button class="btn small left" onclick={copyId}>Copy id</button>
       <button class="btn small" onclick={branchHere}><Icon name="branch" size={16} />Branch from here</button>
       <button class="btn small" onclick={tagHere}><Icon name="tag" size={16} />Tag</button>
+      <button
+        class="btn small"
+        title="Reorder, reword, squash or drop this commit and the ones after it"
+        onclick={() => {
+          const h = c!.hash;
+          close();
+          git.rewrite = h;
+        }}>Rewrite from here</button
+      >
+      <button
+        class="btn small"
+        title="Something broke after this commit? Find which commit did it (bisect)"
+        onclick={() => {
+          const h = c!.hash;
+          close();
+          git.bisect = { good: h };
+        }}>It worked here: find the break</button
+      >
       <button class="btn small" onclick={revert}>Revert</button>
       <button class="btn small brand" onclick={cherryPick}>Cherry-pick</button>
     {/if}

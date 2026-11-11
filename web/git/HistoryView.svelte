@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from "../components/Icon.svelte";
+  import Menu from "../components/Menu.svelte";
   import RelayLoading from "../components/RelayLoading.svelte";
   import Section from "../components/Section.svelte";
   import { api, enc } from "../lib/api.ts";
@@ -24,11 +25,35 @@
     seenKey = "";
   let firstNew = $state(0);
 
+  // what "All branches" would add: commits on other branches that this one doesn't have
+  let others = $state<{ commits: number; branches: number } | null>(null);
   $effect(() => {
-    const key = [git.selected, all, st.branch].join("|");
+    void git.selected;
+    void branch;
+    void head;
+    void git.bump;
+    api<{ commits: number; branches: number }>("GET", git.url("elsewhere")).then(
+      (r) => (others = r),
+      () => (others = null),
+    );
+  });
+  const here = $derived(st.branch || "this branch");
+  const extraTitle = $derived(
+    !others
+      ? "Also commits on other branches and tags"
+      : others.commits
+        ? `${plural(others.commits, "commit")} on ${plural(others.branches, "other branch", "other branches")} that ${here} doesn't have`
+        : `Every other branch is already part of ${here}, so this shows the same commits`,
+  );
+
+  // the repository's state is replaced every few seconds; reload only when these actually change
+  const branch = $derived(st.branch);
+  const head = $derived(st.head);
+  $effect(() => {
+    const key = [git.selected, all, branch].join("|");
     const want = limit;
     void git.bump;
-    if (!st.head) {
+    if (!head) {
       commits = [];
       return;
     }
@@ -148,63 +173,106 @@
   <RelayLoading say="Reading the history" mood="thinking" />
 {:else}
   <Section id="g-hist" title="History" count={commits.length}>
-    <div class="tools">
-      <div class="seg" role="radiogroup" aria-label="Which commits">
-        <button
-          class:on={!all}
-          role="radio"
-          aria-checked={!all}
-          onclick={() => {
-            all = false;
-            limit = PAGE;
-          }}>On {st.branch || "this branch"}</button
-        >
-        <button
-          class:on={all}
-          role="radio"
-          aria-checked={all}
-          onclick={() => {
-            all = true;
-            limit = PAGE;
-          }}>All branches</button
-        >
-      </div>
-      <input
-        type="search"
-        class="search"
-        bind:value={query}
-        aria-label="Find a commit"
-        placeholder={mode === "code"
-          ? "Text that was added or removed, e.g. a function name"
-          : "Find a commit: message, author or id"}
-        onkeydown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            void deepSearch();
-          }
-        }}
+    {#snippet extra()}
+      <!-- the occasional tools: out of the toolbar, a click away -->
+      <Menu
+        label="More history tools"
+        items={[
+          ...(commits!.length > 1
+            ? [
+                {
+                  label: "Edit commits…",
+                  hint: "Reorder, reword, squash or drop recent commits",
+                  icon: "list",
+                  // your unpushed commits, or the last five when everything's pushed
+                  run: () => (git.rewrite = commits![Math.min(commits!.length - 1, (st.ahead || 5) - 1)]!.hash),
+                },
+              ]
+            : []),
+          {
+            label: "Find a break…",
+            hint: "Find the commit that broke something (bisect)",
+            icon: "search",
+            run: () => (git.bisect = {}),
+          },
+        ]}
       />
-      <div class="seg" role="radiogroup" aria-label="Search in">
-        <button
-          class:on={mode === "message"}
-          role="radio"
-          aria-checked={mode === "message"}
-          title="Commit messages, authors and ids"
-          onclick={() => setMode("message")}>Messages</button
-        >
-        <button
-          class:on={mode === "code"}
-          role="radio"
-          aria-checked={mode === "code"}
-          title="Commits that added or removed the text"
-          onclick={() => setMode("code")}>Code changes</button
-        >
+    {/snippet}
+    <div class="tools">
+      <div class="scope">
+        <div class="seg" role="radiogroup" aria-label="Which commits">
+          <button
+            class:on={!all}
+            role="radio"
+            aria-checked={!all}
+            onclick={() => {
+              all = false;
+              limit = PAGE;
+            }}>On {st.branch || "this branch"}</button
+          >
+          <button
+            class:on={all}
+            role="radio"
+            aria-checked={all}
+            title={extraTitle}
+            onclick={() => {
+              all = true;
+              limit = PAGE;
+            }}
+            >All branches{#if others?.commits}<span class="more">+{others.commits}</span>{/if}</button
+          >
+        </div>
       </div>
-      {#if q.length >= 2}<button class="btn small" onclick={deepSearch}
-          ><Icon name="search" size={16} />{mode === "code" ? "Find in all code changes" : "Search all history"}</button
-        >{/if}
+      <!-- at the end: the search, one field holding what to look for and (inside it) where to look -->
+      <div class="end">
+        {#if q.length >= 2}<button class="btn small" onclick={deepSearch}
+            ><Icon name="search" size={16} />{mode === "code"
+              ? "Find in all code changes"
+              : "Search all history"}</button
+          >{/if}
+        <div class="find">
+          <Icon name="search" size={16} />
+          <input
+            type="search"
+            bind:value={query}
+            aria-label={mode === "code" ? "Find commits that added or removed this text" : "Find a commit"}
+            placeholder={mode === "code"
+              ? "Text added or removed, e.g. a function name"
+              : "Message, author or commit id"}
+            onkeydown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void deepSearch();
+              }
+              if (e.key === "Escape") query = "";
+            }}
+          />
+          {#if query}<button type="button" class="clear" aria-label="Clear the search" onclick={() => (query = "")}
+              ><Icon name="close" size={14} /></button
+            >{/if}
+          <div class="seg mini" role="radiogroup" aria-label="Search in">
+            <button
+              class:on={mode === "message"}
+              role="radio"
+              aria-checked={mode === "message"}
+              title="Commit messages, authors and ids"
+              onclick={() => setMode("message")}>Messages</button
+            >
+            <button
+              class:on={mode === "code"}
+              role="radio"
+              aria-checked={mode === "code"}
+              title="Commits that added or removed the text"
+              onclick={() => setMode("code")}>Code</button
+            >
+          </div>
+        </div>
+      </div>
     </div>
 
+    {#if all && others && !others.commits}
+      <p class="same muted">Every other branch is already part of {here}, so this is the same list.</p>
+    {/if}
     {#if searching}
       <RelayLoading
         card={false}
@@ -272,10 +340,99 @@
     flex-wrap: wrap;
     padding: 2px space(4) space(2) + 2;
   }
-  .search {
-    max-width: 340px;
-    flex: 1;
-    min-width: 200px;
+  .scope {
+    display: flex;
+    align-items: center;
+    gap: space(2);
+    // the same height as the search field beside it
+    .seg {
+      padding: 4px;
+    }
+  }
+  .more {
+    margin-left: space(1) + 2;
+    padding: 0 space(1) + 2;
+    border-radius: $radius-pill;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11.5px;
+    font-weight: $weight-bold;
+  }
+  .same {
+    margin: 0;
+    padding: 0 space(4) space(2);
+    font-size: fs(sm);
+  }
+  // the search sits at the end of the row; "Search all history" appears just before it
+  .end {
+    display: flex;
+    align-items: center;
+    gap: space(2) + 2;
+    margin-left: auto;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+  // the search field: icon, input, clear, and where to search, in one pill the same height as the toggles
+  .find {
+    display: flex;
+    align-items: center;
+    gap: space(2);
+    flex: 0 1 480px;
+    min-width: 260px;
+    height: 40px;
+    padding: 0 3px 0 space(3) + 2;
+    border: 1px solid var(--line);
+    border-radius: $radius-pill;
+    background: var(--card-solid);
+    color: var(--muted);
+    @include motion {
+      transition:
+        border-color $duration-fast,
+        box-shadow $duration-fast;
+    }
+    &:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: none;
+      padding: 0;
+      box-shadow: none;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      &::-webkit-search-cancel-button {
+        display: none;
+      }
+    }
+  }
+  .clear {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--card2);
+    color: var(--muted);
+    cursor: pointer;
+    flex: none;
+    &:hover {
+      color: var(--text);
+    }
+  }
+  .seg.mini {
+    flex: none;
+    padding: 2px;
+    button {
+      padding: space(1) space(2) + 2;
+      font-size: 12.5px;
+    }
   }
   .found-head {
     display: flex;

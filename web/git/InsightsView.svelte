@@ -21,10 +21,14 @@
   let d = $state<InsightsResponse | null>(null);
   let loading = $state(true);
 
+  // the repository's state is replaced every few seconds; reload only when these actually change
+  const branch = $derived(st.branch);
+  const head = $derived(st.head);
   $effect(() => {
     const w = who;
     void git.selected;
-    void st.branch;
+    void branch;
+    void head;
     void git.bump;
     loading = true;
     act(null, () => api<InsightsResponse>("GET", git.url("insights") + (w === "me" ? "?author=me" : ""))).then((r) => {

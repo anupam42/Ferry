@@ -100,9 +100,11 @@
   <RelayLoading say="Gathering your branches" />
 {:else}
   <Section id="g-local" title="Your branches" count={b.local.length} tone="blue">
-    {#snippet extra()}<button class="btn small brand" onclick={newBranch}
-        ><Icon name="plus" size={16} />New branch</button
-      >{/snippet}
+    {#snippet extra()}<button
+        class="btn small"
+        onclick={() => (git.compare = { base: st.branch, head: b!.local.find((x) => !x.current)?.name ?? st.branch })}
+        ><Icon name="branch" size={16} />Compare</button
+      ><button class="btn small brand" onclick={newBranch}><Icon name="plus" size={16} />New branch</button>{/snippet}
     <table class="table">
       <tbody>
         {#each b.local as x (x.name)}
@@ -132,6 +134,11 @@
                     )}>Switch</button
                 >
                 <button class="btn small" onclick={() => merge(x)}>Merge into {st.branch}</button>
+                <button
+                  class="btn small ghost"
+                  title="What {x.name} has that {st.branch} doesn't, and what it changed"
+                  onclick={() => (git.compare = { base: st.branch, head: x.name })}>Compare</button
+                >
               {/if}
               <button class="btn small ghost" onclick={() => rename(x)}>Rename</button>
               {#if !x.current}<button class="btn small ghost danger" onclick={() => remove(x)}>Delete</button>{/if}
@@ -149,6 +156,10 @@
             <tr>
               <td class="file">{x.name}<small>{x.subject} · {ago(x.date)}</small></td>
               <td class="end"
+                ><button
+                  class="btn small ghost"
+                  title="What {x.name} has that {st.branch} doesn't, and what it changed"
+                  onclick={() => (git.compare = { base: st.branch, head: x.name })}>Compare</button
                 ><button
                   class="btn small"
                   onclick={() =>

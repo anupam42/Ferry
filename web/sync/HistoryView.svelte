@@ -10,8 +10,13 @@
 
   let { p }: { p: PairStatus } = $props();
   let batches = $state<Batch[] | null>(null);
+  // the pairs' status is replaced every few seconds; reload only when the pair itself changes
+  const name = $derived(p.name);
+  // ...and when a sync for it finishes, so new batches show up
+  const syncs = $derived((sync.log[name] ?? []).filter((e) => e.kind === "synced").length);
   $effect(() => {
-    act(null, () => api<Batch[]>("GET", pairURL(p.name, "history"))).then((b) => (batches = b ?? []));
+    void syncs;
+    act(null, () => api<Batch[]>("GET", pairURL(name, "history"))).then((b) => (batches = b ?? []));
   });
 
   const remote = $derived(!!p.remote);

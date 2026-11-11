@@ -36,6 +36,248 @@ async function repo(): Promise<string> {
 }
 
 describe("git client", () => {
+  test("bisect finds the commit that broke it, step by step, and goes back to the branch", async () => {
+    const d = await repo(); // commit 1: "first"
+    const main = sh(d, "branch", "--show-current").trim();
+    for (let i = 2; i <= 9; i++) {
+      put(d, "app.txt", i >= 6 ? `version ${i}\nBUG\n` : `version ${i}\n`);
+      sh(d, "add", "app.txt");
+      sh(d, "commit", "-qm", `change ${i}${i === 6 ? " (the bad one)" : ""}`);
+    }
+    const first = sh(d, "rev-list", "--max-parents=0", "HEAD").trim();
+
+    put(d, "a.txt", "uncommitted\n");
+    await expect(g.bisectStart(d, first, "")).rejects.toThrow(/Commit or stash/);
+    sh(d, "checkout", "--", "a.txt");
+
+    let st = await g.bisectStart(d, first, "");
+    expect(st.active).toBe(true);
+    expect(st.branch).toBe(main);
+    expect((await g.state(d)).bisecting).toBe(true);
+    let tests = 0;
+    while (!st.found && tests < 10) {
+      // what a person would do: look at the checked-out files and say whether it's broken
+      const broken = fs.existsSync(path.join(d, "app.txt")) && read(d, "app.txt").includes("BUG");
+      st = await g.bisectMark(d, broken ? "bad" : "good");
+      tests++;
+    }
+    expect(st.found?.subject).toBe("change 6 (the bad one)");
+    expect(tests).toBeLessThanOrEqual(4); // 9 commits: about log2(9)
+    expect(st.marks.length).toBe(tests + 2); // the two from the start, plus each test
+
+    await g.bisectReset(d);
+    expect(sh(d, "branch", "--show-current").trim()).toBe(main);
+    expect((await g.bisectState(d)).active).toBe(false);
+    expect((await g.state(d)).bisecting).toBe(false);
+    await expect(g.bisectMark(d, "good")).rejects.toThrow(/No bisect/);
+  });
+
+  test("rewrite recent commits: reword, squash, drop and reorder, with work in progress kept", async () => {
+    const d = await repo(); // "first": a.txt
+    const add = (f: string, text: string, msg: string) => {
+      put(d, f, text);
+      sh(d, "add", f);
+      sh(d, "commit", "-m", msg);
+    };
+    add("b.txt", "b\n", "add b");
+    add("c.txt", "c\n", "add c");
+    add("c.txt", "c, fixed\n", "fix c");
+    add("d.txt", "d\n", "add d");
+    put(d, "a.txt", "work in progress\n"); // uncommitted
+    const from = sh(d, "rev-parse", "HEAD~3").trim(); // "add b"
+    const plan = await g.rewritePlan(d, from);
+    expect(plan.blocked).toBe("");
+    expect(plan.dirty).toBe(true);
+    expect(plan.commits.map((c) => c.subject)).toEqual(["add b", "add c", "fix c", "add d"]);
+    expect(plan.commits.every((c) => !c.pushed)).toBe(true); // no remote
+    const [b, c, fix, dd] = plan.commits;
+
+    // d first (reordered), c reworded with "fix c" squashed into it, b dropped
+    const r = await g.rewrite(d, {
+      from,
+      head: plan.head,
+      steps: [
+        { hash: dd!.hash, action: "pick" },
+        { hash: b!.hash, action: "drop" },
+        { hash: c!.hash, action: "pick", message: "add c (fixed)" },
+        { hash: fix!.hash, action: "squash" },
+      ],
+    });
+    expect(r).toEqual({ commits: 2, stopped: false, changed: true });
+    expect(sh(d, "log", "--format=%s").trim().split("\n")).toEqual(["add c (fixed)", "add d", "first"]);
+    expect(read(d, "c.txt")).toBe("c, fixed\n");
+    expect(fs.existsSync(path.join(d, "b.txt"))).toBe(false);
+    expect(read(d, "a.txt")).toBe("work in progress\n"); // set aside and put back
+
+    // what's refused, before anything changes
+    const now = await g.rewritePlan(d, sh(d, "rev-parse", "HEAD~1").trim());
+    const steps = now.commits.map((x) => ({ hash: x.hash, action: "pick" as const }));
+    await expect(g.rewrite(d, { from: now.from, head: "0".repeat(40), steps })).rejects.toThrow(/moved/);
+    await expect(g.rewrite(d, { from: now.from, head: now.head, steps: steps.slice(1) })).rejects.toThrow(
+      /every commit/,
+    );
+    await expect(
+      g.rewrite(d, { from: now.from, head: now.head, steps: [{ ...steps[0]!, action: "squash" }, steps[1]!] }),
+    ).rejects.toThrow(/nothing before it/);
+    await expect(
+      g.rewrite(d, { from: now.from, head: now.head, steps: steps.map((x) => ({ ...x, action: "drop" as const })) }),
+    ).rejects.toThrow(/drop every commit/);
+    await expect(
+      g.rewrite(d, { from: now.from, head: now.head, steps: [{ hash: "deadbeef", action: "pick" }, steps[1]!] }),
+    ).rejects.toThrow(/don't match/);
+    // nothing to do: nothing happens
+    expect(await g.rewrite(d, { from: now.from, head: now.head, steps })).toMatchObject({ changed: false });
+    expect(sh(d, "log", "--format=%s").trim().split("\n")).toEqual(["add c (fixed)", "add d", "first"]);
+  });
+
+  test("rewrite: merges block it, pushed commits are marked, a conflicting reorder stops for you", async () => {
+    const d = await repo();
+    const main = sh(d, "branch", "--show-current").trim();
+    // pushed: a remote that has "first"
+    const remote = path.join(tempDir(), "remote.git");
+    sh(d, "init", "--bare", remote);
+    sh(d, "remote", "add", "origin", remote);
+    sh(d, "push", "-q", "origin", main);
+    put(d, "a.txt", "one\ntwo\nthree\nfour\n");
+    sh(d, "commit", "-qam", "add four");
+    put(d, "a.txt", "one\ntwo\nthree\nfour\nfive\n");
+    sh(d, "commit", "-qam", "add five");
+    const root = sh(d, "rev-list", "--max-parents=0", "HEAD").trim();
+    const plan = await g.rewritePlan(d, root);
+    expect(plan.commits.map((c) => [c.subject, c.pushed])).toEqual([
+      ["first", true],
+      ["add four", false],
+      ["add five", false],
+    ]);
+    // "add five" before "add four" can't apply: the rebase stops on the conflict
+    const [, four, five] = plan.commits;
+    const r = await g.rewrite(d, {
+      from: four!.hash,
+      head: plan.head,
+      steps: [
+        { hash: five!.hash, action: "pick" },
+        { hash: four!.hash, action: "pick" },
+      ],
+    });
+    expect(r.stopped).toBe(true);
+    expect((await g.state(d)).operation).toBe("rebase");
+    await g.finishOperation(d, "abort");
+    expect(sh(d, "log", "--format=%s").trim().split("\n")).toEqual(["add five", "add four", "first"]);
+
+    // a merge in the range: blocked
+    sh(d, "switch", "-qc", "side");
+    put(d, "s.txt", "s\n");
+    sh(d, "add", "s.txt");
+    sh(d, "commit", "-qm", "side");
+    sh(d, "switch", "-q", main);
+    sh(d, "merge", "-q", "--no-ff", "--no-edit", "side");
+    expect((await g.rewritePlan(d, four!.hash)).blocked).toMatch(/merge commit/);
+  });
+
+  test("a conflict in pieces, settled change by change", async () => {
+    const d = await repo(); // a.txt: one / two / three
+    const main = sh(d, "branch", "--show-current").trim();
+    sh(d, "switch", "-c", "theirs");
+    put(d, "a.txt", "ONE (theirs)\ntwo\nthree\n");
+    sh(d, "commit", "-am", "theirs");
+    sh(d, "switch", main);
+    put(d, "a.txt", "one (mine)\ntwo\nthree, and more\n");
+    sh(d, "commit", "-am", "mine");
+    Bun.spawnSync(["git", "-C", d, "merge", "theirs"], { env: { ...process.env, GIT_MERGE_AUTOEDIT: "no" } });
+
+    const c = await g.conflictParts(d, "a.txt");
+    expect(c.reason).toBe("");
+    const conflicts = c.parts!.filter((x) => x.kind === "conflict");
+    expect(conflicts).toEqual([{ kind: "conflict", ours: "one (mine)\n", base: "one\n", theirs: "ONE (theirs)\n" }]);
+    // the change only one side made merges by itself
+    expect(
+      c
+        .parts!.filter((x) => x.kind === "same")
+        .map((x) => (x as { text: string }).text)
+        .join(""),
+    ).toContain("three, and more\n");
+
+    // settled with text that still has markers: refused
+    await expect(g.resolveConflict(d, "a.txt", "text", "<<<<<<< ours\nx\n")).rejects.toThrow(/conflict markers/);
+    // settled: both lines, theirs first
+    await g.resolveConflict(d, "a.txt", "text", "ONE (theirs)\none (mine)\ntwo\nthree, and more\n");
+    expect(read(d, "a.txt")).toBe("ONE (theirs)\none (mine)\ntwo\nthree, and more\n");
+    expect(sh(d, "diff", "--name-only", "--diff-filter=U").trim()).toBe(""); // no longer conflicted
+  });
+
+  test("parseMerge: diff3 output in pieces, line endings kept, stray markers left as text", () => {
+    expect(g.parseMerge("a\n<<<<<<< ours\nmine\n||||||| base\nold\n=======\ntheirs\n>>>>>>> theirs\nz\n")).toEqual([
+      { kind: "same", text: "a\n" },
+      { kind: "conflict", ours: "mine\n", base: "old\n", theirs: "theirs\n" },
+      { kind: "same", text: "z\n" },
+    ]);
+    expect(g.parseMerge("<<<<<<< ours\r\nm\r\n||||||| base\r\n=======\r\nt\r\n>>>>>>> theirs\r\n")).toEqual([
+      { kind: "conflict", ours: "m\r\n", base: "", theirs: "t\r\n" },
+    ]);
+    // a line that only looks like the start of a conflict
+    expect(g.parseMerge("<<<<<<< not really\nrest\n")).toEqual([{ kind: "same", text: "<<<<<<< not really\nrest\n" }]);
+    expect(g.parseMerge("")).toEqual([]);
+  });
+
+  test("compare two branches: commits on each side, and what one changed since they split", async () => {
+    const d = await repo();
+    const main = sh(d, "branch", "--show-current").trim();
+    sh(d, "switch", "-c", "feature");
+    put(d, "a.txt", "one\nTWO\nthree\n");
+    put(d, "new.txt", "hello\n");
+    sh(d, "add", "-A");
+    sh(d, "commit", "-m", "feature work");
+    sh(d, "switch", main);
+    put(d, "other.txt", "main moved on\n");
+    sh(d, "add", "-A");
+    sh(d, "commit", "-m", "main work");
+
+    const c = await g.compare(d, main, "feature");
+    expect(c.aheadCount).toBe(1);
+    expect(c.ahead.map((x) => x.subject)).toEqual(["feature work"]);
+    expect(c.behindCount).toBe(1);
+    expect(c.behind.map((x) => x.subject)).toEqual(["main work"]);
+    expect(c.mergeBase).not.toBe("");
+    // since they split: what feature changed, not main's other.txt
+    expect(c.files.map((f) => [f.path, f.status]).sort()).toEqual([
+      ["a.txt", "M"],
+      ["new.txt", "A"],
+    ]);
+    expect(c.files.find((f) => f.path === "a.txt")).toMatchObject({ added: 1, removed: 1 });
+
+    const diff = await g.compareFileDiff(d, main, "feature", "a.txt");
+    expect(diff.lines.some((l) => l.op === "+" && l.text === "TWO")).toBe(true);
+    expect(diff.lines.some((l) => l.op === "-" && l.text === "two")).toBe(true);
+
+    // the same branch: nothing either way
+    const same = await g.compare(d, main, main);
+    expect([same.aheadCount, same.behindCount, same.files.length]).toEqual([0, 0, 0]);
+    await expect(g.compare(d, main, "no-such-branch")).rejects.toThrow(
+      /no branch, tag or commit called "no-such-branch"/,
+    );
+    await expect(g.compare(d, "--all", main)).rejects.toThrow(/can't start with "-"/);
+  });
+
+  test("what All branches adds: commits only on other branches, until they're merged", async () => {
+    const d = await repo();
+    expect(await g.elsewhere(d)).toEqual({ commits: 0, branches: 0 });
+    const main = sh(d, "branch", "--show-current").trim();
+    sh(d, "switch", "-c", "side");
+    put(d, "b.txt", "b\n");
+    sh(d, "add", "b.txt");
+    sh(d, "commit", "-m", "on side");
+    put(d, "c.txt", "c\n");
+    sh(d, "add", "c.txt");
+    sh(d, "commit", "-m", "on side again");
+    sh(d, "switch", main);
+    // from the main branch: two commits elsewhere, on one branch, and All branches shows them
+    expect(await g.elsewhere(d)).toEqual({ commits: 2, branches: 1 });
+    expect((await g.log(d, { all: true })).length).toBe((await g.log(d)).length + 2);
+    // merged: the side branch is part of this one now, so the two lists are the same
+    sh(d, "merge", "--no-edit", "side");
+    expect(await g.elsewhere(d)).toEqual({ commits: 0, branches: 0 });
+  });
+
   test("state, staging, commit, amend and undo", async () => {
     const d = await repo();
     put(d, "a.txt", "one\nTWO\nthree\n");

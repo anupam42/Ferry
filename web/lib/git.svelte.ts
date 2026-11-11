@@ -39,6 +39,12 @@ class Git {
   conflict = $state<string | null>(null);
   /** the commit open in the commit drawer */
   commit = $state<string | null>(null);
+  /** the bisect drawer (finding the commit that broke something); good: where to say it worked */
+  bisect = $state<{ good?: string } | null>(null);
+  /** rewriting the commits from this one to HEAD (interactive rebase) */
+  rewrite = $state<string | null>(null);
+  /** two branches (or tags, or commits) side by side in the compare drawer */
+  compare = $state<{ base: string; head: string } | null>(null);
   /** the pull request open in the conversation drawer, or whose checks are shown */
   pr = $state<{ pr: PullRequest; provider: string } | null>(null);
   checks = $state<PullRequest | null>(null);

@@ -33,6 +33,8 @@ export interface RepoState {
   behind: number;
   operation: "" | "merge" | "rebase" | "cherry-pick" | "revert";
   operationBranch: string; // what is being merged, when known
+  /** a bisect is running: HEAD is a commit being tested, not your branch */
+  bisecting: boolean;
   files: FileChange[];
   stashes: number;
   remotes: string[];
@@ -88,9 +90,109 @@ export interface Commit {
   head?: boolean;
 }
 
+/** One file a commit (or a comparison) changed: A, M, D, R or C, and its line counts. */
+export interface CommitFile {
+  path: string;
+  from?: string;
+  status: string;
+  added: number;
+  removed: number;
+}
+
 export interface CommitDetail extends Commit {
   body: string;
-  files: { path: string; from?: string; status: string; added: number; removed: number }[];
+  files: CommitFile[];
+}
+
+/** One verdict in a bisect so far. */
+export interface BisectMark {
+  verdict: "good" | "bad" | "skip";
+  hash: string;
+  subject: string;
+}
+
+/** GET /git/{id}/bisect: where a bisect stands. */
+export interface BisectState {
+  active: boolean;
+  /** the branch it started from, where Stop goes back to */
+  branch: string;
+  /** the commit checked out to test now */
+  current: Commit | null;
+  /** commits still in question */
+  remaining: number;
+  /** about how many more tests it takes */
+  steps: number;
+  marks: BisectMark[];
+  /** the first bad commit, once it's found */
+  found: Commit | null;
+}
+
+/** One commit you can rewrite: its whole message, and whether it's already on a remote. */
+export interface RewriteCommit {
+  hash: string;
+  short: string;
+  author: string;
+  date: string;
+  subject: string;
+  /** the whole message, subject and body */
+  message: string;
+  /** already on a remote: rewriting it means force-pushing */
+  pushed: boolean;
+}
+
+/** GET /git/{id}/rewrite-plan?from=hash: the commits from that one to HEAD, oldest first. */
+export interface RewritePlan {
+  /** the first commit to rewrite */
+  from: string;
+  /** HEAD when the plan was made: a rewrite of a different HEAD is refused */
+  head: string;
+  branch: string;
+  commits: RewriteCommit[];
+  /** uncommitted changes: set aside while it runs and put back after */
+  dirty: boolean;
+  /** why it can't be done (a merge commit in the range, a detached HEAD, …); "" when it can */
+  blocked: string;
+}
+
+/**
+ * POST /git/{id}/rewrite: the commits in the order they'll be replayed, each
+ * kept (pick, optionally with a new message for the commit it ends up as),
+ * folded into the commit before it (squash), or dropped.
+ */
+export interface RewriteStep {
+  hash: string;
+  action: "pick" | "squash" | "drop";
+  /** on a pick: the message of the commit it becomes (with anything squashed into it); omitted keeps git's */
+  message?: string;
+}
+
+/** A conflicted file, in pieces: text both sides agree on, and each place they don't. */
+export type MergePart =
+  { kind: "same"; text: string } | { kind: "conflict"; ours: string; base: string; theirs: string };
+
+/** GET /git/{id}/conflict-parts: a conflicted file, to settle it change by change. */
+export interface ConflictParts {
+  path: string;
+  /** null when it can't be split up (a binary file, or deleted on one side): settle the whole file instead */
+  parts: MergePart[] | null;
+  /** why parts is null */
+  reason: string;
+}
+
+/** GET /git/{id}/compare: what head has that base doesn't, and the other way round. */
+export interface Comparison {
+  base: string;
+  head: string;
+  /** where they split ("" when they share no history) */
+  mergeBase: string;
+  /** commits on head that base doesn't have, newest first (at most 200) */
+  ahead: Commit[];
+  aheadCount: number;
+  /** commits on base that head doesn't have, newest first (at most 200) */
+  behind: Commit[];
+  behindCount: number;
+  /** what head changed since they split (the three-dot diff, like a pull request) */
+  files: CommitFile[];
 }
 
 export interface Branch {

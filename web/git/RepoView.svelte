@@ -30,6 +30,7 @@
   import TagsView from "./TagsView.svelte";
   import UndoView from "./UndoView.svelte";
   import WorktreesView from "./WorktreesView.svelte";
+  import BisectCard from "./BisectCard.svelte";
   import OperationCard from "./OperationCard.svelte";
   import RemoteCard from "./RemoteCard.svelte";
 
@@ -148,6 +149,7 @@
       </div>
     </div>
     {#if st}
+      <BisectCard {st} />
       <OperationCard {st} />
       <RemoteCard {st} />
     {/if}
