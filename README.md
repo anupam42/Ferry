@@ -467,6 +467,15 @@ Features other Git apps have, or that people ask for, ordered by how often they'
 - [ ] **Dependency change detection** — notice when `package.json`, `Cargo.toml` or a lock file changes and offer to run install.
 - [ ] **CI integration** — start runs and read their logs for GitHub Actions, GitLab CI and Azure Pipelines (pull requests already show check results).
 - [ ] **AI help for reviews** — write pull request descriptions, summarise changes and explain conflicts.
+- [ ] **Partial checkouts** — clone a big repository without downloading every file's history up front (`--filter=blob:none`), and check out only some folders (`git sparse-checkout`), with a folder picker to change them later. The clone wizard below would build on this.
+- [ ] **Keep stacked branches in place when rebasing** — a "move the branches on top too" option (`--update-refs`) when rebasing or editing commits, so branches built on the one being rewritten follow it instead of being left on the old commits.
+- [ ] **Background maintenance** — a switch per repository to turn on `git maintenance` (scheduled gc, commit-graph, prefetch, pack-refs), plus speed settings for large repos (`core.fsmonitor`, `core.untrackedCache`). The app would also say when a repository is slow and offer them.
+- [ ] **Compare two versions of a pull request** — after a force-push or rebase, show which commits were added, removed or changed between the old and new version (`git range-diff`).
+- [ ] **Search the code** — search the files in a repository or at any commit, with file, line and column (`git grep`), opening each match. History search already finds commit messages and code changes, but not today's files.
+- [ ] **Pull that keeps merges** — a "rebase, keeping merge commits" choice (`pull.rebase=merges`) next to merge and rebase in the Git settings.
+- [ ] **SHA-256 repositories** — work with repositories that use SHA-256 commit IDs (blame currently expects 40-character IDs), and offer it when creating a repository.
+- [ ] **Git update notice** — check the installed Git version against the latest release, and when a new one is out, the mascot says so with what's new in it and how to update for your system (Homebrew, apt, winget or the installer). Also warn when the installed Git is too old for a feature the app uses, and turn that feature off instead of failing.
+- [ ] **New repositories use your default branch** — creating a repository in the app always names the first branch `main`, even when your Git settings say something else (`init.defaultBranch`).
 
 ### Wishes from developers
 
