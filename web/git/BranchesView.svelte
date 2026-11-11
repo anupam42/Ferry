@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from "../components/Icon.svelte";
+  import IconBar, { type BarAction } from "../components/IconBar.svelte";
   import RelayLoading from "../components/RelayLoading.svelte";
   import Section from "../components/Section.svelte";
   import { api, ApiError } from "../lib/api.ts";
@@ -69,6 +70,27 @@
     });
     if (v) await git.try("branch-rename", { from: x.name, to: v.to }, "Renamed to " + v.to, "wink");
   }
+  const switchTo = (name: string, done: string) =>
+    git.try<{ branch: string }>("branch-switch", { name }, (r) => `${done} ${r.branch}`, "wink");
+  const compareWith = (name: string) => (git.compare = { base: st.branch, head: name });
+  /** a branch of yours: switch to it, merge it in, compare, rename, delete (the current one: just rename) */
+  const localActions = (x: Branch): BarAction[] =>
+    x.current
+      ? [{ icon: "pencil", label: "Rename", run: () => rename(x) }]
+      : [
+          { icon: "switch", label: `Switch to ${x.name}`, primary: true, run: () => switchTo(x.name, "Switched to") },
+          { icon: "merge", label: `Merge into ${st.branch}`, run: () => merge(x) },
+          { icon: "compare", label: `Compare with ${st.branch}`, run: () => compareWith(x.name) },
+          { icon: "pencil", label: "Rename", run: () => rename(x) },
+          { icon: "trash", label: "Delete", danger: true, run: () => remove(x) },
+        ];
+  /** a branch only on the remote: check it out, compare, delete it there */
+  const remoteActions = (x: RemoteBranch): BarAction[] => [
+    { icon: "switch", label: "Check out", primary: true, run: () => switchTo(x.name, "Checked out") },
+    { icon: "compare", label: `Compare with ${st.branch}`, run: () => compareWith(x.name) },
+    { icon: "trash", label: `Delete on ${x.name.split("/")[0]}`, danger: true, run: () => removeRemote(x) },
+  ];
+
   /** Deletes a branch on the remote; if it has commits the current branch doesn't, that takes a press-and-hold. */
   async function removeRemote(x: RemoteBranch) {
     const where = x.name.split("/")[0];
@@ -140,26 +162,7 @@
               {:else}not on a remote{/if}
             </td>
             <td class="end">
-              {#if !x.current}
-                <button
-                  class="btn small brand"
-                  onclick={() =>
-                    git.try<{ branch: string }>(
-                      "branch-switch",
-                      { name: x.name },
-                      (r) => `Switched to ${r.branch}`,
-                      "wink",
-                    )}>Switch</button
-                >
-                <button class="btn small" onclick={() => merge(x)}>Merge into {st.branch}</button>
-                <button
-                  class="btn small ghost"
-                  title="What {x.name} has that {st.branch} doesn't, and what it changed"
-                  onclick={() => (git.compare = { base: st.branch, head: x.name })}>Compare</button
-                >
-              {/if}
-              <button class="btn small ghost" onclick={() => rename(x)}>Rename</button>
-              {#if !x.current}<button class="btn small ghost danger" onclick={() => remove(x)}>Delete</button>{/if}
+              <IconBar label="{x.name}: actions" actions={localActions(x)} />
             </td>
           </tr>
         {/each}
@@ -178,22 +181,7 @@
                     >merged</span
                   >{/if}<small>{x.subject} · {ago(x.date)}</small></td
               >
-              <td class="end"
-                ><button
-                  class="btn small ghost"
-                  title="What {x.name} has that {st.branch} doesn't, and what it changed"
-                  onclick={() => (git.compare = { base: st.branch, head: x.name })}>Compare</button
-                ><button
-                  class="btn small"
-                  onclick={() =>
-                    git.try<{ branch: string }>(
-                      "branch-switch",
-                      { name: x.name },
-                      (r) => `Checked out ${r.branch}`,
-                      "wink",
-                    )}>Check out</button
-                ><button class="btn small ghost danger" onclick={() => removeRemote(x)}>Delete</button></td
-              >
+              <td class="end"><IconBar label="{x.name}: actions" actions={remoteActions(x)} /></td>
             </tr>
           {/each}
         </tbody>
@@ -204,9 +192,6 @@
 
 <style lang="scss">
   @use "tokens" as *;
-  .end :global(.btn) {
-    margin-left: space(1);
-  }
   .file .pill {
     margin-left: space(2);
   }
