@@ -18,6 +18,35 @@
     });
   });
 
+  /**
+   * While Branches is on screen, every minute: fetch from the remote (with prune), then read the
+   * branches again, so new, moved and deleted remote branches and the "gone from remote" marks
+   * show up without a click. Skipped while the tab is hidden or an action is running; coming back
+   * to the tab catches up straight away.
+   */
+  const EVERY = 60_000;
+  async function poll() {
+    const id = git.selected;
+    if (document.hidden || git.busy || !id) return;
+    const checked = Date.parse(git.remote[id]?.checkedAt ?? "") || 0;
+    // the server fetches at most once a minute; ask it to when our own minute is up
+    await git.checkRemote(Date.now() - checked >= EVERY - 5_000);
+    if (git.selected !== id) return;
+    const r = await api<BranchList>("GET", git.url("branches")).catch(() => null);
+    if (r && git.selected === id) b = r;
+  }
+  $effect(() => {
+    const t = setInterval(() => void poll(), EVERY);
+    const back = () => {
+      if (!document.hidden) void poll();
+    };
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", back);
+    };
+  });
+
   async function newBranch() {
     const v = await askFields({
       mood: "excited",
