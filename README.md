@@ -439,6 +439,35 @@ Ideas being considered, roughly in priority order. Checked items are done.
 - [ ] **Encrypted targets** (`--encrypt`) — sync files encrypted with a passphrase or age key, so the target can be an untrusted repo or bucket.
 - [ ] **`ferry snapshot`** — save the current state of a pair as a timestamped tarball in the data folder, a checkpoint before a risky refactor.
 
+### Web app
+
+- [ ] **Todo tab** — a new sidebar tab that reads the Todo section of each project's README and turns it into a checklist per project: what's open, what's done, and what was added recently. The mascot keeps you on schedule, nudging you about items that have been open for a while or are past a date you set ("this one's been waiting three weeks"). Ticking an item off updates the README checkbox, so the list stays in the repo and in sync with the app.
+
+### Git client
+
+Features other Git apps have, or that people ask for, ordered by how often they're requested.
+
+- [x] **Interactive rebase** — reword, squash, reorder or drop recent commits (Edit commits).
+- [x] **Line-by-line conflict editor** — keep mine, theirs or both for each change, or write it yourself.
+- [x] **Compare branches** — what's on one branch that isn't on another, as files and diffs.
+- [x] **Bisect** — find the commit that broke something by testing a few commits (Find a break).
+- [x] **Delete a branch on the remote** — from the Branches screen, with a warning when it has unmerged work.
+- [ ] **Stash selected files** — stash just the files you pick instead of every change.
+- [ ] **Fuller pull request support** — create a pull request in the app (title, description, reviewers), and approve, request changes or merge one. Today the app can read and reply.
+- [ ] **Discard individual lines** — throw away part of a file's changes, the way single lines can already be staged.
+- [ ] **Manage remotes** — add, rename or remove a remote, and set a branch's upstream.
+- [ ] **Submodules** — see their status, update them and open them.
+- [ ] **Git LFS status** — show LFS-tracked files and which ones aren't downloaded yet.
+- [ ] **Signed commits** — show "verified" on commits, and sign your own with GPG or SSH.
+- [ ] **Clean up** — remove untracked or ignored files, with a preview first.
+- [ ] **Keyboard-first use** — a command palette and shortcuts.
+- [ ] **Commit policy rules** — require a message format (such as `feat:` or an issue key), signed commits or a maximum file size before committing.
+- [ ] **Worktree pairs** — a folder pair that syncs into a git worktree. Worktrees can already be created and removed; pairs can't target them yet.
+- [ ] **Drift warnings** — warn when someone has pushed changes to files you're editing, beyond pausing a pair whose target is behind.
+- [ ] **Dependency change detection** — notice when `package.json`, `Cargo.toml` or a lock file changes and offer to run install.
+- [ ] **CI integration** — start runs and read their logs for GitHub Actions, GitLab CI and Azure Pipelines (pull requests already show check results).
+- [ ] **AI help for reviews** — write pull request descriptions, summarise changes and explain conflicts.
+
 ## Development
 
 Ferry is written in TypeScript and runs on [Bun](https://bun.sh). Releases are standalone executables made with `bun build --compile`, so users don't need Bun installed.
