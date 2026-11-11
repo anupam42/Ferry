@@ -7,10 +7,13 @@
   import { face } from "../lib/api.ts";
   import { app } from "../lib/app.svelte.ts";
   import { git } from "../lib/git.svelte.ts";
+  import { ms } from "../lib/look.svelte.ts";
+  import { relay } from "../lib/relay.svelte.ts";
   import { dueLabel, isNew, isOverdue, isSoon, isStale, reminder, today, waited } from "../lib/todo.ts";
   import { todos } from "../lib/todo.svelte.ts";
   import type { TodoItem } from "../lib/types.ts";
   import { splitTodo } from "../../src/shared/todo.ts";
+  import { fade, slide } from "svelte/transition";
 
   /**
    * Each project's todo list, read from the Todo section of its README. Ticking an
@@ -45,9 +48,13 @@
     ["done", "Done"],
     ["all", "All"],
   ] as const;
+  // an item just ticked stays a moment to celebrate before it leaves the Open list
+  let cheering = $state<Record<number, boolean>>({});
   const shown = $derived(
-    items.filter((i) =>
-      show === "open" ? !i.done : show === "done" ? i.done : show === "dated" ? !i.done && !!i.due : true,
+    items.filter(
+      (i) =>
+        cheering[i.line] ||
+        (show === "open" ? !i.done : show === "done" ? i.done : show === "dated" ? !i.done && !!i.due : true),
     ),
   );
   const groups = $derived.by(() => {
@@ -84,7 +91,19 @@
     dating = null;
     void todos.edit(repo.id, it, { due });
   }
-  const tick = (it: TodoItem) => repo && void todos.edit(repo.id, it, { done: !it.done });
+  async function tick(it: TodoItem) {
+    if (!repo) return;
+    const done = !it.done,
+      line = it.line;
+    if (done) cheering[line] = true;
+    const ok = await todos.edit(repo.id, it, { done });
+    if (ok && done) {
+      // Relay on the rail joins in: a hop for one item, a party for the last one
+      const left = (todos.lists[repo.id]?.items ?? []).filter((i) => !i.done).length;
+      relay.react(left ? "happy" : "party", left ? 900 : 1600, { jump: true, burst: !left });
+    }
+    setTimeout(() => delete cheering[line], ok && done ? ms(900) : 0);
+  }
   const isBusy = (it: TodoItem) => !!repo && !!todos.busy[`${repo.id}:${it.line}`];
 
   let opened = $state<Record<number, boolean>>({});
@@ -109,7 +128,14 @@
 {#snippet row(it: TodoItem)}
   {@const l = lede(it)}
   {@const due = it.due && !it.done ? dueLabel(it.due, now) : null}
-  <li class="item" class:done={it.done} class:busy={isBusy(it)} style:--depth={it.depth}>
+  <li
+    class="item"
+    class:done={it.done}
+    class:cheer={cheering[it.line] && it.done}
+    class:busy={isBusy(it)}
+    style:--depth={it.depth}
+    transition:slide={{ duration: ms(260) }}
+  >
     <button
       type="button"
       class="box"
@@ -117,12 +143,15 @@
       aria-checked={it.done}
       aria-label={(it.done ? "Not done: " : "Done: ") + l.title.replace(/[*`_]/g, "")}
       disabled={isBusy(it)}
-      onclick={() => tick(it)}><Icon name="check" size={15} /></button
+      onclick={() => tick(it)}
+      ><Icon name="check" size={15} />{#if cheering[it.line] && it.done}<span class="burst" aria-hidden="true"
+          >{#each [0, 1, 2, 3, 4, 5, 6, 7] as n (n)}<i style:--a="{n * 45}deg"></i>{/each}</span
+        >{/if}</button
     >
     <div class="body">
       <div class="title">
         <span class="t"><InlineMd text={l.title} /></span>
-        {#if due}<span class="pill {due.tone}"><Icon name="calendar" size={12} />{due.text}</span>{/if}
+        {#if due}<span class="pill due {due.tone}"><Icon name="calendar" size={12} />{due.text}</span>{/if}
         {#if markNew && isNew(it)}<span class="pill blue">new</span>{/if}
         {#if isStale(it)}<span class="pill muted" title="Open for over a month">waiting {waited(it.since!)}</span>{/if}
       </div>
@@ -140,7 +169,7 @@
         <span class="line">{list?.file}:{it.line}</span>
       </div>
       {#if dating === it.line}
-        <div class="dating">
+        <div class="dating" transition:slide={{ duration: ms(180) }}>
           <input
             type="date"
             value={it.due ?? ""}
@@ -219,10 +248,12 @@
     {:else}
       <div class="card top">
         <div class="narrator">
-          <img src={face(say.face)} alt="" />
+          {#key say.face}<img src={face(say.face)} alt="" class="face" />{/key}
           <div class="bubble" role="status">
-            <div class="say">{say.say}</div>
-            <div class="hint">{say.hint}</div>
+            {#key say.say}<div class="said" in:fade={{ duration: ms(220) }}>
+                <div class="say">{say.say}</div>
+                <div class="hint">{say.hint}</div>
+              </div>{/key}
           </div>
         </div>
         {#if list?.file && items.length}
@@ -254,7 +285,11 @@
             <ol class="timeline">
               {#each dated as it (it.line)}
                 {@const d = dueLabel(it.due!, now)}
-                <li class:late={isOverdue(it, now)} class:soon={isSoon(it, now)}>
+                <li
+                  class:late={isOverdue(it, now)}
+                  class:soon={isSoon(it, now)}
+                  transition:slide={{ duration: ms(240) }}
+                >
                   <span class="dot" aria-hidden="true"></span>
                   <span class="date mono">{it.due}</span>
                   <span class="tt"><InlineMd text={lede(it).title} /></span>
@@ -264,21 +299,25 @@
             </ol>
           </Section>
         {/if}
-        {#each groups as g (g.name)}
-          <Section id={groupId(g.name)} title={g.name || list.heading || "Todo"} count={g.items.length}>
-            <ul class="items">
-              {#each g.items as it (it.line)}{@render row(it)}{/each}
-            </ul>
-          </Section>
-        {:else}
-          <div class="card pad muted">
-            {show === "done"
-              ? "Nothing ticked off yet."
-              : show === "dated"
-                ? "No open item has a date yet: use the calendar button on one."
-                : "Nothing open. Nice."}
-          </div>
-        {/each}
+        {#key repo.id + show}
+          {#each groups as g, gi (g.name)}
+            <div class="enter" style:--i={Math.min(gi, 6)}>
+              <Section id={groupId(g.name)} title={g.name || list.heading || "Todo"} count={g.items.length}>
+                <ul class="items">
+                  {#each g.items as it (it.line)}{@render row(it)}{/each}
+                </ul>
+              </Section>
+            </div>
+          {:else}
+            <div class="card pad muted">
+              {show === "done"
+                ? "Nothing ticked off yet."
+                : show === "dated"
+                  ? "No open item has a date yet: use the calendar button on one."
+                  : "Nothing open. Nice."}
+            </div>
+          {/each}
+        {/key}
       {/if}
     {/if}
   </div>
@@ -536,6 +575,140 @@
       transform: scale(1.18);
     }
   }
+
+  // ---------- motion (none of it plays when motion is reduced) ----------
+  .box {
+    position: relative;
+    :global(svg) {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+  // a burst of dots around the box when an item is ticked
+  .burst {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    pointer-events: none;
+    i {
+      position: absolute;
+      left: -3px;
+      top: -3px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      opacity: 0;
+      transform: rotate(var(--a)) translateY(0);
+      &:nth-child(3n + 2) {
+        background: var(--accent);
+      }
+      &:nth-child(3n) {
+        background: var(--amber);
+      }
+    }
+  }
+  @include motion {
+    // ticked just now: the tick draws itself, the title is struck through, the row glows green, dots fly out
+    .cheer .box :global(svg) {
+      animation: draw-tick 0.35s ease-out 0.08s backwards;
+    }
+    .cheer .title .t {
+      animation: strike 0.4s ease-out 0.15s backwards;
+    }
+    .cheer {
+      animation: glow 0.9s ease-out;
+    }
+    .burst i {
+      animation: fly 0.6s cubic-bezier(0.2, 0.7, 0.3, 1);
+    }
+    // a date appears with a little pop
+    .pill.due {
+      animation: pop-in 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+    }
+    // Relay's face bounces in when it has something new to say
+    .narrator .face {
+      animation: face-in 0.5s cubic-bezier(0.3, 1.5, 0.5, 1);
+    }
+    // groups rise in one after another when you change project or filter
+    .enter {
+      animation: rise 0.35s $ease-out calc(var(--i, 0) * 45ms) backwards;
+    }
+    // late dates keep a soft pulse on the timeline
+    .timeline .late .dot::after {
+      content: "";
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      border: 2px solid var(--red);
+      animation: pulse 2s ease-out infinite;
+    }
+    .date-btn :global(svg) {
+      transition: transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1);
+    }
+    .date-btn:hover :global(svg) {
+      transform: rotate(-10deg) scale(1.12);
+    }
+  }
+  @keyframes draw-tick {
+    from {
+      clip-path: inset(0 100% 0 0);
+    }
+  }
+  @keyframes strike {
+    from {
+      background-size: 0 1.5px;
+    }
+  }
+  @keyframes glow {
+    0% {
+      background: color-mix(in srgb, var(--green) 16%, transparent);
+    }
+    100% {
+      background: transparent;
+    }
+  }
+  @keyframes fly {
+    0% {
+      opacity: 1;
+      transform: rotate(var(--a)) translateY(-8px) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: rotate(var(--a)) translateY(-22px) scale(0.4);
+    }
+  }
+  @keyframes pop-in {
+    from {
+      transform: scale(0.6);
+      opacity: 0;
+    }
+  }
+  @keyframes face-in {
+    0% {
+      transform: scale(0.8) rotate(-6deg);
+    }
+    60% {
+      transform: scale(1.06) rotate(2deg);
+    }
+    100% {
+      transform: none;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(2.2);
+      opacity: 0;
+    }
+  }
   .body {
     min-width: 0;
   }
@@ -561,8 +734,7 @@
     }
     .done & .t {
       color: var(--muted);
-      text-decoration: line-through;
-      text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent);
+      background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 100% 1.5px;
     }
   }
   .rest {
