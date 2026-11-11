@@ -50,17 +50,23 @@
   // the language being pointed at, and where its tooltip goes (the middle of its segment)
   let card = $state<HTMLElement>();
   const segs: HTMLElement[] = $state([]);
-  let hot = $state<{ i: number; x: number; y: number; arrow: number } | null>(null);
+  /** at: the segment's middle; y: the bar's top; width: the card's (all relative to the card) */
+  let hot = $state<{ i: number; at: number; y: number; width: number } | null>(null);
   function point(i: number) {
     const s = segs[i];
     if (!s || !card) return;
     const c = card.getBoundingClientRect(),
       r = s.getBoundingClientRect();
-    const at = r.left - c.left + r.width / 2;
-    // the box stays inside the card; its arrow still points at the segment
-    const x = Math.max(90, Math.min(c.width - 90, at));
-    hot = { i, x, y: r.top - c.top, arrow: at - x };
+    hot = { i, at: r.left - c.left + r.width / 2, y: r.top - c.top, width: c.width };
   }
+  // The box is centred over the segment, but kept inside the card (8px clear of its edges); the
+  // arrow points at the segment wherever the box ends up, staying clear of the box's rounded corners.
+  let tipWidth = $state(0);
+  const box = $derived.by(() => {
+    if (!hot) return { left: 0, arrow: 0 };
+    const left = Math.max(8, Math.min(hot.width - tipWidth - 8, hot.at - tipWidth / 2));
+    return { left, arrow: Math.max(16, Math.min(tipWidth - 16, hot.at - left)) };
+  });
   const leave = () => (hot = null);
 </script>
 
@@ -103,9 +109,10 @@
       <div
         class="tip"
         role="tooltip"
-        style:left="{hot.x}px"
+        bind:offsetWidth={tipWidth}
+        style:left="{box.left}px"
         style:top="{hot.y}px"
-        style:--arrow="{hot.arrow}px"
+        style:--arrow="{box.arrow}px"
         transition:fade={{ duration: ms(120) }}
       >
         <span class="tip-head"><i class:dark={dark(l.color)} style:--c={l.color}></i><b>{l.name}</b></span>
@@ -209,7 +216,7 @@
   .tip {
     position: absolute;
     z-index: z(sticky);
-    transform: translate(-50%, calc(-100% - 10px));
+    transform: translateY(calc(-100% - 10px));
     display: flex;
     flex-direction: column;
     gap: 1px;
@@ -225,7 +232,7 @@
     &::after {
       content: "";
       position: absolute;
-      left: calc(50% + var(--arrow, 0px));
+      left: var(--arrow);
       bottom: -5px;
       width: 10px;
       height: 10px;
