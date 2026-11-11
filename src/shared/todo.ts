@@ -1,6 +1,7 @@
-// A project's todo list, read from the Todo section of its README: every
-// "- [ ] …" / "- [x] …" line under a heading called Todo (or To do, Todos,
-// Tasks or Roadmap), grouped by the subheadings (or bold-only lines) inside it.
+// A project's todo list, read from its README: every "- [ ] …" / "- [x] …"
+// checklist line, grouped by the heading (or bold-only line) it's under, so a
+// "## Todo", a "## Status" with "### Backend" and "### Frontend", or a list of
+// ideas all show up.
 // An item can carry a date it should be done by, written in the line itself as
 // "(due 2026-12-01)" or "📅 2026-12-01", so the list and its dates live in the
 // repository. No imports: the server and the web app both use this.
@@ -30,7 +31,7 @@ export interface TodoItem {
 export interface TodoList {
   /** the README's path in the repository, or null when there is none */
   file: string | null;
-  /** the section's heading, or "" when the README has no todo section */
+  /** the heading the first checklist is under, or "" when the README has none */
   heading: string;
   items: TodoItem[];
   /** edits go to the working folder of a folder pair, which then syncs them into the repository */
@@ -38,35 +39,27 @@ export interface TodoList {
 }
 
 const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
-const TODO_TITLE = /^(to-?\s?dos?|tasks|roadmap)\b/i;
 const ITEM = /^(\s*)[-*+]\s+\[([ xX])\]\s+(.*)$/;
 const BOLD_GROUP = /^\*\*([^*].*?)\*\*:?\s*$/;
 const DUE = /\s*(?:\(due:?\s*(\d{4}-\d{2}-\d{2})\)|📅\s*(\d{4}-\d{2}-\d{2}))/i;
 
-/** The todo section of a README's text, with each item's line number; dates from git are filled in later. */
+const plainText = (s: string) => s.replace(/[*_`]/g, "").trim();
+
+/**
+ * Every checklist in a README's text ("- [ ] …" and "- [x] …" lines, outside code blocks), each
+ * item under the heading (or bold-only line) it sits in, with its line number; dates from git
+ * are filled in later. A group name that appears under two different headings ("Backend" under
+ * both Status and Ideas) gets its parent's name in front, so the two stay apart. `heading` is the
+ * section the list starts in.
+ */
 export function parseTodo(text: string): { heading: string; items: TodoItem[] } {
   const lines = text.split(/\r?\n/);
-  let start = -1,
-    level = 0,
-    heading = "";
-  let fence = false;
+  // the headings around the current line, outermost first, and a bold-only line under the last one
+  const path: { level: number; name: string }[] = [];
+  let bold = "",
+    fence = false;
+  const found: { item: TodoItem; path: string[] }[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const l = lines[i]!;
-    if (/^\s*(```|~~~)/.test(l)) fence = !fence;
-    if (fence) continue;
-    const h = HEADING.exec(l);
-    if (h && TODO_TITLE.test(h[2]!.replace(/[*_`]/g, ""))) {
-      start = i;
-      level = h[1]!.length;
-      heading = h[2]!.replace(/[*_`]/g, "");
-      break;
-    }
-  }
-  if (start < 0) return { heading: "", items: [] };
-  const items: TodoItem[] = [];
-  let group = "";
-  fence = false;
-  for (let i = start + 1; i < lines.length; i++) {
     const l = lines[i]!;
     if (/^\s*(```|~~~)/.test(l)) {
       fence = !fence;
@@ -75,13 +68,15 @@ export function parseTodo(text: string): { heading: string; items: TodoItem[] } 
     if (fence) continue;
     const h = HEADING.exec(l);
     if (h) {
-      if (h[1]!.length <= level) break;
-      group = h[2]!.replace(/[*_`]/g, "");
+      const level = h[1]!.length;
+      while (path.length && path[path.length - 1]!.level >= level) path.pop();
+      path.push({ level, name: plainText(h[2]!) });
+      bold = "";
       continue;
     }
     const b = BOLD_GROUP.exec(l);
     if (b) {
-      group = b[1]!;
+      bold = plainText(b[1]!);
       continue;
     }
     const m = ITEM.exec(l);
@@ -90,20 +85,36 @@ export function parseTodo(text: string): { heading: string; items: TodoItem[] } 
     const d = DUE.exec(body);
     const due = d ? (d[1] ?? d[2] ?? null) : null;
     if (d) body = (body.slice(0, d.index) + body.slice(d.index + d[0].length)).trim();
-    items.push({
-      line: i + 1,
-      raw: l,
-      text: body,
-      done: m[2] !== " ",
-      due,
-      group,
-      depth: Math.floor(m[1]!.replace(/\t/g, "  ").length / 2),
-      since: null,
-      by: "",
-      uncommitted: false,
+    // a level-1 heading is the document's title, not a group
+    const names = path.filter((p) => p.level > 1).map((p) => p.name);
+    if (bold) names.push(bold);
+    found.push({
+      path: names,
+      item: {
+        line: i + 1,
+        raw: l,
+        text: body,
+        done: m[2] !== " ",
+        due,
+        group: names[names.length - 1] ?? "",
+        depth: Math.floor(m[1]!.replace(/\t/g, "  ").length / 2),
+        since: null,
+        by: "",
+        uncommitted: false,
+      },
     });
   }
-  return { heading, items };
+  // the same name under different parents: "Status › Backend" and "Ideas › Backend"
+  const parents = new Map<string, Set<string>>();
+  for (const f of found) {
+    const set = parents.get(f.item.group) ?? new Set<string>();
+    set.add(f.path.slice(0, -1).join(" › "));
+    parents.set(f.item.group, set);
+  }
+  for (const f of found)
+    if ((parents.get(f.item.group)?.size ?? 0) > 1 && f.path.length > 1) f.item.group = f.path.slice(-2).join(" › ");
+  const heading = found[0]?.path[0] ?? "";
+  return { heading, items: found.map((f) => f.item) };
 }
 
 /** The line with its checkbox and due date changed; other text stays as written. */

@@ -1,4 +1,4 @@
-// The web app's Todo tab: a repository's README todo section (see shared/todo.ts),
+// The web app's Todo tab: the checklists in a repository's README (see shared/todo.ts),
 // with git blame saying when each item was added or ticked, and edits written
 // back into the README.
 import fs from "node:fs";

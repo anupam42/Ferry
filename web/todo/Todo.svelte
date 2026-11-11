@@ -16,7 +16,7 @@
   import { fade, slide } from "svelte/transition";
 
   /**
-   * Each project's todo list, read from the Todo section of its README. Ticking an
+   * Each project's todo list: the checklists in its README, by heading. Ticking an
    * item or giving it a date edits that line of the README, so the list stays in
    * the repository; Relay keeps an eye on the dates and on items left waiting.
    */
@@ -240,7 +240,7 @@
         <img src={face("excited")} alt="Relay" class="float" />
         <h2>Let's find your todo lists.</h2>
         <p>
-          I read the Todo section of each project's README. Open a repository in the Git tab first, or let a folder pair
+          I read the checklists in each project's README. Open a repository in the Git tab first, or let a folder pair
           sync into one.
         </p>
         <button class="btn brand" onclick={() => app.go("git")}>Go to Git</button>
@@ -268,7 +268,7 @@
               }}
             />
             <span class="where muted">
-              <Icon name="files" size={14} />{list.file}{list.heading ? ` · ${list.heading}` : ""}{#if list.via}
+              <Icon name="files" size={14} />{list.file}{#if list.via}
                 · edits go through {list.via}{/if}
             </span>
           </div>

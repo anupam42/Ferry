@@ -65,7 +65,7 @@ export function reminder(items: TodoItem[], nowDay = today(), nowMs = Date.now()
     return {
       face: "thinking",
       say: "No todo list here yet.",
-      hint: "Add a “## Todo” section to the README with “- [ ] something” lines, and I'll keep track of it for you.",
+      hint: "Add “- [ ] something” lines to the README (under a “## Todo” heading, say), and I'll keep track of them for you.",
     };
   const open = items.filter((i) => !i.done);
   if (!open.length)

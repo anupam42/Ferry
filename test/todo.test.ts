@@ -54,21 +54,27 @@ const item = (o: Partial<TodoItem>): TodoItem => ({
 });
 
 describe("todo", () => {
-  test("reads only the todo section: groups, nesting, dates, and not code blocks", () => {
+  test("reads every checklist outside code blocks, grouped by heading, with nesting and dates", () => {
     const { heading, items } = parseTodo(README);
-    expect(heading).toBe("Todo");
+    expect(heading).toBe("");
     expect(items.map((i) => [i.line, i.done, i.group, i.depth, i.due])).toEqual([
-      [11, false, "", 0, "2026-12-01"],
-      [12, true, "", 0, null],
-      [13, false, "", 1, "2026-11-20"],
+      [5, false, "", 0, null],
+      [11, false, "Todo", 0, "2026-12-01"],
+      [12, true, "Todo", 0, null],
+      [13, false, "Todo", 1, "2026-11-20"],
       [21, false, "Git client", 0, null],
       [25, true, "Visual", 0, null],
+      [29, false, "Development", 0, null],
     ]);
-    expect(items[0]!.text).toBe("**First** — the first thing");
-    expect(items[2]!.text).toBe("nested");
-    expect(parseTodo("# Hi\n\n- [ ] x\n").items).toEqual([]);
-    expect(parseTodo("## To do\n- [ ] a\n").heading).toBe("To do");
-    expect(parseTodo("## Roadmap\n- [ ] a\n").items.length).toBe(1);
+    expect(items[1]!.text).toBe("**First** — the first thing");
+    expect(items[3]!.text).toBe("nested");
+    expect(parseTodo("# Hi\n\nNo list.\n").items).toEqual([]);
+    // a status list like "## Status / ### Backend", and the same group name under two headings
+    const two = parseTodo(
+      "# App\n## Status\n### Backend\n- [x] a\n### Frontend\n- [ ] b\n## Ideas\n### Backend\n- [ ] c\n",
+    );
+    expect(two.heading).toBe("Status");
+    expect(two.items.map((i) => i.group)).toEqual(["Status › Backend", "Frontend", "Ideas › Backend"]);
   });
 
   test("editing a line changes only its box and its date", () => {

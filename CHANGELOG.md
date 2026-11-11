@@ -36,7 +36,7 @@ How an entry is written:
 - **Compare branches**: what one branch has that another doesn't, and what it changed since they split, file by file. [try: git-branches]
 - **Find the commit that broke it**: say where something worked and where it's broken, test the commit Ferry checks out, and it halves the range until it names the first broken commit (git bisect). [try: git-history]
 
-- **Todo**: a new tab with each project's todo list, read from the Todo section of its README. Tick items off or give them a date, right in the README, and Relay reminds you about late ones and ones left waiting.
+- **Todo**: a new tab with each project's todo list, read from the checklists in its README and grouped by heading. Tick items off or give them a date, right in the README, and Relay reminds you about late ones and ones left waiting.
 
 ### Improved
 
