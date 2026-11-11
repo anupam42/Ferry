@@ -457,7 +457,7 @@ Features other Git apps have, or that people ask for, ordered by how often they'
 - [ ] **Discard individual lines** — throw away part of a file's changes, the way single lines can already be staged.
 - [ ] **Manage remotes** — add, rename or remove a remote, and set a branch's upstream.
 - [ ] **Submodules** — see their status, update them and open them.
-- [ ] **Git LFS status** — show LFS-tracked files and which ones aren't downloaded yet.
+- [ ] **Git LFS status** — show LFS-tracked files and which ones aren't downloaded yet, with storage totals (how many LFS objects and how much space, locally and on the server). Offer to move files above a size you choose to LFS automatically when you commit, not only by file extension (pairs already do this with `--max-size` and `--lfs`), and expose transfer settings such as parallel downloads for big repositories.
 - [ ] **Signed commits** — show "verified" on commits, and sign your own with GPG or SSH.
 - [ ] **Clean up** — remove untracked or ignored files, with a preview first.
 - [ ] **Keyboard-first use** — a command palette and shortcuts.
@@ -467,11 +467,22 @@ Features other Git apps have, or that people ask for, ordered by how often they'
 - [ ] **Dependency change detection** — notice when `package.json`, `Cargo.toml` or a lock file changes and offer to run install.
 - [ ] **CI integration** — start runs and read their logs for GitHub Actions, GitLab CI and Azure Pipelines (pull requests already show check results).
 - [ ] **AI help for reviews** — write pull request descriptions, summarise changes and explain conflicts.
-- [ ] **Partial checkouts** — clone a big repository without downloading every file's history up front (`--filter=blob:none`), and check out only some folders (`git sparse-checkout`), with a folder picker to change them later. The clone wizard below would build on this.
+- [ ] **Rename a branch everywhere** — renaming a branch also renames it on the remote and updates its upstream (today it's renamed only locally), with a note when a pull request is open for the old name.
+- [ ] **Clean up branches** — one screen listing branches that are merged or gone from the remote, with a single "delete these" and an undo. Deleted branches already show up in the Undo screen to bring back.
+- [ ] **Stacked branches** — mark a branch as built on another one. The app shows the stack, rebases it in one go when the base changes, opens the pull requests in order, and shows a graph of which pull requests must merge first.
+- [ ] **Split into commits** — sort a pile of unrelated changes (or one big commit) into a few logical commits with messages, for you to adjust before committing, and point out when a commit mixes unrelated changes.
+- [ ] **Rebase preview** — before rebasing or editing commits, show what will happen: which commits move, which will probably conflict and where, and which commits depend on earlier ones, so reordering or dropping them won't break anything.
+- [ ] **Merge by structure** — for conflicts in code, compare functions and blocks instead of raw lines, so moving or reformatting code doesn't cause a conflict. An extra choice in the conflict editor. The same idea makes cherry-pick smarter: take a feature's change without the unrelated bits around it.
+- [ ] **Secret check at commit time** — the pre-push check already blocks secrets, conflict markers and large files on the way out. Run it at commit time too, so a key never enters local history.
+- [ ] **Worktree dashboard** — the Worktrees screen also shows each worktree's branch status, dev server or process running in it, and its open ports, with start and stop buttons.
+- [ ] **Workspace profiles** — save a branch or worktree together with what it needs (Node or Python version, `.env` values, running services) and switch them all together. Warn when a branch needs different runtime or package versions than what's installed, and share safe parts of the setup with the team.
+- [ ] **Repository backups** — back up chosen repositories, including branches, tags and stashes, to more than one place (a folder, ssh or S3, which pairs already use), check that the backups can be restored, and recover worktrees and uncommitted work after a crash.
+- [ ] **Migration check** — after moving to another host, check that every branch, tag and commit arrived, and that pull request discussions were carried over or exported.
+- [ ] **Partial checkouts** — clone a big repository without downloading every file's history up front (`--filter=blob:none`), and check out only some folders (`git sparse-checkout`), with a folder picker to change them later. The clone wizard below would build on this. Smarter still: suggest the folders a branch or ticket needs, from the files it and related work have touched.
 - [ ] **Keep stacked branches in place when rebasing** — a "move the branches on top too" option (`--update-refs`) when rebasing or editing commits, so branches built on the one being rewritten follow it instead of being left on the old commits.
-- [ ] **Background maintenance** — a switch per repository to turn on `git maintenance` (scheduled gc, commit-graph, prefetch, pack-refs), plus speed settings for large repos (`core.fsmonitor`, `core.untrackedCache`). The app would also say when a repository is slow and offer them.
+- [ ] **Background maintenance** — a switch per repository to turn on `git maintenance` (scheduled gc, commit-graph, prefetch, pack-refs), plus speed settings for large repos (`core.fsmonitor`, `core.untrackedCache`). The app would also say when a repository is slow, explain why (too many loose objects, huge files in history, a slow file system, many untracked files) and offer the fix. It can also forecast how fast the repository is growing.
 - [ ] **Compare two versions of a pull request** — after a force-push or rebase, show which commits were added, removed or changed between the old and new version (`git range-diff`).
-- [ ] **Search the code** — search the files in a repository or at any commit, with file, line and column (`git grep`), opening each match. History search already finds commit messages and code changes, but not today's files.
+- [ ] **Search the code** — search the files in a repository or at any commit, with file, line and column (`git grep`), opening each match. History search already finds commit messages and code changes, but not today's files. It can search every branch at once without checking any of them out.
 - [ ] **Pull that keeps merges** — a "rebase, keeping merge commits" choice (`pull.rebase=merges`) next to merge and rebase in the Git settings.
 - [ ] **SHA-256 repositories** — work with repositories that use SHA-256 commit IDs (blame currently expects 40-character IDs), and offer it when creating a repository.
 - [ ] **Git update notice** — check the installed Git version against the latest release, and when a new one is out, the mascot says so with what's new in it and how to update for your system (Homebrew, apt, winget or the installer). Also warn when the installed Git is too old for a feature the app uses, and turn that feature off instead of failing.
@@ -484,7 +495,7 @@ Bigger ideas about understanding a repository, not just recording it. Most need 
 - [ ] **Ask the repository** — ask questions in plain language ("why did we remove the retry logic?", "who knows the sync engine best?"). The answer cites the commits, pull requests and lines it's based on. It uses history search, blame and pull requests to find them, then Claude to answer.
 - [ ] **Why it changed** — next to a commit or a blame line, a short explanation of the intent behind a change, drawn from its message, its pull request discussion and the code around it. Useful on commits whose message says only "fix".
 - [ ] **Conflict forecast** — warn before a pull request is opened, or while you're still editing, when another branch or someone else's open pull request changes the same lines, so a conflict can be avoided instead of resolved. Builds on drift warnings above. It also catches **silent conflicts**: two changes that merge cleanly but break each other, such as one branch renaming a function another branch starts calling. It finds them by building and testing the merged result before the real merge.
-- [ ] **Impact preview** — before you commit, show what else a change may affect: files that usually change together with it (Insights already finds these), the code that calls the functions you changed, and the tests that cover them. A **confidence score** sums it up: how well tested the changed code is, how far the change reaches, and how often changes there needed a fix afterwards.
+- [ ] **Impact preview** — before you commit, show what else a change may affect: files that usually change together with it (Insights already finds these), the code that calls the functions you changed, and the tests that cover them, with a button to run only those tests. A **confidence score** sums it up: how well tested the changed code is, how far the change reaches, and how often changes there needed a fix afterwards. Added up across a release, it gives a release risk.
 - [ ] **Undo a feature** — pick a feature, by pull request, branch or a description, and revert all of its commits together, even when they're spread across history between unrelated work. It previews exactly what will go and stops for a conflict instead of guessing. The reverse too: **bring back a removed feature**, finding the code where it was deleted and adapting it to how the codebase looks today.
 - [ ] **Component story** — replay how one file or folder grew: a timeline of its commits with the big moments (created, split, rewritten, moved) marked, and its size and number of authors over time. An animated version of file history. For a whole branch or product, it condenses thousands of commits into a short story of how it evolved, with the turning points marked, and can lay two branches side by side to show how they drifted apart.
 - [ ] **Health over time** — track size, complexity, hotspots and TODO comments commit by commit, and show when a part of the codebase started getting worse. Extends the Insights hotspot chart. A **risk map** colours areas that change often, have few tests and are tied to many other files. It also flags **regret commits**, the ones that needed fix after fix, and shortcuts that keep costing time. It can find bug families (bugs that look unrelated but trace back to the same code), and forecast which areas are likely to need work next.
@@ -502,10 +513,14 @@ Bigger ideas about understanding a repository, not just recording it. Most need 
 - [ ] **House rules check** — write down a repository's architecture conventions ("the web app never imports from `src/engine`", "no new `any`") in a small file, and check them on every commit, with the rule and the line that breaks it.
 - [ ] **Explain this change** — turn a big or unfamiliar diff into a plain explanation for someone new to the code: what it does, why, and a small diagram of the parts it touches, linking each point to the lines.
 - [ ] **One review per feature** — show a pull request grouped by layer (database, API, backend, frontend, tests) and in the order data flows through them, instead of as an alphabetical file list.
+- [ ] **Pull request inbox** — every pull request waiting for you across all your repositories and hosts (GitHub, GitLab and Azure DevOps are already connected), in one list.
+- [ ] **Pick up where you left off** — remember which files of a pull request you've reviewed, and after new pushes show only what changed since your last review.
+- [ ] **Review offline** — read and comment on a pull request without a connection, and send the comments when you're back online.
+- [ ] **Conflicting feedback** — point out when two reviewers ask for opposite things on the same code, so the author doesn't have to guess.
 - [ ] **Review memory** — remember concerns raised in past reviews ("don't call the API from this component") and point it out when a new change brings the same problem back.
 - [ ] **Kinder review comments** — before you post, an optional rewrite of a terse comment into clear, specific feedback with a suggestion. Received comments can be explained the same way.
 - [ ] **Tests that prevent repeats** — when a bug is fixed, propose a test that would have caught it. When the same kind of bug keeps coming back, suggest a check or lint rule for it.
-- [ ] **Fix after a regression** — when a merge breaks the tests, find the commit responsible (bisect), propose a fix, run the tests on it and offer it as a pull request.
+- [ ] **Fix after a regression** — when a merge or a CI build breaks the tests, find the commit most likely responsible (from what changed, then bisect to confirm), propose a fix, run the tests on it and offer it as a pull request.
 
 **Working as a team**
 
@@ -519,7 +534,7 @@ Bigger ideas about understanding a repository, not just recording it. Most need 
 **Visual**
 
 - [ ] **Repository map** — explore a repository as an interactive map: folders as regions, files sized by how big or busy they are, and lines for imports between them. Zoom from the whole app down to one file. Circular dependencies and tightly coupled areas stand out.
-- [ ] **Screenshot diff** — for a web project, take screenshots of its pages before and after a commit and show what changed visually, beside the code diff. Can also flag layout and accessibility regressions (contrast, missing labels, overlapping text).
+- [ ] **Screenshot diff** — for a web project, take screenshots of its pages before and after a commit and show what changed visually, beside the code diff. Can also flag layout and accessibility regressions (contrast, missing labels, overlapping text), and find when a component first looked different.
 - [ ] **See any branch's UI** — preview a component or page from another branch, or from an old commit, without switching your own checkout. Built on run any commit.
 - [ ] **Evolution replay** — play an app's history as a film: screenshots of its pages at each release, with the big architecture changes and test coverage over time.
 - [ ] **Feature storyboard** — a feature's history as a row of cards: the commits, pull requests, reviews and screenshots, in order.
@@ -529,6 +544,10 @@ Bigger ideas about understanding a repository, not just recording it. Most need 
 **Experimental**
 
 - [ ] **Cost of a shortcut** — when a commit adds a TODO, a workaround or a disabled test, estimate its future cost from how similar shortcuts in this repository played out.
+- [ ] **Compatibility checks** — before merging, warn when a change breaks an API other code relies on (removed or renamed endpoints, changed types), when a model change needs a database migration that isn't there, and when dependency versions clash. Also preview what will break before upgrading a package.
+- [ ] **Feature flag tracker** — find feature flags in the code, link each to the commits that added it and changed it, and point out flags that are fully rolled out and can be removed.
+- [ ] **Dead code history** — find code nothing uses any more, and show when and in which commit it stopped being used.
+- [ ] **Permissions map** — who can push to, review and merge each repository and branch (branch protection, code owners), across hosts.
 - [ ] **Repository twin** — a model of how a project's parts depend on each other and behave, kept up to date, to try a proposed change against before making it.
 
 ### Wishes from developers
