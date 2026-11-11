@@ -36,6 +36,51 @@ async function repo(): Promise<string> {
 }
 
 describe("git client", () => {
+  test("a conflict in pieces, settled change by change", async () => {
+    const d = await repo(); // a.txt: one / two / three
+    const main = sh(d, "branch", "--show-current").trim();
+    sh(d, "switch", "-c", "theirs");
+    put(d, "a.txt", "ONE (theirs)\ntwo\nthree\n");
+    sh(d, "commit", "-am", "theirs");
+    sh(d, "switch", main);
+    put(d, "a.txt", "one (mine)\ntwo\nthree, and more\n");
+    sh(d, "commit", "-am", "mine");
+    Bun.spawnSync(["git", "-C", d, "merge", "theirs"], { env: { ...process.env, GIT_MERGE_AUTOEDIT: "no" } });
+
+    const c = await g.conflictParts(d, "a.txt");
+    expect(c.reason).toBe("");
+    const conflicts = c.parts!.filter((x) => x.kind === "conflict");
+    expect(conflicts).toEqual([{ kind: "conflict", ours: "one (mine)\n", base: "one\n", theirs: "ONE (theirs)\n" }]);
+    // the change only one side made merges by itself
+    expect(
+      c
+        .parts!.filter((x) => x.kind === "same")
+        .map((x) => (x as { text: string }).text)
+        .join(""),
+    ).toContain("three, and more\n");
+
+    // settled with text that still has markers: refused
+    await expect(g.resolveConflict(d, "a.txt", "text", "<<<<<<< ours\nx\n")).rejects.toThrow(/conflict markers/);
+    // settled: both lines, theirs first
+    await g.resolveConflict(d, "a.txt", "text", "ONE (theirs)\none (mine)\ntwo\nthree, and more\n");
+    expect(read(d, "a.txt")).toBe("ONE (theirs)\none (mine)\ntwo\nthree, and more\n");
+    expect(sh(d, "diff", "--name-only", "--diff-filter=U").trim()).toBe(""); // no longer conflicted
+  });
+
+  test("parseMerge: diff3 output in pieces, line endings kept, stray markers left as text", () => {
+    expect(g.parseMerge("a\n<<<<<<< ours\nmine\n||||||| base\nold\n=======\ntheirs\n>>>>>>> theirs\nz\n")).toEqual([
+      { kind: "same", text: "a\n" },
+      { kind: "conflict", ours: "mine\n", base: "old\n", theirs: "theirs\n" },
+      { kind: "same", text: "z\n" },
+    ]);
+    expect(g.parseMerge("<<<<<<< ours\r\nm\r\n||||||| base\r\n=======\r\nt\r\n>>>>>>> theirs\r\n")).toEqual([
+      { kind: "conflict", ours: "m\r\n", base: "", theirs: "t\r\n" },
+    ]);
+    // a line that only looks like the start of a conflict
+    expect(g.parseMerge("<<<<<<< not really\nrest\n")).toEqual([{ kind: "same", text: "<<<<<<< not really\nrest\n" }]);
+    expect(g.parseMerge("")).toEqual([]);
+  });
+
   test("compare two branches: commits on each side, and what one changed since they split", async () => {
     const d = await repo();
     const main = sh(d, "branch", "--show-current").trim();

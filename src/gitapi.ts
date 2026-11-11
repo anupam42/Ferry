@@ -3,7 +3,7 @@
 //   GET  /git/repos                         repositories: opened directly, and pair targets
 //   POST /git/repos                         {"action": "clone"|"create"|"add", "url", "path"}
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
-//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|file|
+//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|conflict-parts|file|
 //                  folder|remote-check|undo-timeline|push-check|blame|file-history|search}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
 //                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|restore|branch-at|
@@ -141,6 +141,8 @@ export class GitApi {
     switch (action) {
       case "state":
         return json({ ...(await g.state(root)), name: r.name, pairs: r.pairs, standalone: r.standalone });
+      case "conflict-parts":
+        return json(await g.conflictParts(root, q.get("path")));
       case "compare":
         return json(await g.compare(root, q.get("base"), q.get("head")));
       case "compare-diff":
@@ -318,7 +320,7 @@ export class GitApi {
         await g.removeWorktree(root, b.path, b.force === true);
         return done();
       case "resolve":
-        await g.resolveConflict(root, b.path, b.choice);
+        await g.resolveConflict(root, b.path, b.choice, b.text);
         return done();
       case "finish":
         await g.finishOperation(root, b.action === "abort" ? "abort" : "continue");

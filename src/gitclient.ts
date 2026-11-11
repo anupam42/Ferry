@@ -15,6 +15,8 @@ import type { GhPullRequest, GlMergeRequest } from "./apitypes.ts";
 import type {
   CommitFile,
   Comparison,
+  ConflictParts,
+  MergePart,
   Insights,
   PullRequest,
   Branch,
@@ -1338,8 +1340,106 @@ export async function conflictDiff(root: string, file: unknown): Promise<FileDif
   });
 }
 
+/**
+ * Splits git merge-file --diff3 output into pieces: text both sides agree on,
+ * and each conflict with your side, the common ancestor ("base") and theirs.
+ * Line endings are kept as they are.
+ */
+export function parseMerge(out: string): MergePart[] {
+  const parts: MergePart[] = [];
+  const lines = out.split(/(?<=\n)/);
+  let same = "";
+  let i = 0;
+  const flush = () => {
+    if (same) parts.push({ kind: "same", text: same });
+    same = "";
+  };
+  while (i < lines.length) {
+    const l = lines[i]!;
+    if (!l.startsWith("<<<<<<< ")) {
+      same += l;
+      i++;
+      continue;
+    }
+    // <<<<<<< ours … ||||||| base … ======= … >>>>>>> theirs
+    let ours = "",
+      base = "",
+      theirs = "",
+      at: "ours" | "base" | "theirs" = "ours",
+      closed = false;
+    for (i++; i < lines.length; i++) {
+      const m = lines[i]!;
+      if (at === "ours" && m.startsWith("||||||| ")) at = "base";
+      else if ((at === "ours" || at === "base") && /^=======\r?\n?$/.test(m)) at = "theirs";
+      else if (at === "theirs" && m.startsWith(">>>>>>> ")) {
+        closed = true;
+        i++;
+        break;
+      } else if (at === "ours") ours += m;
+      else if (at === "base") base += m;
+      else theirs += m;
+    }
+    if (!closed) {
+      // not a conflict after all (a line that only looks like a marker): keep it as text
+      same += l + ours + base + theirs;
+      continue;
+    }
+    flush();
+    parts.push({ kind: "conflict", ours, base, theirs });
+  }
+  flush();
+  return parts;
+}
+
+/**
+ * A conflicted file in pieces, rebuilt from the three versions git keeps while
+ * it's conflicted (the common ancestor, yours and theirs), so a half-edited file
+ * or a conflictStyle setting doesn't change what you see.
+ */
+export async function conflictParts(root: string, file: unknown): Promise<ConflictParts> {
+  const p = repoPath(root, file);
+  const show = async (n: number) => {
+    const r = await exec(["git", "-C", root, "show", `:${n}:${p}`], { env: env() });
+    return r.code === 0 ? r.stdout : null;
+  };
+  const [base, ours, theirs] = await Promise.all([show(1), show(2), show(3)]);
+  if (ours === null || theirs === null)
+    return { path: p, parts: null, reason: "It was deleted on one side, so keep one version of the whole file." };
+  if (ours.includes("\0") || theirs.includes("\0"))
+    return { path: p, parts: null, reason: "It's a binary file, so keep one version of the whole file." };
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ferry-parts-"));
+  try {
+    fs.writeFileSync(path.join(tmp, "base"), base ?? "");
+    fs.writeFileSync(path.join(tmp, "ours"), ours);
+    fs.writeFileSync(path.join(tmp, "theirs"), theirs);
+    const r = await exec(
+      [
+        "git",
+        "merge-file",
+        "-p",
+        "--diff3",
+        "-L",
+        "ours",
+        "-L",
+        "base",
+        "-L",
+        "theirs",
+        path.join(tmp, "ours"),
+        path.join(tmp, "base"),
+        path.join(tmp, "theirs"),
+      ],
+      { env: env() },
+    );
+    // merge-file exits with the number of conflicts; only a negative code is a failure
+    if (r.code < 0) throw new GitClientError(cleanMessage(r.stderr || r.error || "couldn't read the conflict"));
+    return { path: p, parts: parseMerge(r.stdout), reason: "" };
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 /** Settles one conflicted file: keep yours, keep theirs, keep both (union), or mark your own edit as done. */
-export async function resolveConflict(root: string, file: unknown, choice: unknown): Promise<void> {
+export async function resolveConflict(root: string, file: unknown, choice: unknown, text?: unknown): Promise<void> {
   const p = repoPath(root, file);
   const abs = path.join(root, p);
   switch (choice) {
@@ -1374,6 +1474,14 @@ export async function resolveConflict(root: string, file: unknown, choice: unkno
       }
       break;
     }
+    case "text": {
+      // the file as you settled it, change by change in the conflict editor
+      if (typeof text !== "string") throw new GitClientError("the settled text is missing");
+      if (/^(<{7}|>{7}) /m.test(text))
+        throw new GitClientError(`${p} still has conflict markers (<<<<<<<); settle every change first`, "markers");
+      fs.writeFileSync(abs, text);
+      break;
+    }
     case "done": {
       const text = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
       if (/^(<{7}|>{7}) /m.test(text))
@@ -1381,7 +1489,7 @@ export async function resolveConflict(root: string, file: unknown, choice: unkno
       break;
     }
     default:
-      throw new GitClientError("choice must be ours, theirs, both or done");
+      throw new GitClientError("choice must be ours, theirs, both, text or done");
   }
   await git(root, ["add", "--", p]);
   // outside a merge or rebase (edits put back after a pull) the file is just your uncommitted work again

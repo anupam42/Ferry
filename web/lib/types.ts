@@ -47,6 +47,8 @@ export interface FerryEvent {
 export type {
   CommitFile,
   Comparison,
+  ConflictParts,
+  MergePart,
   Conversation,
   InsightsResponse,
   ShapeBatch,

@@ -102,6 +102,19 @@ export interface CommitDetail extends Commit {
   files: CommitFile[];
 }
 
+/** A conflicted file, in pieces: text both sides agree on, and each place they don't. */
+export type MergePart =
+  { kind: "same"; text: string } | { kind: "conflict"; ours: string; base: string; theirs: string };
+
+/** GET /git/{id}/conflict-parts: a conflicted file, to settle it change by change. */
+export interface ConflictParts {
+  path: string;
+  /** null when it can't be split up (a binary file, or deleted on one side): settle the whole file instead */
+  parts: MergePart[] | null;
+  /** why parts is null */
+  reason: string;
+}
+
 /** GET /git/{id}/compare: what head has that base doesn't, and the other way round. */
 export interface Comparison {
   base: string;
