@@ -8,7 +8,8 @@
   import { git } from "../lib/git.svelte.ts";
   import type { FileContent, FolderEntry, RepoFolder, RepoStateResponse } from "../lib/types.ts";
   import Avatar from "./Avatar.svelte";
-  import FileIcon from "./FileIcon.svelte";
+  import FileIcon from "../components/FileIcon.svelte";
+  import LanguagesBar from "./LanguagesBar.svelte";
 
   /** A folder-at-a-time browser, like a code host's: each entry's last commit, file search, and the folder's README below. */
   let { st }: { st: RepoStateResponse } = $props();
@@ -163,7 +164,7 @@
                 if (e.key === "Enter") open(dir.split("/").slice(0, -1).join("/"));
               }}
             >
-              <td colspan="4" class="name"><FileIcon name=".." up /><span class="label muted">..</span></td>
+              <td colspan="4"><div class="name"><FileIcon name=".." up /><span class="label muted">..</span></div></td>
             </tr>
           {/if}
           {#each entries as e (e.path)}
@@ -177,10 +178,12 @@
                 if (ev.key === "Enter") go(e);
               }}
             >
-              <td class="name"
-                ><FileIcon name={e.name} dir={e.dir} /><span class="label">{e.name}</span>{#if e.dir}<span class="n"
-                    >{countUnder(e.path)}</span
-                  >{/if}</td
+              <td
+                ><div class="name">
+                  <FileIcon name={e.name} dir={e.dir} /><span class="label">{e.name}</span>{#if e.dir}<span class="n"
+                      >{countUnder(e.path)}</span
+                    >{/if}
+                </div></td
               >
               <td class="msg">
                 {#if !byPath}<span class="skel"></span>
@@ -207,6 +210,7 @@
       </table>
     {/if}
   </div>
+  {#if !dir}<LanguagesBar />{/if}
   {#if readme}
     <div class="card readme">
       <div class="readme-head">
@@ -367,8 +371,9 @@
       width: 46%;
     }
     .when {
-      width: 120px;
+      width: 150px;
       color: var(--muted);
+      white-space: nowrap;
     }
     .size {
       width: 80px;

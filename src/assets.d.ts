@@ -13,6 +13,10 @@ declare module "*/web/app/app.js" {
   const text: string;
   export default text;
 }
+declare module "*/web/app/icons.json" {
+  const text: string;
+  export default text;
+}
 declare module "*.css" {
   const text: string;
   export default text;

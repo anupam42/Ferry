@@ -1,0 +1,41 @@
+// Copies the file and folder icons web/lib/fileicons.ts uses out of Material
+// Icon Theme (MIT, the @iconify-json/material-icon-theme dev dependency) into
+// web/lib/fileicons.json, so the app carries only those, not all 1,100+. The
+// build copies it next to the app as icons.json, which pages load once, so the
+// icons don't weigh down app.js.
+//   bun scripts/gen-file-icons.ts
+// Run it after adding a name to fileicons.ts (a test fails until you do).
+import fs from "node:fs";
+import path from "node:path";
+
+import { ICON_NAMES } from "../web/lib/fileicons.ts";
+
+const ROOT = path.join(import.meta.dir, "..");
+const SET = path.join(ROOT, "node_modules", "@iconify-json", "material-icon-theme", "icons.json");
+const OUT = path.join(ROOT, "web", "lib", "fileicons.json");
+
+interface IconSet {
+  width?: number;
+  height?: number;
+  icons: Record<string, { body: string; width?: number; height?: number }>;
+  aliases?: Record<string, { parent: string }>;
+}
+
+const set = JSON.parse(fs.readFileSync(SET, "utf8")) as IconSet;
+const find = (name: string) =>
+  set.icons[name] ?? (set.aliases?.[name] ? set.icons[set.aliases[name]!.parent] : undefined);
+const missing = ICON_NAMES.filter((n) => !find(n));
+if (missing.length) {
+  console.error(`not in Material Icon Theme: ${missing.join(", ")}`);
+  process.exit(1);
+}
+
+const out: Record<string, { w: number; h: number; body: string }> = {};
+for (const n of ICON_NAMES) {
+  const i = find(n)!;
+  out[n] = { w: i.width ?? set.width ?? 16, h: i.height ?? set.height ?? 16, body: i.body };
+}
+fs.writeFileSync(OUT, JSON.stringify(out) + "\n");
+console.log(
+  `wrote ${ICON_NAMES.length} icons to ${path.relative(ROOT, OUT)} (${Math.round(fs.statSync(OUT).size / 1024)} KB)`,
+);

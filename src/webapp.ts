@@ -9,21 +9,23 @@ import fs from "node:fs";
 import path from "node:path";
 
 const DIR = path.join(import.meta.dir, "web", "app");
-type Assets = { html: string; js: string; css: string };
+type Assets = { html: string; js: string; css: string; icons: string };
 
 let embedded: Assets | null | undefined;
 async function fromBinary(): Promise<Assets | null> {
   if (embedded !== undefined) return embedded;
   try {
-    const [html, js, css] = await Promise.all([
+    const [html, js, css, icons] = await Promise.all([
       import("./web/app/index.html", { with: { type: "text" } }),
       import("./web/app/app.js", { with: { type: "text" } }),
       import("./web/app/app.css", { with: { type: "text" } }),
+      import("./web/app/icons.json", { with: { type: "text" } }),
     ]);
     embedded = {
       html: html.default as unknown as string,
       js: js.default as unknown as string,
       css: css.default as unknown as string,
+      icons: icons.default as unknown as string,
     };
   } catch {
     embedded = null;
@@ -37,6 +39,7 @@ async function assets(): Promise<Assets | null> {
       html: fs.readFileSync(path.join(DIR, "index.html"), "utf8"),
       js: fs.readFileSync(path.join(DIR, "app.js"), "utf8"),
       css: fs.readFileSync(path.join(DIR, "app.css"), "utf8"),
+      icons: fs.readFileSync(path.join(DIR, "icons.json"), "utf8"),
     };
   } catch {
     return fromBinary();
@@ -59,19 +62,20 @@ function policy(html: string): string {
 export const isPublicAsset = (p: string) =>
   p === "/app.js" ||
   p === "/app.css" ||
+  p === "/icons.json" ||
   p === "/logo.svg" ||
   p === "/favicon.ico" ||
   /^\/mascot\/[a-z]+\.svg$/.test(p) ||
   p === "/relay.svg" ||
   p === "/relay-comparing.svg";
 
-/** Answers /, /index.html, /app.js and /app.css (and sends the old /next address to /); null for anything else. */
+/** Answers /, /index.html, /app.js, /app.css and /icons.json (and sends the old /next address to /); null for anything else. */
 export async function serveApp(url: URL): Promise<Response | null> {
   const p = url.pathname;
   // the app lived at /next while it was being built: old links and bookmarks still work
   if (p === "/next" || p.startsWith("/next/"))
     return new Response(null, { status: 302, headers: { Location: "/" + url.search } });
-  if (p !== "/" && p !== "/index.html" && p !== "/app.js" && p !== "/app.css") return null;
+  if (p !== "/" && p !== "/index.html" && p !== "/app.js" && p !== "/app.css" && p !== "/icons.json") return null;
   const a = await assets();
   if (!a) {
     return new Response("The web app isn't built yet. Run: bun run build:web\n", {
@@ -84,6 +88,8 @@ export async function serveApp(url: URL): Promise<Response | null> {
     return new Response(a.js, { headers: { ...common, "Content-Type": "text/javascript; charset=utf-8" } });
   if (p === "/app.css")
     return new Response(a.css, { headers: { ...common, "Content-Type": "text/css; charset=utf-8" } });
+  if (p === "/icons.json")
+    return new Response(a.icons, { headers: { ...common, "Content-Type": "application/json; charset=utf-8" } });
   return new Response(a.html, {
     headers: { ...common, "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": policy(a.html) },
   });

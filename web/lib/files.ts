@@ -22,24 +22,6 @@ export function folderTree(paths: string[]): Map<string, Folder> {
   return tree;
 }
 
-const KINDS: [RegExp, string][] = [
-  [
-    /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|cs|cpp|cc|c|h|hpp|rb|php|swift|scala|sh|ps1|bat|cmd|sql|vue|svelte)$/i,
-    "code",
-  ],
-  [/\.(md|markdown|mdown|mkd|txt|rst|adoc|pdf|docx?)$/i, "doc"],
-  [/\.(png|jpe?g|gif|svg|webp|ico|bmp|avif)$/i, "img"],
-  [
-    /\.(json|ya?ml|toml|ini|env|xml|lock|config|conf|editorconfig|npmrc|prettierrc|eslintrc|gitignore|gitattributes)$|^\.[^.]+$/i,
-    "conf",
-  ],
-  [/\.(css|scss|sass|less|html?)$/i, "web"],
-];
-export const fileKind = (name: string) => (KINDS.find(([re]) => re.test(name)) ?? [null, "other"])[1];
-export const fileExt = (name: string) => {
-  const m = /\.([^.]+)$/.exec(name);
-  return m && m.index > 0 ? m[1]!.slice(0, 4) : "";
-};
 export const fileSize = (n: number | null) =>
   n == null
     ? ""

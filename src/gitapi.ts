@@ -3,7 +3,7 @@
 //   GET  /git/repos                         repositories: opened directly, and pair targets
 //   POST /git/repos                         {"action": "clone"|"create"|"add", "url", "path"}
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
-//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|file|
+//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|file|
 //                  folder|remote-check|undo-timeline|push-check|blame|file-history|search}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
 //                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|restore|branch-at|
@@ -160,6 +160,8 @@ export class GitApi {
         return json(await g.conflictDiff(root, q.get("path")));
       case "files":
         return json(await g.trackedFiles(root));
+      case "languages":
+        return json(await g.languages(root));
       case "folder":
         return json(await g.folderEntries(root, q.get("dir")));
       case "undo-timeline":

@@ -48,6 +48,7 @@ export type {
   RepoState,
 } from "./shared/git.ts";
 import { scanSecretContent, secretNameHit } from "./engine/secrets.ts";
+import { languageShares, type LanguageShare } from "./shared/languages.ts";
 import { moveToTrash } from "./engine/trash.ts";
 import { exec, which } from "./proc.ts";
 
@@ -1512,6 +1513,25 @@ export async function checkoutPullRequest(root: string, number: unknown): Promis
 export async function trackedFiles(root: string): Promise<string[]> {
   const out = await git(root, ["ls-files", "-z"]);
   return out.split("\0").filter(Boolean);
+}
+
+/**
+ * How much of the repository each language makes up, the way GitHub's language
+ * bar counts it: bytes of committed files (from git, so uncommitted edits don't
+ * count). Empty for a repository with no commits yet.
+ */
+export async function languages(root: string): Promise<LanguageShare[]> {
+  if (!(await gitOk(root, ["rev-parse", "--verify", "--quiet", "HEAD"]))) return [];
+  const out = await git(root, ["ls-tree", "-r", "-l", "-z", "HEAD"]);
+  const files: { path: string; size: number }[] = [];
+  for (const rec of out.split("\0")) {
+    // "<mode> <type> <object> <size>\t<path>"; submodules have "-" for the size
+    const tab = rec.indexOf("\t");
+    if (tab < 0) continue;
+    const [, type, , size] = rec.slice(0, tab).split(/\s+/);
+    if (type === "blob") files.push({ path: rec.slice(tab + 1), size: Number(size) || 0 });
+  }
+  return languageShares(files);
 }
 
 /** Most entries one folder listing looks up commits for; the rest are listed without. */

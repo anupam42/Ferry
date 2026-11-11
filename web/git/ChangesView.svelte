@@ -1,4 +1,5 @@
 <script lang="ts">
+  import FileIcon from "../components/FileIcon.svelte";
   import Icon from "../components/Icon.svelte";
   import Section from "../components/Section.svelte";
   import { api } from "../lib/api.ts";
@@ -127,7 +128,11 @@
               /></td
             >
             <td class="file"
-              >{f.path.split("/").pop()}<small>{f.from ? `renamed from ${f.from}` : folder(f.path)}</small></td
+              ><div class="fi">
+                <FileIcon name={f.path} /><span
+                  >{f.path.split("/").pop()}<small>{f.from ? `renamed from ${f.from}` : folder(f.path)}</small></span
+                >
+              </div></td
             >
             <td
               ><span class="pill {tone}">{word}</span>{#if partly(f)}
