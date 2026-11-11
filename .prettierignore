@@ -6,4 +6,3 @@ exports/
 # the VS Code extension is plain JavaScript with its own style
 editors/
 bun.lock
-package-lock.json
