@@ -471,11 +471,11 @@ Not a full text editor (everyone using Ferry already has one), but quick, safe e
 
 ### Design system and typeface
 
-Ferry's own look, written down and shared, and a typeface of its own grown from the wordmark. The design system is **Kevat**, after the boatman in the Ramayana who ferried Rama, Sita and Lakshmana across the Ganga and wanted nothing in return: the one who carries you safely to the other side, as Ferry carries your work. The typeface's working name is **Wakeline** (after the wake on its R and the wave under the wordmark). The pieces already exist in the web app (the colour, spacing and motion tokens in `web/styles/_tokens.scss`, the components in `web/components/`, the icon set, Relay, and the hand-drawn wordmark); this turns them into one system with a name.
+Ferry's own look, written down and shared, and a typeface of its own grown from the wordmark. The design system is **Kevat**, after the boatman in the Ramayana who ferried Rama, Sita and Lakshmana across the Ganga and wanted nothing in return: the one who carries you safely to the other side, as Ferry carries your work. The typeface is **Tarang**, "wave" in Hindi (from Sanskrit *taranga*): the water Kevat crosses, and the wave under the wordmark. The pieces already exist in the web app (the colour, spacing and motion tokens in `web/styles/_tokens.scss`, the components in `web/components/`, the icon set, Relay, and the hand-drawn wordmark); this turns them into one system with a name.
 
 **Kevat, the design system**
 
-- [ ] **Settle the names** — Kevat is free on npm and no software uses it that a web search finds; have a trademark search done before it's public. Wakeline is taken on npm by an onboarding product, so pick the typeface's name too (Tarang, "wave", is the suggestion).
+- [ ] **Settle the names** — Kevat is free on npm and no software uses it that a web search finds; have a trademark search done before it's public. Tarang is free on npm too and needs the same search, plus a check that no existing typeface is called Tarang.
 - [ ] **Tokens as the source of truth** — colours (the palette, what each colour is for, light and dark, the accent choices), the type scale, spacing, corner radii, shadows, motion (durations, easings and named moves like pop, rise and draw) and layers, kept in one tokens file in the standard design-tokens format. The SCSS and CSS variables the app uses are generated from it, and design tools such as Figma can read the same file.
 - [ ] **A component library** — the parts Ferry is built from (buttons, pills, sections, segmented pickers, switches, drawers, menus, the floating icon bar, toasts, Relay's speech bubble, file icons, the wordmark), each with its states, sizes and keyboard and screen-reader behaviour written down.
 - [ ] **A living gallery** — a page in the web app (for example `?design`) that shows every token and component for real, in light and dark and at each interface size, so changes can be checked by eye before they ship.
@@ -484,7 +484,7 @@ Ferry's own look, written down and shared, and a typeface of its own grown from 
 - [ ] **Accessibility built in** — contrast checked automatically for every colour pair in both themes, one focus ring, minimum target sizes and reduced motion, as tests that fail when something slips.
 - [ ] **A package of its own** — the tokens, styles and components published together as `ferry-kevat` (the `@ferry` name on npm belongs to someone else), so the VS Code extension, a docs site and future apps look the same.
 
-**Wakeline, Ferry's own typeface**
+**Tarang, Ferry's own typeface**
 
 - [ ] **The character** — start from the wordmark: even-weight strokes with round ends, open shapes, and a little water in it (a wake on R, a sail on Y).
 - [ ] **A display face first** — capitals, then lowercase, figures and punctuation (the basic Latin set, about 95 characters), for headings, the wordmark and Relay's big moments. The app keeps the system font for body text, where a new face would need years of tuning to read as well at small sizes.
