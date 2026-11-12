@@ -14,6 +14,8 @@
   import NotificationsDrawer from "./notes/NotificationsDrawer.svelte";
   import ReleaseNotice from "./updates/ReleaseNotice.svelte";
   import WhatsNew from "./updates/WhatsNew.svelte";
+  import Intro from "./intro/Intro.svelte";
+  import { intro } from "./lib/intro.svelte.ts";
 </script>
 
 <div class="app">
@@ -33,10 +35,11 @@
 
 {#if app.connectionsOpen}<ConnectionsDrawer />{/if}
 {#if notes.open}<NotificationsDrawer />{/if}
-{#if releases.notice}{#key releases.notice.kind + releases.notice.version}<ReleaseNotice
+{#if releases.notice && !intro.open}{#key releases.notice.kind + releases.notice.version}<ReleaseNotice
       n={releases.notice}
     />{/key}{/if}
-{#if releases.whatsNew && releases.info}<WhatsNew />{/if}
+{#if releases.whatsNew && releases.info && !intro.open}<WhatsNew />{/if}
+{#if intro.open}<Intro />{/if}
 <RelayAsk />
 <Toasts />
 <PullToRefresh />

@@ -3,6 +3,7 @@
   import RelayLoading from "../components/RelayLoading.svelte";
   import { api, face } from "../lib/api.ts";
   import { toast } from "../lib/app.svelte.ts";
+  import { intro } from "../lib/intro.svelte.ts";
   import { releases } from "../lib/releases.svelte.ts";
   import { INSTALL_NAME, PLATFORM_NAME } from "../lib/releases.ts";
   import type { Health } from "../lib/types.ts";
@@ -66,6 +67,7 @@
         <button class="btn small" onclick={() => releases.openWhatsNew()}
           ><Icon name="sparkle" size={16} />What's new</button
         >
+        <button class="btn small" onclick={() => intro.show()}><Icon name="play" size={16} />Meet Relay again</button>
         <a
           class="btn small ghost"
           href="https://github.com/anupam42/Ferry/issues/new/choose"

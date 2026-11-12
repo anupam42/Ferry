@@ -57,6 +57,7 @@ import mascot_surprised from "../assets/mascot/relay-surprised.svg" with { type:
 import mascot_love from "../assets/mascot/relay-love.svg" with { type: "text" };
 import mascot_wink from "../assets/mascot/relay-wink.svg" with { type: "text" };
 import mascot_comparing from "../assets/mascot/relay-comparing.svg" with { type: "text" };
+import mascot_cool from "../assets/mascot/relay-cool.svg" with { type: "text" };
 
 /** Relay's expressions, served at /mascot/{name}.svg (bundled into the binary). */
 const MASCOT: Record<string, string> = {
@@ -73,6 +74,7 @@ const MASCOT: Record<string, string> = {
   love: mascot_love as unknown as string,
   wink: mascot_wink as unknown as string,
   comparing: mascot_comparing as unknown as string,
+  cool: mascot_cool as unknown as string,
 };
 
 /** Adds and removes pairs while ferry runs (provided by "ferry ui"). */
