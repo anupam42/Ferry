@@ -7,7 +7,7 @@
   import { intro } from "../lib/intro.svelte.ts";
   import { ms } from "../lib/look.svelte.ts";
   import { relay } from "../lib/relay.svelte.ts";
-  import { chirp, setSound, soundOn } from "../lib/sound.ts";
+  import { canPlay, chirp, opening, OPENING_HIT, setSound, soundOn } from "../lib/sound.ts";
   import type { Mode } from "../lib/types.ts";
 
   /**
@@ -100,17 +100,54 @@
     return () => document.documentElement.classList.remove("intro-open");
   });
 
-  // Relay says hello as it lands (or at your first click, if the browser holds sound back until then)
+  /**
+   * The opening, like a film's: a dark stage, a light that swells while the sound rises around
+   * you, and a flash into the first scene as the chord lands, with Relay's "hi" in it. Browsers
+   * only allow sound after a click, so when they hold it back it starts behind a "Begin" button.
+   * With motion reduced there's no opening, just the first scene and Relay's chirp.
+   */
   let sound = $state(soundOn());
+  let phase = $state<"wait" | "gate" | "opening" | "scenes">("wait");
+  let flashed = $state(false);
+  let stopOpening = () => {};
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let beginBtn = $state<HTMLButtonElement>();
+  function runOpening(withSound: boolean) {
+    phase = "opening";
+    if (withSound) stopOpening = opening();
+    timer = setTimeout(() => {
+      phase = "scenes";
+      flashed = true;
+    }, OPENING_HIT * 1000);
+  }
   $effect(() => {
-    const t = setTimeout(() => chirp("hello", true), ms(520));
-    return () => clearTimeout(t);
+    void (async () => {
+      if (ms(1) === 0) {
+        phase = "scenes";
+        chirp("hello", true);
+      } else if (!soundOn()) runOpening(false);
+      else if (await canPlay()) runOpening(true);
+      else phase = "gate";
+    })();
+    return () => {
+      clearTimeout(timer);
+      stopOpening();
+    };
   });
+  $effect(() => {
+    if (phase === "gate") beginBtn?.focus();
+  });
+  // a click: the browser now allows sound (canPlay asks for it inside the click)
+  function begin() {
+    void canPlay().then((ok) => runOpening(ok && soundOn()));
+  }
   function toggleSound() {
     sound = !sound;
     setSound(sound);
-    if (sound) chirp("hello");
+    if (!sound) stopOpening();
+    else if (phase === "scenes") chirp("hello");
   }
+  const MARK = "FERRY".split("");
 
   function go(i: number) {
     if (i < 0 || i >= SCENES.length || i === at) return;
@@ -119,12 +156,15 @@
     chirp("pop");
   }
   function finish(to: Mode | null) {
-    chirp(to ? "party" : "pop");
+    clearTimeout(timer);
+    if (phase !== "scenes") stopOpening();
+    else chirp(to ? "party" : "pop");
     intro.close();
     if (to) app.go(to);
     relay.react("party", 1600, { jump: true, burst: true });
   }
   function key(e: KeyboardEvent) {
+    if (phase !== "scenes" && e.key !== "Escape") return;
     if (e.key === "Escape") {
       e.preventDefault();
       finish(null);
@@ -147,6 +187,7 @@
   role="dialog"
   aria-modal="true"
   aria-label="Meet Relay"
+  class:cinema={phase !== "scenes"}
   style:--t1={s.tint[0]}
   style:--t2={s.tint[1]}
   transition:fade={{ duration: ms(300) }}
@@ -170,105 +211,124 @@
     </div>
   </header>
 
-  {#key at}
-    <section class="scene" style:--dir={dir} aria-live="polite">
-      <div class="words">
-        <div class="eyebrow">{s.eyebrow}</div>
-        <h1>
-          {#each words(s.title) as w, i (i)}<span class="w" style:--i={i}>{w}</span>{/each}
-        </h1>
-        <p style:--i={words(s.title).length}>{s.text}</p>
+  {#if phase !== "scenes"}
+    <div class="prelude" class:lit={phase === "opening"} aria-live="polite">
+      <div class="orb" aria-hidden="true"></div>
+      <div class="rays" aria-hidden="true">
+        {#each [0, 1, 2, 3, 4, 5] as n (n)}<i style:--n={n}></i>{/each}
       </div>
-
-      <div class="art art-{s.art}" aria-hidden="true">
-        {#if s.art === "ferry"}
-          <div class="shore left">
-            <div class="label"><Icon name="folder" size={18} />Working folder</div>
-            {#each FILES as f, i (f)}<div class="file" style:--i={i}><Icon name="files" size={15} />{f}</div>{/each}
-          </div>
-          <div class="river">
-            <img src={face(s.face)} alt="" class="relay boat" />
-            {#each FILES as f, i (f)}<span class="cargo" style:--i={i}></span>{/each}
-          </div>
-          <div class="shore right">
-            <div class="label"><Icon name="branch" size={18} />Git repository</div>
-            {#each FILES as f, i (f)}<div class="file landed" style:--i={i}>
-                <Icon name="check" size={15} />{f}
-              </div>{/each}
-          </div>
-        {:else}
-          <div class="stage">
-            <div class="halo"></div>
-            {#if s.art === "mess"}
-              {#each ["draft-3-final.md", "test.ts", "old/", "TODO.txt", "copy of app.ts"] as f, i (f)}
-                <span class="paper" style:--i={i}><Icon name="files" size={14} />{f}</span>
-              {/each}
-            {:else if s.art === "safe"}
-              {#each [["undo", "Undo the last sync"], ["clock", "Go back to this morning"], ["shield", "Secrets caught"]] as [ic, t], i (t)}
-                <span class="chip" style:--i={i}><Icon name={ic} size={15} />{t}</span>
-              {/each}
-            {:else if s.art === "git"}
-              {#each [["branch", "Branches"], ["merge", "Conflicts, change by change"], ["undo", "Undo anything"], ["pr", "Pull requests"]] as [ic, t], i (t)}
-                <span class="chip" style:--i={i}><Icon name={ic} size={15} />{t}</span>
-              {/each}
-            {:else if s.art === "todo"}
-              {#each ["Write the docs", "Ship the Todo tab", "Fix the login bug"] as t, i (t)}
-                <span class="check" class:ticked={i === 1} style:--i={i}
-                  ><span class="box"><Icon name="check" size={13} /></span>{t}</span
-                >
-              {/each}
-            {:else if s.art === "go" || s.art === "hello"}
-              {#each [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as n (n)}<i
-                  class="spark"
-                  style:--a="{n * 30}deg"
-                  style:--n={n}
-                ></i>{/each}
-            {/if}
-            {#if s.art === "hello"}
-              <div class="welcome">
-                <span class="hi" aria-hidden="true">Hi!<span class="hand">👋</span></span>
-                <img src={face(s.face)} alt="" class="relay wave" />
-                <span class="shadow"></span>
-                {#each [0, 1, 2] as n (n)}<span class="heart" style:--n={n}>♥</span>{/each}
-              </div>
-            {:else}
-              <img src={face(s.face)} alt="" class="relay" />
-            {/if}
-          </div>
-        {/if}
+      <div class="mark" aria-label="Ferry">
+        {#each MARK as c, i (i)}<span style:--i={i} aria-hidden="true">{c}</span>{/each}
       </div>
-    </section>
-  {/key}
-
-  <footer class="bottom">
-    <div class="dots" role="tablist" aria-label="Scenes">
-      {#each SCENES as sc, i (i)}
-        <button
-          type="button"
-          role="tab"
-          class="dot"
-          class:on={i === at}
-          class:past={i < at}
-          aria-selected={i === at}
-          aria-label="{i + 1}. {sc.eyebrow}"
-          onclick={() => go(i)}
-        ></button>
-      {/each}
-    </div>
-    <div class="nav">
-      {#if at > 0}<button type="button" class="btn ghost" onclick={() => go(at - 1)}>Back</button>{/if}
-      {#if last}
-        <button type="button" class="btn ghost" onclick={() => finish(null)}>Look around</button>
-        <button type="button" class="btn brand" bind:this={next} onclick={() => finish("sync")}
-          >Add a folder pair<Icon name="plus" size={17} /></button
+      {#if phase === "gate"}
+        <button type="button" class="begin" bind:this={beginBtn} onclick={begin}
+          ><Icon name="play" size={18} />Begin</button
         >
-      {:else}
-        <button type="button" class="btn brand" bind:this={next} onclick={() => go(at + 1)}
-          >{at === 0 ? "Show me" : "Next"}<span class="arrow" aria-hidden="true">→</span></button
-        >
+        <small class="phones">Sound on · best with headphones</small>
       {/if}
     </div>
-  </footer>
+  {:else}
+    {#if flashed}<div class="flash" aria-hidden="true"></div>{/if}
+    {#key at}
+      <section class="scene" style:--dir={dir} aria-live="polite">
+        <div class="words">
+          <div class="eyebrow">{s.eyebrow}</div>
+          <h1>
+            {#each words(s.title) as w, i (i)}<span class="w" style:--i={i}>{w}</span>{/each}
+          </h1>
+          <p style:--i={words(s.title).length}>{s.text}</p>
+        </div>
+
+        <div class="art art-{s.art}" aria-hidden="true">
+          {#if s.art === "ferry"}
+            <div class="shore left">
+              <div class="label"><Icon name="folder" size={18} />Working folder</div>
+              {#each FILES as f, i (f)}<div class="file" style:--i={i}><Icon name="files" size={15} />{f}</div>{/each}
+            </div>
+            <div class="river">
+              <img src={face(s.face)} alt="" class="relay boat" />
+              {#each FILES as f, i (f)}<span class="cargo" style:--i={i}></span>{/each}
+            </div>
+            <div class="shore right">
+              <div class="label"><Icon name="branch" size={18} />Git repository</div>
+              {#each FILES as f, i (f)}<div class="file landed" style:--i={i}>
+                  <Icon name="check" size={15} />{f}
+                </div>{/each}
+            </div>
+          {:else}
+            <div class="stage">
+              <div class="halo"></div>
+              {#if s.art === "mess"}
+                {#each ["draft-3-final.md", "test.ts", "old/", "TODO.txt", "copy of app.ts"] as f, i (f)}
+                  <span class="paper" style:--i={i}><Icon name="files" size={14} />{f}</span>
+                {/each}
+              {:else if s.art === "safe"}
+                {#each [["undo", "Undo the last sync"], ["clock", "Go back to this morning"], ["shield", "Secrets caught"]] as [ic, t], i (t)}
+                  <span class="chip" style:--i={i}><Icon name={ic} size={15} />{t}</span>
+                {/each}
+              {:else if s.art === "git"}
+                {#each [["branch", "Branches"], ["merge", "Conflicts, change by change"], ["undo", "Undo anything"], ["pr", "Pull requests"]] as [ic, t], i (t)}
+                  <span class="chip" style:--i={i}><Icon name={ic} size={15} />{t}</span>
+                {/each}
+              {:else if s.art === "todo"}
+                {#each ["Write the docs", "Ship the Todo tab", "Fix the login bug"] as t, i (t)}
+                  <span class="check" class:ticked={i === 1} style:--i={i}
+                    ><span class="box"><Icon name="check" size={13} /></span>{t}</span
+                  >
+                {/each}
+              {:else if s.art === "go" || s.art === "hello"}
+                {#each [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as n (n)}<i
+                    class="spark"
+                    style:--a="{n * 30}deg"
+                    style:--n={n}
+                  ></i>{/each}
+              {/if}
+              {#if s.art === "hello"}
+                <div class="welcome">
+                  <span class="hi" aria-hidden="true">Hi!<span class="hand">👋</span></span>
+                  <img src={face(s.face)} alt="" class="relay wave" />
+                  <span class="shadow"></span>
+                  {#each [0, 1, 2] as n (n)}<span class="heart" style:--n={n}>♥</span>{/each}
+                </div>
+              {:else}
+                <img src={face(s.face)} alt="" class="relay" />
+              {/if}
+            </div>
+          {/if}
+        </div>
+      </section>
+    {/key}
+
+    <footer class="bottom">
+      <div class="dots" role="tablist" aria-label="Scenes">
+        {#each SCENES as sc, i (i)}
+          <button
+            type="button"
+            role="tab"
+            class="dot"
+            class:on={i === at}
+            class:past={i < at}
+            aria-selected={i === at}
+            aria-label="{i + 1}. {sc.eyebrow}"
+            onclick={() => go(i)}
+          ></button>
+        {/each}
+      </div>
+      <div class="nav">
+        {#if at > 0}<button type="button" class="btn ghost" onclick={() => go(at - 1)}>Back</button>{/if}
+        {#if last}
+          <button type="button" class="btn ghost" onclick={() => finish(null)}>Look around</button>
+          <button type="button" class="btn brand" bind:this={next} onclick={() => finish("sync")}
+            >Add a folder pair<Icon name="plus" size={17} /></button
+          >
+        {:else}
+          <button type="button" class="btn brand" bind:this={next} onclick={() => go(at + 1)}
+            >{at === 0 ? "Show me" : "Next"}<span class="arrow" aria-hidden="true">→</span></button
+          >
+        {/if}
+      </div>
+    </footer>
+  {/if}
 </div>
 
 <style lang="scss">
@@ -298,6 +358,114 @@
       padding: space(4);
       gap: space(4);
     }
+  }
+
+  // ---------- the opening ----------
+  .intro.cinema {
+    background: #050a18;
+    color: #fff;
+    .sky {
+      opacity: 0;
+    }
+    .skip {
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.7);
+      &:hover {
+        color: #fff;
+      }
+    }
+    .logo {
+      opacity: 0;
+    }
+  }
+  .prelude {
+    position: relative;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: space(6);
+    grid-row: 2 / 4;
+  }
+  .orb {
+    position: absolute;
+    width: 420px;
+    height: 420px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.9) 0%,
+      color-mix(in srgb, var(--accent-2) 70%, transparent) 18%,
+      color-mix(in srgb, var(--accent) 45%, transparent) 40%,
+      transparent 70%
+    );
+    filter: blur(8px);
+    opacity: 0.12;
+    transform: scale(0.25);
+  }
+  .rays {
+    position: absolute;
+    width: 900px;
+    height: 900px;
+    opacity: 0;
+    i {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 2px;
+      height: 50%;
+      margin-left: -1px;
+      transform-origin: 50% 0;
+      transform: rotate(calc(var(--n) * 60deg));
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0.35), transparent 70%);
+    }
+  }
+  .mark {
+    position: relative;
+    display: flex;
+    gap: 0.5em;
+    font-size: clamp(30px, 5vw, 56px);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    span {
+      opacity: 0.15;
+    }
+  }
+  .begin {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: space(2);
+    padding: space(3) space(6);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: $radius-pill;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font: inherit;
+    font-size: 16px;
+    font-weight: $weight-bold;
+    cursor: pointer;
+    &:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+    &:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 3px;
+    }
+  }
+  .phones {
+    position: relative;
+    margin-top: calc(space(4) * -1);
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 13px;
+  }
+  // the chord lands: a flash of light, and the first scene is there
+  .flash {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: radial-gradient(circle at 70% 50%, #fff, color-mix(in srgb, #fff 70%, var(--accent-2)) 40%, #fff);
+    opacity: 0;
   }
 
   // soft colour drifting behind everything, tinted per scene
@@ -767,6 +935,25 @@
 
   // ---------- motion ----------
   @include motion {
+    // the opening: the light swells and the letters come out of the dark, in step with the sound
+    .prelude.lit .orb {
+      animation: swell 2.6s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+    }
+    .prelude.lit .rays {
+      animation: rays 2.6s ease-in forwards;
+    }
+    .prelude.lit .mark span {
+      animation: letter 2.2s ease-out calc(0.3s + var(--i) * 0.18s) forwards;
+    }
+    .prelude .orb {
+      animation: glow 3s ease-in-out infinite alternate;
+    }
+    .flash {
+      animation: flash 1.1s ease-out forwards;
+    }
+    .begin {
+      animation: rise 0.6s $ease-out 0.4s backwards;
+    }
     .blob.a {
       animation: drift-a 16s ease-in-out infinite alternate;
     }
@@ -901,6 +1088,55 @@
     }
     80% {
       transform: rotate(3deg);
+    }
+  }
+  @keyframes swell {
+    0% {
+      transform: scale(0.25);
+      opacity: 0.15;
+    }
+    100% {
+      transform: scale(3.2);
+      opacity: 1;
+    }
+  }
+  @keyframes glow {
+    to {
+      opacity: 0.22;
+      transform: scale(0.32);
+    }
+  }
+  @keyframes rays {
+    0% {
+      opacity: 0;
+      transform: rotate(0) scale(0.6);
+    }
+    100% {
+      opacity: 1;
+      transform: rotate(80deg) scale(1.4);
+    }
+  }
+  @keyframes letter {
+    0% {
+      opacity: 0.15;
+      letter-spacing: 0.1em;
+      filter: blur(6px);
+    }
+    60% {
+      opacity: 1;
+      filter: blur(0);
+    }
+    100% {
+      opacity: 1;
+      text-shadow: 0 0 24px rgba(255, 255, 255, 0.8);
+    }
+  }
+  @keyframes flash {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
     }
   }
   @keyframes arrive {
