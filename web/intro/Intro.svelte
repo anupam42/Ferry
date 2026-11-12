@@ -2,6 +2,7 @@
   import { fade } from "svelte/transition";
 
   import Icon from "../components/Icon.svelte";
+  import Wordmark from "../components/Wordmark.svelte";
   import { face } from "../lib/api.ts";
   import { app } from "../lib/app.svelte.ts";
   import { intro } from "../lib/intro.svelte.ts";
@@ -147,7 +148,6 @@
     if (!sound) stopOpening();
     else if (phase === "scenes") chirp("hello");
   }
-  const MARK = "FERRY".split("");
 
   function go(i: number) {
     if (i < 0 || i >= SCENES.length || i === at) return;
@@ -218,8 +218,8 @@
         {#each [0, 1, 2, 3, 4, 5] as n (n)}<i style:--n={n}></i>{/each}
       </div>
       <div class="mark" aria-label="Ferry" style:--fly="{OPENING_HIT}s">
-        {#each MARK as c, i (i)}<span style:--at="{LETTER_AT[i]}s" aria-hidden="true">{c}</span>{/each}
-        <!-- Relay flies across and each letter lights up as it passes -->
+        <Wordmark draw={phase === "opening"} at={LETTER_AT} sea={OPENING_HIT - 0.4} />
+        <!-- Relay rides the wave across, and each letter draws itself as it passes -->
         <span class="flyer" aria-hidden="true"><img src={face("excited")} alt="" /></span>
       </div>
       {#if phase === "gate"}
@@ -423,21 +423,16 @@
   }
   .mark {
     position: relative;
-    display: flex;
-    gap: 0.42em;
-    font-size: clamp(34px, 6vw, 72px);
-    font-weight: 800;
-    font-style: italic;
-    letter-spacing: 0.04em;
-    > span:not(.flyer) {
-      opacity: 0.12;
-      display: inline-block;
+    width: clamp(240px, 42vw, 540px);
+    color: #fff;
+    :global(.wordmark) {
+      opacity: 0.14;
     }
   }
   .flyer {
     position: absolute;
     left: -40vw;
-    top: 50%;
+    top: 84%;
     width: 96px;
     height: 72px;
     margin: -36px 0 0 -48px;
@@ -974,8 +969,9 @@
     .prelude.lit .rays {
       animation: rays 2.6s ease-in forwards;
     }
-    .prelude.lit .mark > span:not(.flyer) {
-      animation: letter 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.3) var(--at) forwards;
+    .prelude.lit .mark :global(.wordmark) {
+      opacity: 1;
+      animation: mark-glow var(--fly) ease-in forwards;
     }
     .prelude.lit .flyer {
       animation: fly var(--fly) cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
@@ -1154,25 +1150,7 @@
       transform: rotate(80deg) scale(1.4);
     }
   }
-  @keyframes letter {
-    0% {
-      opacity: 0.12;
-      filter: blur(8px);
-      transform: translateY(18px) scale(0.8);
-    }
-    40% {
-      opacity: 1;
-      filter: blur(0);
-      transform: translateY(-6px) scale(1.12);
-      text-shadow: 0 0 34px #fff;
-    }
-    100% {
-      opacity: 1;
-      transform: none;
-      text-shadow: 0 0 22px rgba(255, 255, 255, 0.7);
-    }
-  }
-  // across the word on the letters' beat (first letter at 0.75 s, last at 1.95 s of 2.6 s), then up above it
+  // along the wave under the word, then up above it as the opening lands
   @keyframes fly {
     0% {
       left: -40vw;
@@ -1182,26 +1160,44 @@
     10% {
       opacity: 1;
     }
+    // riding the wave under each letter as it draws (letters at 0.75, 1.35 and 1.95 s of 2.6 s)
     28.8% {
-      left: 5%;
-      transform: translateY(14px) rotate(4deg);
+      left: 11%;
+      transform: translateY(-6px) rotate(-5deg);
+    }
+    40% {
+      left: 30%;
+      transform: translateY(6px) rotate(5deg);
     }
     52% {
       left: 50%;
-      transform: translateY(-14px) rotate(-3deg);
+      transform: translateY(-6px) rotate(-5deg);
+    }
+    64% {
+      left: 69%;
+      transform: translateY(6px) rotate(5deg);
     }
     75% {
-      left: 95%;
-      transform: translateY(10px) rotate(4deg);
+      left: 88%;
+      transform: translateY(-4px) rotate(-4deg);
     }
     88% {
-      left: 108%;
-      transform: translateY(-40px) rotate(-14deg) scale(1.05);
+      left: 104%;
+      transform: translateY(-60px) rotate(-16deg) scale(1.05);
     }
     100% {
       left: 50%;
       opacity: 1;
-      transform: translateY(-120px) rotate(0) scale(1.35);
+      transform: translateY(-200px) rotate(0) scale(1.3);
+    }
+  }
+  @keyframes mark-glow {
+    0%,
+    60% {
+      filter: drop-shadow(0 0 0 transparent);
+    }
+    100% {
+      filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.75));
     }
   }
   @keyframes flutter {
