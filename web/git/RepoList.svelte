@@ -5,6 +5,7 @@
   import { plural } from "../lib/format.ts";
   import { git, repoMood } from "../lib/git.svelte.ts";
   import { short } from "../lib/sync.svelte.ts";
+  import Visibility from "./Visibility.svelte";
 
   const canOpen = $derived(!app.info || app.info.can_open_repos);
 </script>
@@ -35,7 +36,7 @@
         >
           <img src={face(st ? repoMood(st).face : "happy")} alt="" />
           <div>
-            <div class="name">{r.name}</div>
+            <div class="name"><span>{r.name}</span><Visibility id={r.id} /></div>
             <div class="sub">
               {st
                 ? `⎇ ${st.branch || "detached"} · ${st.files.length ? plural(st.files.length, "change") : "clean"}`
@@ -119,7 +120,13 @@
   }
   .name {
     font-weight: 650;
-    @include ellipsis;
+    display: flex;
+    align-items: center;
+    gap: space(2);
+    min-width: 0;
+    span {
+      @include ellipsis;
+    }
   }
   .sub {
     font-size: 12px;

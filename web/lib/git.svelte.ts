@@ -2,7 +2,14 @@
 import { api, ApiError, enc } from "./api.ts";
 import { act, app, ask, toast } from "./app.svelte.ts";
 import { plural } from "./format.ts";
-import type { PullRequest, PushIssue, RemoteCheckResponse, RepoEntry, RepoStateResponse } from "./types.ts";
+import type {
+  PullRequest,
+  PushIssue,
+  RemoteCheckResponse,
+  RepoEntry,
+  RepoStateResponse,
+  RepoVisibility,
+} from "./types.ts";
 
 export type GitView =
   | "files"
@@ -52,6 +59,8 @@ class Git {
   shaping = $state(false);
   /** the file open in the file drawer */
   file = $state<string | null>(null);
+  /** public or private on its host, per repository (asked once, the server keeps it for 10 minutes) */
+  visibility = $state<Record<string, RepoVisibility | null>>({});
   /** the folder the Files view shows, per repository */
   folder = $state<Record<string, string>>({});
 

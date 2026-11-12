@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Visibility from "./Visibility.svelte";
   import Dock, { type DockAction, type DockItem } from "../components/Dock.svelte";
   import Icon from "../components/Icon.svelte";
   import RelayLoading from "../components/RelayLoading.svelte";
@@ -127,6 +128,7 @@
     <div class="crumbs"><span>Repositories</span><span>›</span><b>{r.name}</b></div>
     <div class="title-row">
       <h1>{r.name}</h1>
+      <Visibility id={r.id} size="large" />
       <button class="pill blue branch" onclick={() => (git.view = "branches")} title="Branches">
         <Icon name="branch" size={15} />{st ? st.branch || `detached at ${st.head}` : "…"}
       </button>
