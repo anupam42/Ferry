@@ -7,6 +7,7 @@
   import { intro } from "../lib/intro.svelte.ts";
   import { ms } from "../lib/look.svelte.ts";
   import { relay } from "../lib/relay.svelte.ts";
+  import { chirp, setSound, soundOn } from "../lib/sound.ts";
   import type { Mode } from "../lib/types.ts";
 
   /**
@@ -99,12 +100,26 @@
     return () => document.documentElement.classList.remove("intro-open");
   });
 
+  // Relay says hello as it lands (or at your first click, if the browser holds sound back until then)
+  let sound = $state(soundOn());
+  $effect(() => {
+    const t = setTimeout(() => chirp("hello", true), ms(520));
+    return () => clearTimeout(t);
+  });
+  function toggleSound() {
+    sound = !sound;
+    setSound(sound);
+    if (sound) chirp("hello");
+  }
+
   function go(i: number) {
     if (i < 0 || i >= SCENES.length || i === at) return;
     dir = i > at ? 1 : -1;
     at = i;
+    chirp("pop");
   }
   function finish(to: Mode | null) {
+    chirp(to ? "party" : "pop");
     intro.close();
     if (to) app.go(to);
     relay.react("party", 1600, { jump: true, burst: true });
@@ -142,7 +157,17 @@
 
   <header class="top">
     <img src="/logo.svg" alt="Ferry" class="logo" />
-    <button type="button" class="skip" onclick={() => finish(null)}>Skip</button>
+    <div class="tools">
+      <button
+        type="button"
+        class="skip icon"
+        aria-label={sound ? "Mute Relay" : "Let Relay make sounds"}
+        title={sound ? "Mute Relay" : "Turn sound on"}
+        aria-pressed={!sound}
+        onclick={toggleSound}><Icon name={sound ? "sound" : "mute"} size={18} /></button
+      >
+      <button type="button" class="skip" onclick={() => finish(null)}>Skip</button>
+    </div>
   </header>
 
   {#key at}
@@ -199,7 +224,16 @@
                   style:--n={n}
                 ></i>{/each}
             {/if}
-            <img src={face(s.face)} alt="" class="relay" class:wave={s.art === "hello"} />
+            {#if s.art === "hello"}
+              <div class="welcome">
+                <span class="hi" aria-hidden="true">Hi!<span class="hand">👋</span></span>
+                <img src={face(s.face)} alt="" class="relay wave" />
+                <span class="shadow"></span>
+                {#each [0, 1, 2] as n (n)}<span class="heart" style:--n={n}>♥</span>{/each}
+              </div>
+            {:else}
+              <img src={face(s.face)} alt="" class="relay" />
+            {/if}
           </div>
         {/if}
       </div>
@@ -313,6 +347,16 @@
   }
   .logo {
     height: 34px;
+  }
+  .tools {
+    display: flex;
+    gap: space(2);
+  }
+  .skip.icon {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    padding: 0;
   }
   .skip {
     border: 0;
@@ -509,6 +553,47 @@
   .art-todo .relay {
     margin-left: 46%;
     margin-top: 30%;
+  }
+  // the first scene: Relay arrives, says hi and waves
+  .welcome {
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+  .hi {
+    position: absolute;
+    right: -38%;
+    top: -26%;
+    z-index: 2;
+    padding: space(2) space(4);
+    border-radius: 18px 18px 18px 4px;
+    background: var(--card-solid);
+    box-shadow: 0 10px 28px rgba(9, 35, 72, 0.14);
+    font-size: 22px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  .hand {
+    display: inline-block;
+    margin-left: 6px;
+    transform-origin: 70% 80%;
+  }
+  .shadow {
+    position: absolute;
+    bottom: -14px;
+    width: 120px;
+    height: 14px;
+    border-radius: 50%;
+    background: rgba(9, 35, 72, 0.14);
+    filter: blur(3px);
+  }
+  .heart {
+    position: absolute;
+    top: 0;
+    left: calc(30% + var(--n) * 22%);
+    color: #ff6b8b;
+    font-size: 18px;
+    opacity: 0;
   }
   .spark {
     position: absolute;
@@ -709,11 +794,27 @@
         pop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) 0.15s backwards,
         bob 4s ease-in-out 0.9s infinite;
     }
+    // hello: Relay drops in with a squash, hops twice with the chirps, waves, then floats
     .relay.wave {
       animation:
-        pop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) 0.15s backwards,
-        hello 1.4s ease-in-out 0.8s 2,
-        bob 4s ease-in-out 3.6s infinite;
+        arrive 0.6s cubic-bezier(0.3, 1.3, 0.5, 1) 0.05s backwards,
+        hop 0.5s ease-out 0.55s 2,
+        hello 1.4s ease-in-out 1.6s 2,
+        bob 4s ease-in-out 4.4s infinite;
+    }
+    .shadow {
+      animation:
+        shadow-in 0.6s ease-out 0.05s backwards,
+        shadow-hop 0.5s ease-out 0.55s 2;
+    }
+    .hi {
+      animation: bubble 0.55s cubic-bezier(0.3, 1.7, 0.5, 1) 0.75s backwards;
+    }
+    .hand {
+      animation: wave-hand 1.2s ease-in-out 1.1s 3;
+    }
+    .heart {
+      animation: heart 2.4s ease-out calc(1.2s + var(--n) * 0.35s) 2;
     }
     .halo {
       animation: breathe 5s ease-in-out infinite;
@@ -800,6 +901,82 @@
     }
     80% {
       transform: rotate(3deg);
+    }
+  }
+  @keyframes arrive {
+    0% {
+      opacity: 0;
+      transform: translateY(-120px) scale(0.6, 1.2);
+    }
+    55% {
+      opacity: 1;
+      transform: translateY(0) scale(1.18, 0.82);
+    }
+    75% {
+      transform: translateY(-8px) scale(0.95, 1.06);
+    }
+    100% {
+      transform: none;
+    }
+  }
+  @keyframes hop {
+    0%,
+    100% {
+      transform: none;
+    }
+    20% {
+      transform: scale(1.08, 0.92);
+    }
+    50% {
+      transform: translateY(-26px) scale(0.96, 1.05);
+    }
+    80% {
+      transform: scale(1.05, 0.95);
+    }
+  }
+  @keyframes shadow-in {
+    from {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+  }
+  @keyframes shadow-hop {
+    50% {
+      transform: scale(0.7);
+      opacity: 0.6;
+    }
+  }
+  @keyframes bubble {
+    from {
+      opacity: 0;
+      transform: translate(-30px, 20px) scale(0.3);
+    }
+  }
+  @keyframes wave-hand {
+    0%,
+    100% {
+      transform: rotate(0);
+    }
+    15%,
+    45% {
+      transform: rotate(18deg);
+    }
+    30%,
+    60% {
+      transform: rotate(-12deg);
+    }
+  }
+  @keyframes heart {
+    0% {
+      opacity: 0;
+      transform: translateY(10px) scale(0.5);
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-90px) scale(1.2) rotate(calc((var(--n) - 1) * 18deg));
     }
   }
   @keyframes breathe {
