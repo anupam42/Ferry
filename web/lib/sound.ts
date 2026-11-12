@@ -148,6 +148,8 @@ function orbit(p: PannerNode, at: number, seconds: number, turns: number, phase:
 
 /** When the opening lands (s after it starts): the picture flashes into the first scene then. */
 export const OPENING_HIT = 2.6;
+/** How long the finished wordmark stays on screen after that, while the sound rings out, before the first scene. */
+export const OPENING_HOLD = 2.5;
 /** When Relay passes each letter of FERRY (s after the start): the picture and the harp agree on these. */
 export const LETTER_AT = [0.75, 1.05, 1.35, 1.65, 1.95];
 

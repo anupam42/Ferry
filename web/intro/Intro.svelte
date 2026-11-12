@@ -8,7 +8,7 @@
   import { intro } from "../lib/intro.svelte.ts";
   import { ms } from "../lib/look.svelte.ts";
   import { relay } from "../lib/relay.svelte.ts";
-  import { canPlay, chirp, LETTER_AT, opening, OPENING_HIT, setSound, soundOn } from "../lib/sound.ts";
+  import { canPlay, chirp, LETTER_AT, opening, OPENING_HIT, OPENING_HOLD, setSound, soundOn } from "../lib/sound.ts";
   import type { Mode } from "../lib/types.ts";
 
   /**
@@ -116,10 +116,13 @@
   function runOpening(withSound: boolean) {
     phase = "opening";
     if (withSound) stopOpening = opening();
-    timer = setTimeout(() => {
-      phase = "scenes";
-      flashed = true;
-    }, OPENING_HIT * 1000);
+    timer = setTimeout(
+      () => {
+        phase = "scenes";
+        flashed = true;
+      },
+      (OPENING_HIT + OPENING_HOLD) * 1000,
+    );
   }
   $effect(() => {
     void (async () => {
@@ -222,6 +225,9 @@
         <!-- Relay rides the wave across, and each letter draws itself as it passes -->
         <span class="flyer" aria-hidden="true"><img src={face("excited")} alt="" /></span>
       </div>
+      {#if phase === "opening"}<p class="tagline" style:--in="{OPENING_HIT + 0.3}s">
+          Your work, carried safely into git.
+        </p>{/if}
       {#if phase === "gate"}
         <button type="button" class="begin" bind:this={beginBtn} onclick={begin}
           ><Icon name="play" size={18} />Begin</button
@@ -456,6 +462,14 @@
       filter: blur(1.5px);
       opacity: 0.85;
     }
+  }
+  .tagline {
+    position: relative;
+    margin: 0;
+    font-size: clamp(15px, 1.6vw, 19px);
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.75);
+    opacity: 0;
   }
   .begin {
     position: relative;
@@ -976,6 +990,10 @@
     .prelude.lit .flyer {
       animation: fly var(--fly) cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
     }
+    // the trail fades once Relay stops above the word
+    .prelude.lit .flyer::before {
+      animation: trail-out var(--fly) linear forwards;
+    }
     .prelude.lit .flyer img {
       animation: flutter 0.5s ease-in-out infinite alternate;
     }
@@ -984,6 +1002,10 @@
     }
     .flash {
       animation: flash 1.1s ease-out forwards;
+    }
+    // while the wordmark holds: the line under it rises in
+    .tagline {
+      animation: tagline 0.9s $ease-out var(--in) forwards;
     }
     .begin {
       animation: rise 0.6s $ease-out 0.4s backwards;
@@ -1189,6 +1211,27 @@
       left: 50%;
       opacity: 1;
       transform: translateY(-200px) rotate(0) scale(1.3);
+    }
+  }
+  @keyframes trail-out {
+    0%,
+    80% {
+      opacity: 0.85;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes tagline {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+      filter: blur(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: none;
     }
   }
   @keyframes mark-glow {
