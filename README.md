@@ -471,11 +471,11 @@ Not a full text editor (everyone using Ferry already has one), but quick, safe e
 
 ### Design system and typeface
 
-Ferry's own look, written down and shared, and a typeface of its own grown from the wordmark. The design system is **Kevat**, after the boatman in the Ramayana who ferried Rama, Sita and Lakshmana across the Ganga and wanted nothing in return: the one who carries you safely to the other side, as Ferry carries your work. The typeface is **Tarang**, "wave" in Hindi (from Sanskrit *taranga*): the water Kevat crosses, and the wave under the wordmark. The pieces already exist in the web app (the colour, spacing and motion tokens in `web/styles/_tokens.scss`, the components in `web/components/`, the icon set, Relay, and the hand-drawn wordmark); this turns them into one system with a name.
+Ferry's own look, written down and shared, and two typefaces of its own grown from the wordmark. The design system is **Kevat**, after the boatman in the Ramayana who ferried Rama, Sita and Lakshmana across the Ganga and wanted nothing in return: the one who carries you safely to the other side, as Ferry carries your work. The typefaces are **Tarang**, "wave" in Hindi (from Sanskrit *taranga*), the water Kevat crosses and the wave under the wordmark, for display; and **Paar**, "across, to the other shore", for reading: the text that carries what you need to know across. The pieces already exist in the web app (the colour, spacing and motion tokens in `web/styles/_tokens.scss`, the components in `web/components/`, the icon set, Relay, and the hand-drawn wordmark); this turns them into one system with a name.
 
 **Kevat, the design system**
 
-- [ ] **Settle the names** — Kevat is free on npm and no software uses it that a web search finds; have a trademark search done before it's public. Tarang is free on npm too and needs the same search, plus a check that no existing typeface is called Tarang.
+- [ ] **Settle the names** — Kevat is free on npm and no software uses it that a web search finds; have a trademark search done before it's public. Tarang and Paar are free on npm too and need the same search, plus a check that no existing typeface already has either name.
 - [ ] **Tokens as the source of truth** — colours (the palette, what each colour is for, light and dark, the accent choices), the type scale, spacing, corner radii, shadows, motion (durations, easings and named moves like pop, rise and draw) and layers, kept in one tokens file in the standard design-tokens format. The SCSS and CSS variables the app uses are generated from it, and design tools such as Figma can read the same file.
 - [ ] **A component library** — the parts Ferry is built from (buttons, pills, sections, segmented pickers, switches, drawers, menus, the floating icon bar, toasts, Relay's speech bubble, file icons, the wordmark), each with its states, sizes and keyboard and screen-reader behaviour written down.
 - [ ] **A living gallery** — a page in the web app (for example `?design`) that shows every token and component for real, in light and dark and at each interface size, so changes can be checked by eye before they ship.
@@ -484,15 +484,19 @@ Ferry's own look, written down and shared, and a typeface of its own grown from 
 - [ ] **Accessibility built in** — contrast checked automatically for every colour pair in both themes, one focus ring, minimum target sizes and reduced motion, as tests that fail when something slips.
 - [ ] **A package of its own** — the tokens, styles and components published together as `ferry-kevat` (the `@ferry` name on npm belongs to someone else), so the VS Code extension, a docs site and future apps look the same.
 
-**Tarang, Ferry's own typeface**
+**Tarang and Paar, Ferry's own typefaces**
 
-- [ ] **The character** — start from the wordmark: even-weight strokes with round ends, open shapes, and a little water in it (a wake on R, a sail on Y).
-- [ ] **A display face first** — capitals, then lowercase, figures and punctuation (the basic Latin set, about 95 characters), for headings, the wordmark and Relay's big moments. The app keeps the system font for body text, where a new face would need years of tuning to read as well at small sizes.
-- [ ] **Open, reproducible sources** — drawn in a font editor (FontForge or Fontra, both open source, or Glyphs), with the sources (UFO) in the repository and the font built by a script (fontmake) into a variable font with a weight axis, shipped as WOFF2 trimmed to the characters used.
-- [ ] **Make it read well** — spacing and kerning, how it renders at small sizes on Windows, macOS and Linux, and a test page with real Ferry screens set in it, in light and dark.
-- [ ] **Grow it** — accented letters (Latin-1 and beyond) for other languages, then a matching monospace for code, file paths and commit hashes.
-- [ ] **Licence and protection** — decide how the font is licensed (kept to Ferry, or open under the SIL Open Font Licence) and protect the name and the wordmark as trademarks. In the US a typeface design can also get a design patent; ask an IP lawyer which fits. The repository's history records who drew what and when.
-- [ ] **Roll it out** — the wordmark first, then headings in the web app, the README and docs, and the VS Code extension.
+Two faces that share one character: **Tarang** for display (the wordmark, headings and Relay's big moments) and **Paar** for reading (body text, labels, buttons and tables), so the app can one day use its own type everywhere instead of the system font.
+
+- [ ] **The shared character** — start from the wordmark: even-weight strokes with round ends, open shapes, and a little water in them (a wake on R, a sail on Y). Tarang shows it off; Paar keeps it quiet so long text stays easy to read.
+- [ ] **Tarang first** — capitals, then lowercase, figures and punctuation (the basic Latin set, about 95 characters), for headings, the wordmark and Relay's big moments.
+- [ ] **Then Paar** — a text face built for small sizes: a taller x-height, more open letters, clear shapes for look-alikes (1, l and I; 0 and O), and regular, medium and bold weights. Until it reads as well as the system font at 13–15 px, the app keeps the system font for text.
+- [ ] **Paar Mono** — a monospace cut of Paar for code, file paths and commit hashes.
+- [ ] **Open, reproducible sources** — both drawn in a font editor (FontForge or Fontra, both open source, or Glyphs), with the sources (UFO) in the repository and each font built by a script (fontmake) into a variable font with a weight axis, shipped as WOFF2 trimmed to the characters used.
+- [ ] **Make them read well** — spacing and kerning, how they render at small sizes on Windows, macOS and Linux, and a test page with real Ferry screens set in them, in light and dark.
+- [ ] **Grow them** — accented letters (Latin-1 and beyond) for other languages, and Devanagari, so Tarang and Paar can set their own names.
+- [ ] **Licence and protection** — decide how the fonts are licensed (kept to Ferry, or open under the SIL Open Font Licence) and protect the names and the wordmark as trademarks. In the US a typeface design can also get a design patent; ask an IP lawyer which fits. The repository's history records who drew what and when.
+- [ ] **Roll them out** — the wordmark first, then Tarang for headings in the web app, the README and docs, then Paar for text once it's ready, and the VS Code extension.
 
 ### Git client
 
