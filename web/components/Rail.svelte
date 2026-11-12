@@ -437,30 +437,40 @@
     place-items: center;
     border: 2px solid var(--rail);
   }
+  // a new version: a solid dot with a crisp ring the colour of the button, and now and then a
+  // thin ring that pings outwards (a soft glow looked blurry at this size)
   .new-dot {
     position: absolute;
-    top: 7px;
-    right: 7px;
-    width: 10px;
-    height: 10px;
+    top: 6px;
+    right: 6px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
-    @include brand-gradient;
-    box-shadow: 0 0 0 2px var(--pill);
+    background: var(--accent);
+    box-shadow: 0 0 0 2.5px var(--pill);
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 1.5px solid var(--accent);
+      opacity: 0;
+    }
     @include motion {
-      animation: breathe 2.4s ease-in-out infinite;
+      &::after {
+        animation: ping 3.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+      }
     }
   }
-  @keyframes breathe {
-    0%,
-    100% {
-      box-shadow:
-        0 0 0 2px var(--pill),
-        0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  @keyframes ping {
+    0% {
+      transform: scale(1);
+      opacity: 0.9;
     }
-    50% {
-      box-shadow:
-        0 0 0 2px var(--pill),
-        0 0 0 6px transparent;
+    45%,
+    100% {
+      transform: scale(2.3);
+      opacity: 0;
     }
   }
 
