@@ -238,10 +238,8 @@
     aria-label={releases.unseen ? "What's new: a new version" : "What's new"}
     disabled={!releases.info?.releases.length}
   >
-    <Icon name="sparkle" size={22} /><span class="label">What's new</span>{#if releases.unseen}<span
-        class="new-dot"
-        aria-hidden="true"
-      ></span>{/if}
+    <Icon name="sparkle" size={22} /><span class="label">What's new</span
+    >{#if releases.unseen && !releases.whatsNew}<span class="new-dot" aria-hidden="true"></span>{/if}
   </button>
   <button
     class="btn-rail"
@@ -460,6 +458,14 @@
       &::after {
         animation: ping 3.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
       }
+    }
+  }
+  // on a highlighted (gradient) button: a white dot with a ring that blends into the gradient
+  .btn-rail.on .new-dot {
+    background: #fff;
+    box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--accent) 80%, var(--accent-2));
+    &::after {
+      border-color: #fff;
     }
   }
   @keyframes ping {
