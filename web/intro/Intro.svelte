@@ -7,7 +7,7 @@
   import { intro } from "../lib/intro.svelte.ts";
   import { ms } from "../lib/look.svelte.ts";
   import { relay } from "../lib/relay.svelte.ts";
-  import { canPlay, chirp, opening, OPENING_HIT, setSound, soundOn } from "../lib/sound.ts";
+  import { canPlay, chirp, LETTER_AT, opening, OPENING_HIT, setSound, soundOn } from "../lib/sound.ts";
   import type { Mode } from "../lib/types.ts";
 
   /**
@@ -217,8 +217,10 @@
       <div class="rays" aria-hidden="true">
         {#each [0, 1, 2, 3, 4, 5] as n (n)}<i style:--n={n}></i>{/each}
       </div>
-      <div class="mark" aria-label="Ferry">
-        {#each MARK as c, i (i)}<span style:--i={i} aria-hidden="true">{c}</span>{/each}
+      <div class="mark" aria-label="Ferry" style:--fly="{OPENING_HIT}s">
+        {#each MARK as c, i (i)}<span style:--at="{LETTER_AT[i]}s" aria-hidden="true">{c}</span>{/each}
+        <!-- Relay flies across and each letter lights up as it passes -->
+        <span class="flyer" aria-hidden="true"><img src={face("excited")} alt="" /></span>
       </div>
       {#if phase === "gate"}
         <button type="button" class="begin" bind:this={beginBtn} onclick={begin}
@@ -422,12 +424,42 @@
   .mark {
     position: relative;
     display: flex;
-    gap: 0.5em;
-    font-size: clamp(30px, 5vw, 56px);
+    gap: 0.42em;
+    font-size: clamp(34px, 6vw, 72px);
     font-weight: 800;
-    letter-spacing: 0.1em;
-    span {
-      opacity: 0.15;
+    font-style: italic;
+    letter-spacing: 0.04em;
+    > span:not(.flyer) {
+      opacity: 0.12;
+      display: inline-block;
+    }
+  }
+  .flyer {
+    position: absolute;
+    left: -40vw;
+    top: 50%;
+    width: 96px;
+    height: 72px;
+    margin: -36px 0 0 -48px;
+    opacity: 0;
+    z-index: 1;
+    img {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.45));
+    }
+    // the glowing trail behind it
+    &::before {
+      content: "";
+      position: absolute;
+      right: 70%;
+      top: 58%;
+      width: 34vw;
+      height: 4px;
+      border-radius: 4px;
+      background: linear-gradient(to right, transparent, color-mix(in srgb, var(--accent-2) 70%, transparent), #fff);
+      filter: blur(1.5px);
+      opacity: 0.85;
     }
   }
   .begin {
@@ -942,8 +974,14 @@
     .prelude.lit .rays {
       animation: rays 2.6s ease-in forwards;
     }
-    .prelude.lit .mark span {
-      animation: letter 2.2s ease-out calc(0.3s + var(--i) * 0.18s) forwards;
+    .prelude.lit .mark > span:not(.flyer) {
+      animation: letter 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.3) var(--at) forwards;
+    }
+    .prelude.lit .flyer {
+      animation: fly var(--fly) cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
+    }
+    .prelude.lit .flyer img {
+      animation: flutter 0.5s ease-in-out infinite alternate;
     }
     .prelude .orb {
       animation: glow 3s ease-in-out infinite alternate;
@@ -1118,17 +1156,57 @@
   }
   @keyframes letter {
     0% {
-      opacity: 0.15;
-      letter-spacing: 0.1em;
-      filter: blur(6px);
+      opacity: 0.12;
+      filter: blur(8px);
+      transform: translateY(18px) scale(0.8);
     }
-    60% {
+    40% {
       opacity: 1;
       filter: blur(0);
+      transform: translateY(-6px) scale(1.12);
+      text-shadow: 0 0 34px #fff;
     }
     100% {
       opacity: 1;
-      text-shadow: 0 0 24px rgba(255, 255, 255, 0.8);
+      transform: none;
+      text-shadow: 0 0 22px rgba(255, 255, 255, 0.7);
+    }
+  }
+  // across the word on the letters' beat (first letter at 0.75 s, last at 1.95 s of 2.6 s), then up above it
+  @keyframes fly {
+    0% {
+      left: -40vw;
+      opacity: 0;
+      transform: rotate(8deg);
+    }
+    10% {
+      opacity: 1;
+    }
+    28.8% {
+      left: 5%;
+      transform: translateY(14px) rotate(4deg);
+    }
+    52% {
+      left: 50%;
+      transform: translateY(-14px) rotate(-3deg);
+    }
+    75% {
+      left: 95%;
+      transform: translateY(10px) rotate(4deg);
+    }
+    88% {
+      left: 108%;
+      transform: translateY(-40px) rotate(-14deg) scale(1.05);
+    }
+    100% {
+      left: 50%;
+      opacity: 1;
+      transform: translateY(-120px) rotate(0) scale(1.35);
+    }
+  }
+  @keyframes flutter {
+    to {
+      transform: translateY(-5px) rotate(-3deg);
     }
   }
   @keyframes flash {

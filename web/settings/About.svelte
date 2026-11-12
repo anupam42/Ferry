@@ -4,9 +4,20 @@
   import { api, face } from "../lib/api.ts";
   import { toast } from "../lib/app.svelte.ts";
   import { intro } from "../lib/intro.svelte.ts";
+  import { canPlay, opening, OPENINGS, openingSound, setOpeningSound, type OpeningSound } from "../lib/sound.ts";
   import { releases } from "../lib/releases.svelte.ts";
   import { INSTALL_NAME, PLATFORM_NAME } from "../lib/releases.ts";
   import type { Health } from "../lib/types.ts";
+
+  // which sound the introduction opens with; choosing one plays it
+  let openWith = $state<OpeningSound>(openingSound());
+  let stopPreview = () => {};
+  async function preview() {
+    setOpeningSound(openWith);
+    stopPreview();
+    if (await canPlay()) stopPreview = opening(openWith);
+  }
+  $effect(() => () => stopPreview());
 
   /** This copy of Ferry: version and build, diagnostics to copy into a bug report, and the tools it needs. */
   $effect(() => {
@@ -67,13 +78,26 @@
         <button class="btn small" onclick={() => releases.openWhatsNew()}
           ><Icon name="sparkle" size={16} />What's new</button
         >
-        <button class="btn small" onclick={() => intro.show()}><Icon name="play" size={16} />Meet Relay again</button>
+        <button
+          class="btn small"
+          onclick={() => {
+            stopPreview();
+            intro.show();
+          }}><Icon name="play" size={16} />Meet Relay again</button
+        >
         <a
           class="btn small ghost"
           href="https://github.com/anupam42/Ferry/issues/new/choose"
           target="_blank"
           rel="noopener noreferrer">Report a problem</a
         >
+      </div>
+      <div class="opening">
+        <label for="opening-sound">The introduction opens with</label>
+        <select id="opening-sound" bind:value={openWith} onchange={preview}>
+          {#each OPENINGS as [k, name] (k)}<option value={k}>{name}</option>{/each}
+        </select>
+        <button class="btn small ghost" onclick={preview}><Icon name="sound" size={16} />Play it</button>
       </div>
     </div>
     <dl class="facts">
@@ -117,6 +141,20 @@
 <style lang="scss">
   @use "tokens" as *;
   @use "mixins" as *;
+  .opening {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: space(2);
+    margin-top: space(3);
+    font-size: 13px;
+    color: var(--muted);
+    select {
+      width: auto;
+      max-width: 100%;
+      padding: space(1) + 2 space(3);
+    }
+  }
   .pad {
     padding: space(5);
   }
