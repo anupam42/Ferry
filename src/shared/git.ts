@@ -1,6 +1,17 @@
 // What the server says about git repositories (GET /git/…), shared by the
 // server and the web app. No imports, so both can use it.
 
+/**
+ * Who can see a repository on its host (GET /git/{id}/visibility). "local": it has no remote;
+ * "unknown": the host isn't one Ferry knows, or it couldn't be asked. `sure` is false when it was
+ * worked out without signing in (a private repository looks the same as a missing one then).
+ */
+export interface RepoVisibility {
+  visibility: "public" | "private" | "internal" | "local" | "unknown";
+  host: string;
+  sure: boolean;
+}
+
 /** A repository in the list (GET /git/repos). */
 export interface RepoEntry {
   id: string;

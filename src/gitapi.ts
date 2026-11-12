@@ -3,7 +3,7 @@
 //   GET  /git/repos                         repositories: opened directly, and pair targets
 //   POST /git/repos                         {"action": "clone"|"create"|"add", "url", "path"}
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
-//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|conflict-parts|rewrite-plan|bisect|todo|file|
+//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|conflict-parts|rewrite-plan|bisect|todo|visibility|file|
 //                  folder|remote-check|undo-timeline|push-check|blame|file-history|search}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
 //                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|restore|branch-at|
@@ -24,6 +24,8 @@ import * as conn from "./integrations.ts";
 import * as reviews from "./reviews.ts";
 import * as shaper from "./shape.ts";
 import * as todo from "./todo.ts";
+import { repoVisibility } from "./visibility.ts";
+import type { RepoVisibility } from "./shared/git.ts";
 import { errMsg } from "./util.ts";
 
 export interface RepoManager {
@@ -70,11 +72,15 @@ const CHANGES_FILES = new Set([
   "bisect-reset",
 ]);
 
+/** How long a repository's public/private answer is kept before asking its host again. */
+const VISIBILITY_FOR_MS = 10 * 60_000;
+
 /** Background remote checks fetch at most this often per repository; force=1 (before a push) always fetches. */
 const REMOTE_CHECK_EVERY_MS = 60_000;
 
 export class GitApi {
   private lastFetch = new Map<string, number>();
+  private seen = new Map<string, { at: number; v: RepoVisibility }>();
   constructor(
     private engines: Engine[],
     private repos: RepoManager | null,
@@ -191,6 +197,13 @@ export class GitApi {
         return json(await g.trackedFiles(root));
       case "languages":
         return json(await g.languages(root));
+      case "visibility": {
+        const hit = this.seen.get(root);
+        if (hit && q.get("force") !== "1" && Date.now() - hit.at < VISIBILITY_FOR_MS) return json(hit.v);
+        const v = await repoVisibility(root);
+        this.seen.set(root, { at: Date.now(), v });
+        return json(v);
+      }
       case "todo": {
         const rel = todo.findReadme(root);
         return json(await todo.readTodo(root, rel, rel ? this.readmePlace(root, rel) : null));

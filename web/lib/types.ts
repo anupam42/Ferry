@@ -84,6 +84,7 @@ export type {
   ReflogEntry,
   RemoteCheckResponse,
   RepoEntry,
+  RepoVisibility,
   RepoStateResponse,
   Stash,
   Tag,
