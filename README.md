@@ -469,6 +469,31 @@ Not a full text editor (everyone using Ferry already has one), but quick, safe e
 - [ ] **Scratch pad** — a throwaway tab for pasting things that aren't files: JSON from an API, a YAML snippet, a log, a stack trace. It gets the same highlighting (guessed from what you paste), the JSON and YAML checks, format and minify, and find. Scratch pads are kept in Ferry's data folder, so they survive a restart, until you clear them or save one as a file in a project.
 - [ ] **Edit from anywhere** — with the web app served to another device (`--host` with `--serve-token`), make a quick fix from your phone or another computer and commit it, without your editor or the code on that device.
 
+### Design system and typeface
+
+Ferry's own look, written down and shared, and a typeface of its own grown from the wordmark. Working names: **Quay** for the design system (where a ferry ties up: what everything in Ferry is built on) and **Wakeline** for the typeface (after the wake on its R and the wave under the wordmark). The pieces already exist in the web app (the colour, spacing and motion tokens in `web/styles/_tokens.scss`, the components in `web/components/`, the icon set, Relay, and the hand-drawn wordmark); this turns them into one system with a name.
+
+**Quay, the design system**
+
+- [ ] **Settle the names** — check that Quay and Wakeline are free to use for software and fonts (a trademark search, the npm and GitHub names, existing typefaces called Wakeline), or pick others.
+- [ ] **Tokens as the source of truth** — colours (the palette, what each colour is for, light and dark, the accent choices), the type scale, spacing, corner radii, shadows, motion (durations, easings and named moves like pop, rise and draw) and layers, kept in one tokens file in the standard design-tokens format. The SCSS and CSS variables the app uses are generated from it, and design tools such as Figma can read the same file.
+- [ ] **A component library** — the parts Ferry is built from (buttons, pills, sections, segmented pickers, switches, drawers, menus, the floating icon bar, toasts, Relay's speech bubble, file icons, the wordmark), each with its states, sizes and keyboard and screen-reader behaviour written down.
+- [ ] **A living gallery** — a page in the web app (for example `?design`) that shows every token and component for real, in light and dark and at each interface size, so changes can be checked by eye before they ship.
+- [ ] **Icons** — Ferry's line icons as a documented set: the 24-unit grid, the stroke weight, round ends, how new ones are drawn, and a preview of all of them together.
+- [ ] **Relay and the brand** — when Relay shows each expression, how it moves, and how Ferry talks (short, plain sentences that say what happens); the wordmark's clear space, smallest size and colours, with light and dark files in `assets/logo/`.
+- [ ] **Accessibility built in** — contrast checked automatically for every colour pair in both themes, one focus ring, minimum target sizes and reduced motion, as tests that fail when something slips.
+- [ ] **A package of its own** — the tokens, styles and components published together as `@ferry/quay`, so the VS Code extension, a docs site and future apps look the same.
+
+**Wakeline, Ferry's own typeface**
+
+- [ ] **The character** — start from the wordmark: even-weight strokes with round ends, open shapes, and a little water in it (a wake on R, a sail on Y).
+- [ ] **A display face first** — capitals, then lowercase, figures and punctuation (the basic Latin set, about 95 characters), for headings, the wordmark and Relay's big moments. The app keeps the system font for body text, where a new face would need years of tuning to read as well at small sizes.
+- [ ] **Open, reproducible sources** — drawn in a font editor (FontForge or Fontra, both open source, or Glyphs), with the sources (UFO) in the repository and the font built by a script (fontmake) into a variable font with a weight axis, shipped as WOFF2 trimmed to the characters used.
+- [ ] **Make it read well** — spacing and kerning, how it renders at small sizes on Windows, macOS and Linux, and a test page with real Ferry screens set in it, in light and dark.
+- [ ] **Grow it** — accented letters (Latin-1 and beyond) for other languages, then a matching monospace for code, file paths and commit hashes.
+- [ ] **Licence and protection** — decide how the font is licensed (kept to Ferry, or open under the SIL Open Font Licence) and protect the name and the wordmark as trademarks. In the US a typeface design can also get a design patent; ask an IP lawyer which fits. The repository's history records who drew what and when.
+- [ ] **Roll it out** — the wordmark first, then headings in the web app, the README and docs, and the VS Code extension.
+
 ### Git client
 
 Features other Git apps have, or that people ask for, ordered by how often they're requested.
