@@ -31,6 +31,23 @@
         if (r[0]) void pick(r[0]);
       }, fail);
   });
+  // the file changed on disk (the state poll noticed): show the new text in place, and work out blame again
+  let seenStamp: string | undefined;
+  $effect(() => {
+    const s = git.state?.stamp;
+    if (s === undefined) return;
+    if (seenStamp === undefined || seenStamp === s) {
+      seenStamp = s;
+      return;
+    }
+    seenStamp = s;
+    blame = null;
+    if (content)
+      api<FileContent>("GET", git.url("file") + q).then(
+        (r) => (content = r),
+        () => {},
+      );
+  });
 
   const lines = $derived(
     content && !content.binary && !content.tooBig ? content.text.replace(/\n$/, "").split("\n") : [],

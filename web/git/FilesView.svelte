@@ -14,9 +14,11 @@
   /** A folder-at-a-time browser, like a code host's: each entry's last commit, file search, and the folder's README below. */
   let { st }: { st: RepoStateResponse } = $props();
   const repo = git.selected;
+  /** changes after an action or when a file in the work tree changes (the state poll notices), so all of this reloads */
+  const fresh = $derived(`${git.bump}:${git.state?.stamp ?? ""}`);
   let paths = $state<string[] | null>(null);
   $effect(() => {
-    void git.bump;
+    void fresh;
     act(null, () => api<string[]>("GET", git.url("files"))).then((p) => {
       if (p) paths = p;
     });
@@ -40,14 +42,22 @@
     query = "";
   };
 
-  // each entry's last commit, per folder, fetched once
+  // each entry's last commit and size, per folder; fetched again once something changed,
+  // keeping the old rows on screen until the new ones arrive
   let info = $state<Record<string, FolderEntry[]>>({});
+  const infoFor: Record<string, string> = {};
   $effect(() => {
-    const d = dir;
-    if (!tree || info[d]) return;
+    const d = dir,
+      f = fresh;
+    if (!tree || infoFor[d] === f) return;
+    infoFor[d] = f;
     api<RepoFolder>("GET", git.url("folder") + "?dir=" + enc(d)).then(
-      (r) => (info[d] = r.entries),
-      () => (info[d] = []),
+      (r) => {
+        if (infoFor[d] === f) info[d] = r.entries;
+      },
+      () => {
+        if (infoFor[d] === f) info[d] ??= [];
+      },
     );
   });
   const byPath = $derived(info[dir] ? new Map(info[dir]!.map((e) => [e.path, e])) : null);
@@ -66,16 +76,27 @@
   const readmePath = $derived(readme ? (dir ? dir + "/" + readme : readme) : "");
   let readmeText = $state<FileContent | null>(null);
   let readmeError = $state("");
+  let readmeShown = "";
   $effect(() => {
     const p = readmePath;
-    readmeText = null;
-    readmeError = "";
+    void fresh;
+    // a different README starts blank; the same one, changed, swaps in place
+    if (p !== readmeShown) {
+      readmeShown = p;
+      readmeText = null;
+      readmeError = "";
+    }
     if (!p) return;
     api<FileContent>("GET", git.url("file") + "?path=" + enc(p)).then(
       (f) => {
-        if (p === readmePath) readmeText = f;
+        if (p === readmePath) {
+          readmeText = f;
+          readmeError = "";
+        }
       },
-      (e) => (readmeError = (e as Error).message),
+      (e) => {
+        if (p === readmePath) readmeError = (e as Error).message;
+      },
     );
   });
   const crumbs = $derived(dir ? dir.split("/") : []);

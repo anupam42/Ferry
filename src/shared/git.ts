@@ -50,6 +50,8 @@ export interface RepoState {
   stashes: number;
   remotes: string[];
   lastCommit: { subject: string; hash: string; pushed: boolean } | null;
+  /** changes whenever a file in the work tree (or HEAD, or the index) does; compare, don't parse */
+  stamp: string;
 }
 
 /** GET /git/{id}/state adds the list entry's details. */
