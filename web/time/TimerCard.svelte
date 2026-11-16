@@ -330,10 +330,11 @@
   .row {
     display: flex;
     gap: space(2);
+    flex-wrap: wrap;
     align-items: center;
     input {
       flex: 1;
-      min-width: 0;
+      min-width: 180px;
     }
   }
   input {

@@ -41,6 +41,8 @@
     void work.load(64);
   });
   const inv = $derived(invoice(work.days, rates, { from: span.from, to: span.to, client }));
+  // more than one currency: each total says which
+  const many = $derived(Object.keys(inv.totals).length > 1);
   const money = (v: number, c: string) => {
     try {
       return new Intl.NumberFormat(undefined, { style: "currency", currency: c }).format(v);
@@ -50,16 +52,58 @@
   };
   const hours = (m: number) => (Math.round((m / 60) * 4) / 4).toFixed(2);
 
+  // the currencies offered; the default follows the browser's region, then whichever was used last
+  const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AUD", "CAD", "SGD", "AED", "JPY", "CHF", "NZD", "ZAR"];
+  const REGION: Record<string, string> = {
+    IN: "INR",
+    GB: "GBP",
+    AU: "AUD",
+    CA: "CAD",
+    SG: "SGD",
+    AE: "AED",
+    JP: "JPY",
+    CH: "CHF",
+    NZ: "NZD",
+    ZA: "ZAR",
+    DE: "EUR",
+    FR: "EUR",
+    ES: "EUR",
+    IT: "EUR",
+    NL: "EUR",
+    IE: "EUR",
+  };
+  const region = (navigator.language.split("-")[1] ?? "").toUpperCase();
+  const defaultCurrency = localStorage.getItem("ferry-currency") || REGION[region] || "USD";
+  // a project's currency and client before it has a rate: kept here, and saved with the rate
+  let drafts = $state<Record<string, { currency: string; client: string }>>({});
+  const shown = (p: string) => ({
+    currency: rates[p]?.currency ?? drafts[p]?.currency ?? defaultCurrency,
+    client: rates[p]?.client ?? drafts[p]?.client ?? "",
+  });
+  const symbol = (c: string) => {
+    try {
+      return (
+        new Intl.NumberFormat(undefined, { style: "currency", currency: c, currencyDisplay: "narrowSymbol" })
+          .formatToParts(0)
+          .find((x) => x.type === "currency")?.value ?? c
+      );
+    } catch {
+      return c;
+    }
+  };
+
   async function setRate(project: string, patch: { rate?: number; currency?: string; client?: string }) {
     const cur = rates[project];
+    const now = shown(project);
+    const next = { currency: patch.currency ?? now.currency, client: patch.client ?? now.client };
+    if (patch.currency) localStorage.setItem("ferry-currency", patch.currency);
     const rate = patch.rate ?? cur?.rate ?? 0;
-    if (!rate && !cur) return;
-    await work.act("rate", {
-      project,
-      rate,
-      currency: patch.currency ?? cur?.currency ?? "USD",
-      client: patch.client ?? cur?.client ?? "",
-    });
+    // no rate yet: just remember the choices for when one is typed
+    if (!rate && !cur) {
+      drafts[project] = next;
+      return;
+    }
+    if (await work.act("rate", { project, rate, ...next })) delete drafts[project];
   }
 
   function csv() {
@@ -86,7 +130,7 @@
       )
       .join("");
     const totals = Object.entries(inv.totals)
-      .map(([c, v]) => `<tr class="t"><td colspan="3">Total</td><td>${money(v, c)}</td></tr>`)
+      .map(([c, v]) => `<tr class="t"><td colspan="3">Total${many ? ` (${c})` : ""}</td><td>${money(v, c)}</td></tr>`)
       .join("");
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Invoice ${esc(span.label)}</title>
 <style>body{font:14px/1.5 system-ui,sans-serif;color:#111;margin:48px;max-width:760px}h1{font-size:28px;margin:0 0 4px}
@@ -108,46 +152,47 @@ th:first-child,td:first-child{text-align:left}th{font-size:12px;text-transform:u
       <h3>Rates</h3>
       <p class="muted hint">A project with a rate counts as billable. Leave it empty for one you don't charge for.</p>
       <table>
-        <thead><tr><th>Project</th><th>Per hour</th><th>Currency</th><th>Client</th></tr></thead>
+        <thead><tr><th>Project</th><th>Rate per hour</th><th>Client</th></tr></thead>
         <tbody>
           {#each work.projects as p (p)}
             {@const r = rates[p]}
-            <tr>
+            {@const s = shown(p)}
+            <tr class:priced={!!r}>
               <th scope="row"><span class="sw" style:background={colorOf(p)}></span>{p}</th>
-              <td
-                ><input
-                  type="number"
-                  min="0"
-                  step="5"
-                  placeholder="0"
-                  aria-label="Rate for {p}"
-                  value={r?.rate ?? ""}
-                  onchange={(e) => setRate(p, { rate: +e.currentTarget.value || 0 })}
-                /></td
-              >
-              <td
-                ><input
-                  type="text"
-                  maxlength="3"
-                  class="cur"
-                  placeholder="USD"
-                  aria-label="Currency for {p}"
-                  value={r?.currency ?? ""}
-                  disabled={!r}
-                  onchange={(e) => setRate(p, { currency: e.currentTarget.value })}
-                /></td
-              >
-              <td
-                ><input
+              <td>
+                <div class="money">
+                  <span class="sym" aria-hidden="true">{symbol(s.currency)}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputmode="decimal"
+                    placeholder="none"
+                    aria-label="Rate per hour for {p}"
+                    value={r?.rate ?? ""}
+                    onchange={(e) => setRate(p, { rate: +e.currentTarget.value || 0 })}
+                  />
+                  <select
+                    aria-label="Currency for {p}"
+                    value={s.currency}
+                    onchange={(e) => setRate(p, { currency: e.currentTarget.value })}
+                  >
+                    {#each CURRENCIES.includes(s.currency) ? CURRENCIES : [s.currency, ...CURRENCIES] as c (c)}
+                      <option value={c}>{c}</option>
+                    {/each}
+                  </select>
+                </div>
+              </td>
+              <td>
+                <input
                   type="text"
                   list="time-clients"
-                  placeholder="Client"
+                  placeholder="Client (optional)"
                   aria-label="Client for {p}"
-                  value={r?.client ?? ""}
-                  disabled={!r}
+                  value={s.client}
                   onchange={(e) => setRate(p, { client: e.currentTarget.value })}
-                /></td
-              >
+                />
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -192,7 +237,7 @@ th:first-child,td:first-child{text-align:left}th{font-size:12px;text-transform:u
           </tbody>
           <tfoot>
             {#each Object.entries(inv.totals) as [c, v] (c)}
-              <tr><th scope="row" colspan="3">Total</th><td>{money(v, c)}</td></tr>
+              <tr><th scope="row" colspan="3">Total{many ? ` (${c})` : ""}</th><td>{money(v, c)}</td></tr>
             {/each}
           </tfoot>
         </table>
@@ -245,12 +290,72 @@ th:first-child,td:first-child{text-align:left}th{font-size:12px;text-transform:u
     }
     input {
       width: 100%;
-      padding: 4px space(2);
+      padding: space(1) + 2 space(2) + 2;
       font-size: 13px;
     }
-    .cur {
-      width: 64px;
-      text-transform: uppercase;
+    td {
+      vertical-align: middle;
+    }
+    tr:not(.priced) th[scope="row"] {
+      color: var(--muted);
+      font-weight: $weight-medium;
+    }
+  }
+  // the rate: currency symbol, amount and currency in one field
+  .money {
+    display: flex;
+    align-items: center;
+    min-width: 190px;
+    border: 1px solid var(--line);
+    border-radius: $radius-md + 2;
+    background: var(--card-solid);
+    overflow: hidden;
+    @include motion {
+      transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+    }
+    &:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .sym {
+      padding-left: space(2) + 2;
+      color: var(--muted);
+      font-size: 13px;
+      min-width: 1.4em;
+    }
+    input,
+    select {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      outline: none;
+    }
+    input {
+      flex: 1;
+      min-width: 0;
+      padding-left: space(1);
+      font-variant-numeric: tabular-nums;
+      // no spinner arrows: the field is for typing a rate
+      appearance: textfield;
+      -moz-appearance: textfield;
+      &::-webkit-inner-spin-button,
+      &::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+    }
+    select {
+      width: auto;
+      flex: none;
+      padding: space(1) + 2 space(2);
+      border-left: 1px solid var(--line);
+      font-size: 12.5px;
+      font-weight: $weight-semibold;
+      color: var(--muted);
+      cursor: pointer;
     }
   }
   .sw {
@@ -275,7 +380,8 @@ th:first-child,td:first-child{text-align:left}th{font-size:12px;text-transform:u
     }
   }
   .lines {
-    td {
+    td,
+    thead th:not(:first-child) {
       text-align: right;
       font-variant-numeric: tabular-nums;
     }

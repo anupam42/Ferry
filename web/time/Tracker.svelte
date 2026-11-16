@@ -100,9 +100,6 @@
   {#if editing === "new"}
     <div class="new"><EntryEditor {day} onclose={() => (editing = null)} /></div>
   {/if}
-  {#if work.data?.calendarError}
-    <p class="cal-error muted">Couldn't read your calendar: {work.data.calendarError}</p>
-  {/if}
   {#if !list.length && !meetings.length}
     <p class="empty muted">
       {isToday
@@ -306,10 +303,6 @@
     border-radius: $radius-lg;
     border: 1px solid var(--line);
     background: var(--card-solid);
-  }
-  .cal-error {
-    font-size: 12px;
-    margin: 0 0 space(2);
   }
   li.open {
     box-shadow: 0 8px 22px rgba(9, 35, 72, 0.08);

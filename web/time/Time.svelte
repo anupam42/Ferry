@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from "../components/Icon.svelte";
   import RelayLoading from "../components/RelayLoading.svelte";
   import Seg from "../components/Seg.svelte";
   import { assign } from "../lib/timecolors.ts";
@@ -121,10 +122,30 @@
     </div>
     <div class="grow"></div>
     {#if work.data}
-      <button type="button" class="btn small ghost" onclick={() => (recapOpen = !recapOpen)}>Last week</button>
-      <button type="button" class="btn small ghost" onclick={setGoals}
-        >{goals.day || goals.week ? "Goals" : "Set goals"}</button
-      >
+      <div class="tools" role="toolbar" aria-label="Time">
+        <button
+          type="button"
+          class="tool"
+          class:on={recapOpen}
+          aria-pressed={recapOpen}
+          title="Relay's recap of last week"
+          onclick={() => (recapOpen = !recapOpen)}><Icon name="chart" size={16} /><span>Last week</span></button
+        >
+        <button
+          type="button"
+          class="tool"
+          class:set={!!(goals.day || goals.week)}
+          title={goals.day || goals.week ? "Change your goals" : "Set a daily or weekly goal"}
+          onclick={setGoals}
+          ><Icon name="target" size={16} /><span
+            >{goals.day
+              ? `${duration(goals.day)} a day`
+              : goals.week
+                ? `${duration(goals.week)} a week`
+                : "Set goals"}</span
+          ></button
+        >
+      </div>
     {/if}
     <Seg
       options={RANGES}
@@ -195,12 +216,12 @@
       <div class="col">
         <ProjectBars days={chart.days} projects={chart.projects} {now} />
         <Tracker />
+        <CalendarCard />
       </div>
       <div class="col">
         <TimerCard />
         <Donut projects={chart.projects} label="the last {range} days" />
         <StandupCard />
-        <CalendarCard />
       </div>
     </div>
     <Timesheet />
@@ -327,13 +348,71 @@
     display: grid;
     grid-template-columns: minmax(0, 1.75fr) minmax(300px, 1fr);
     gap: space(4);
-    align-items: start;
+    // both columns end on the same line: the last card in each grows to fill what's left
+    align-items: stretch;
   }
   .col {
     display: flex;
     flex-direction: column;
     gap: space(4);
     min-width: 0;
+    > :global(:last-child) {
+      flex: 1;
+    }
+  }
+  // Last week and Goals, as pill buttons that sit with the day picker
+  .tools {
+    display: inline-flex;
+    gap: space(1) + 2;
+  }
+  .tool {
+    display: inline-flex;
+    align-items: center;
+    gap: space(1) + 2;
+    height: 38px;
+    padding: 0 space(3) + 2 0 space(3);
+    border-radius: $radius-pill;
+    border: 1px solid var(--line);
+    background: var(--card-solid);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: $weight-semibold;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(9, 35, 72, 0.05);
+    :global(svg) {
+      color: var(--accent);
+    }
+    @include motion {
+      transition:
+        transform 0.15s,
+        box-shadow 0.15s,
+        background 0.15s;
+    }
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(9, 35, 72, 0.1);
+    }
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--accent-soft);
+      border-color: var(--accent);
+    }
+    &.on {
+      background: var(--accent-soft);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+    &.set :global(svg) {
+      color: var(--green);
+    }
+  }
+  @include below(laptop) {
+    .tool span {
+      display: none;
+    }
+    .tool {
+      padding: 0 space(2) + 2;
+    }
   }
   @include below(laptop) {
     .grid {
