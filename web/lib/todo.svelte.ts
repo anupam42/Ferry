@@ -2,7 +2,7 @@
 import { api } from "./api.ts";
 import { toast } from "./app.svelte.ts";
 import { git } from "./git.svelte.ts";
-import type { TodoItem, TodoList } from "./types.ts";
+import type { CodeTodo, CodeTodoList, TodoItem, TodoList } from "./types.ts";
 
 class Todos {
   /** per repository id; undefined while loading */
@@ -11,6 +11,10 @@ class Todos {
   selected = $state(localStorage.getItem("ferry-todo-repo") || "");
   /** an edit is on its way, per item line */
   busy = $state<Record<string, boolean>>({});
+
+  /** TODO comments in each repository's code; undefined until read (only for the project on screen) */
+  code = $state<Record<string, CodeTodoList | undefined>>({});
+  codeErrors = $state<Record<string, string>>({});
 
   current = $derived(git.repos.find((r) => r.id === this.selected) ?? git.repos[0] ?? null);
 
@@ -31,6 +35,36 @@ class Todos {
   async loadAll(): Promise<void> {
     if (!git.loaded) await git.refresh();
     await Promise.all(git.repos.map((r) => this.load(r.id)));
+  }
+
+  async loadCode(id: string): Promise<void> {
+    try {
+      this.code[id] = await api<CodeTodoList>("GET", `/git/${id}/code-todos`);
+      delete this.codeErrors[id];
+    } catch (e) {
+      this.codeErrors[id] = (e as Error).message;
+    }
+  }
+
+  /** Adds a TODO comment to the README's list, under `group`. */
+  async addCode(id: string, c: CodeTodo, group: string): Promise<boolean> {
+    const key = `${id}:code:${c.file}:${c.line}`;
+    this.busy[key] = true;
+    try {
+      const r = await api<{ todo: TodoList }>("POST", `/git/${id}/code-todo-add`, {
+        file: c.file,
+        kind: c.kind,
+        text: c.text,
+        group,
+      });
+      this.lists[id] = r.todo;
+      return true;
+    } catch (e) {
+      toast((e as Error).message, { error: true });
+      return false;
+    } finally {
+      delete this.busy[key];
+    }
   }
 
   /** Ticks, unticks or dates an item; the README is changed and the list read again. */

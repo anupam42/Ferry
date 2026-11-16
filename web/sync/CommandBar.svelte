@@ -3,6 +3,7 @@
   import { api } from "../lib/api.ts";
   import { act, app, toast } from "../lib/app.svelte.ts";
   import { ago } from "../lib/format.ts";
+  import { startExperiment } from "../lib/experiment.ts";
   import type { Mood } from "../lib/mood.ts";
   import { pairURL, short, stopPair, sync, syncNow } from "../lib/sync.svelte.ts";
   import type { PairStatus } from "../lib/types.ts";
@@ -125,6 +126,21 @@
     </button>
     {#if open}
       <div class="menu" role="menu" tabindex="-1" bind:this={menu} onkeydown={menuKey}>
+        {#if !p.experiment}
+          <button
+            type="button"
+            role="menuitem"
+            class="item"
+            onclick={() => {
+              close();
+              void startExperiment(p);
+            }}
+          >
+            <Icon name="rocket" size={17} /><span class="text"
+              >Try something…<small>keep it or drop it; nothing syncs meanwhile</small></span
+            >
+          </button>
+        {/if}
         <button
           type="button"
           role="menuitem"

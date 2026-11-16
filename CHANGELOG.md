@@ -20,6 +20,10 @@ How an entry is written:
 
 ### New
 
+- **Try something, then keep it or drop it**: "Try something…" in a folder pair's menu copies the working folder and holds syncing while you experiment. Keep it and it syncs; drop it and every file goes back as it was, with new files moved aside instead of deleted. [try: pairs]
+- **Time, a tab of its own**: how long you worked on each repository, branch and Jira issue, counted from the saves Ferry synced and your commits, with no timer to forget. Charts per project and day, a ribbon of today, a standup to copy and a weekly timesheet with a CSV download.
+- **A timer, when you want it exact**: start and stop it in the Time tab, mark work billable, and carry on with anything from earlier. While it runs, Ferry's own count steps aside so nothing is counted twice, and if you forgot to start it, Relay offers to start it from when you began.
+- **TODO comments in the Todo tab**: `TODO`, `FIXME`, `HACK` and `XXX` comments in a project's code are listed under "In the code", oldest first, with who wrote them and when. "Add to list" moves one into the README's list, and Relay reminds you about ones older than six months.
 - **Undo anything**: every commit, switch, reset, rebase, merge and pull in one timeline. Go back to any of them, make a branch there, or bring back a branch you deleted. Going back can be undone too. [try: git-undo]
 - **Checks before you push**: secrets, `.env` files, conflict markers, very large files and leftover `console.log` calls are caught before they leave your machine. Serious ones need a press-and-hold to push anyway.
 - **Who changed what**: open any file to see who last changed each line, when, and in which commit, with newer changes glowing brighter. [try: git-files]

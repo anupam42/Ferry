@@ -83,10 +83,12 @@ export interface Status {
   branch: string;
   gitStatus: string[];
   changed: ChangedFile[];
+  /** a throwaway experiment holds syncing (see experiment.ts) */
+  experiment?: { since: string; name: string; files: number } | null;
 }
 
 export function isPaused(s: Status): boolean {
-  return s.userPaused || s.guardReason !== "";
+  return s.userPaused || s.guardReason !== "" || !!s.experiment;
 }
 
 /** A one-line description such as "watching" or "2 conflicts". */
@@ -94,6 +96,8 @@ export function stateOf(s: Status): string {
   if (s.conflicts.length > 0) return plural(s.conflicts.length, "conflict");
   if (s.comparing) return `comparing ${s.comparing.done}/${s.comparing.total} files`;
   if (s.pendingBatch > 0) return plural(s.pendingBatch, "change") + " awaiting approval";
+  if (s.experiment)
+    return "trying something" + (s.experiment.name ? ": " + s.experiment.name : "") + " (keep or drop it in ferry ui)";
   if (s.userPaused) return "paused";
   if (s.guardReason !== "") return "paused: " + s.guardReason;
   if (s.pending) return "settling…";

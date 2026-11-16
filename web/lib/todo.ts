@@ -1,5 +1,5 @@
 // The Todo tab's arithmetic: dates, and what Relay reminds you about (plain TypeScript, so it's unit-testable).
-import { splitTodo, type TodoItem } from "../../src/shared/todo.ts";
+import { splitTodo, type CodeTodo, type TodoItem } from "../../src/shared/todo.ts";
 
 const DAY = 86_400_000;
 
@@ -43,6 +43,17 @@ export const STALE_DAYS = 30;
 /** Added this recently: marked as new. */
 export const NEW_DAYS = 7;
 
+/** A TODO comment older than this gets a nudge (code comments wait longer than list items). */
+export const CODE_STALE_DAYS = 180;
+export const isOldCode = (c: CodeTodo, ms = Date.now()) => c.since !== null && ms - c.since > CODE_STALE_DAYS * DAY;
+
+/** "sync.ts": a file's name without its folders, for Relay to say. */
+const base = (f: string) => f.slice(f.lastIndexOf("/") + 1);
+
+/** A README item that came from this comment (see codeTodoLine), so it isn't offered twice. */
+export const inList = (c: CodeTodo, items: TodoItem[]) =>
+  items.some((i) => i.text.includes("`" + c.file + "`") && (!c.text || splitTodo(i.text).title === c.text));
+
 export const isOverdue = (it: TodoItem, now = today()) => !it.done && !!it.due && daysBetween(now, it.due) < 0;
 export const isSoon = (it: TodoItem, now = today()) =>
   !it.done && !!it.due && daysBetween(now, it.due) >= 0 && daysBetween(now, it.due) < 7;
@@ -60,12 +71,14 @@ const title = (it: TodoItem) => splitTodo(it.text).title.replace(/[*`_]/g, "");
 const quote = (it: TodoItem) => `“${title(it)}”`;
 
 /** What Relay says about a list: late items first, then ones due soon, then ones waiting a long time. */
-export function reminder(items: TodoItem[], nowDay = today(), nowMs = Date.now()): Reminder {
+export function reminder(items: TodoItem[], nowDay = today(), nowMs = Date.now(), code: CodeTodo[] = []): Reminder {
   if (!items.length)
     return {
       face: "thinking",
       say: "No todo list here yet.",
-      hint: "Add “- [ ] something” lines to the README (under a “## Todo” heading, say), and I'll keep track of them for you.",
+      hint: code.length
+        ? `There ${code.length === 1 ? "is a TODO comment" : `are ${code.length} TODO comments`} in the code, though: add the ones that matter to the list.`
+        : "Add “- [ ] something” lines to the README (under a “## Todo” heading, say), and I'll keep track of them for you.",
     };
   const open = items.filter((i) => !i.done);
   if (!open.length)
@@ -111,6 +124,19 @@ export function reminder(items: TodoItem[], nowDay = today(), nowMs = Date.now()
         stale.length > 1
           ? `${stale.length} items have been open over a month. Give the important ones a date, and I'll remind you.`
           : "Give it a date and I'll remind you, or tick it off if it's done.",
+    };
+  }
+  const oldCode = code.filter((c) => isOldCode(c, nowMs) && !inList(c, items));
+  if (oldCode.length) {
+    const first = oldCode.reduce((a, b) => (b.since! < a.since! ? b : a));
+    return {
+      face: "sleepy",
+      say: `A ${first.kind} in ${base(first.file)} has been waiting ${waited(first.since!, nowMs)}.`,
+      hint:
+        (first.text ? `“${first.text}”. ` : "") +
+        (oldCode.length > 1
+          ? `${oldCode.length} comments in the code are over six months old. Fix them, delete them, or add them to the list.`
+          : "Fix it, delete it, or add it to the list so it gets a date."),
     };
   }
   const fresh = open.filter((i) => isNew(i, nowMs)).length;

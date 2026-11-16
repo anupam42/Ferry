@@ -89,7 +89,7 @@ ferry ui                      # opens http://127.0.0.1:7878 in your browser
 
 The web app does what the terminal dashboard does, with buttons instead of keys:
 
-- **Add folder pairs** with a folder picker. Choose "one way" or "both ways", and set what happens to deleted files, files to skip, secret handling, extra targets and auto-commit. Pairs you add are saved (in `./ferry.yaml` if there is one, otherwise in ferry's data folder as `ui.yaml`), so they start again next time. **Stop syncing** removes a pair; no files are deleted.
+- **Add folder pairs** with a folder picker. Choose "one way" or "both ways", and set what happens to deleted files, files to skip, secret handling, extra targets and auto-commit. Pairs you add are saved (in `./ferry.yaml` if there is one, otherwise in ferry's data folder as `ui.yaml`), so they start again next time. **Stop syncing** removes a pair; no files are deleted. **Try something…** (in a pair's ⋯ menu) copies the working folder and holds syncing while you experiment; then **Keep it** to sync what you did, or **Drop it** to put every file back as it was.
 - **Files**: everything synced this session, with a diff and an **Ignore** button for each file. Conflicts appear at the top with "keep working folder's / keep target's / keep newer / keep both / merge" buttons and a side-by-side **Compare**.
 - **Commit**: uncommitted files, a message box, "let Claude write the message" and "push afterwards".
 - **History & undo**: every sync pass, **Undo the last sync**, and **Go back** to how things were 15 minutes ago, this morning, yesterday or at a time you type. It shows what will change before doing it.
@@ -114,7 +114,12 @@ The web app does what the terminal dashboard does, with buttons instead of keys:
 
   Repositories your pairs sync into appear on their own. A Git action that would change files there (switching branches, pulling…) pauses that pair first, and discarded changes go to the Trash.
 
-- **Todo**: each project's todo list, read from the checklists in its README: every `- [ ]` and `- [x]` line, wherever it is (a `## Todo` section, a `## Status` with `### Backend` and `### Frontend`, a list of ideas), grouped by the heading it's under. Tick items off, or give one a date: both edit that line of the README, so the list stays in the repository. A date is written into the line as `(due 2026-12-01)`; `📅 2026-12-01` is read too. Git blame says when each item was added or ticked. Relay reminds you about items past their date first, then ones due this week, then ones that have waited over a month without a date, and **Coming up** lists the dated items in order. For a repository a folder pair syncs into, edits go to the pair's working folder, which syncs them into the repository.
+- **Todo**: each project's todo list, read from the checklists in its README: every `- [ ]` and `- [x]` line, wherever it is (a `## Todo` section, a `## Status` with `### Backend` and `### Frontend`, a list of ideas), grouped by the heading it's under. Tick items off, or give one a date: both edit that line of the README, so the list stays in the repository. A date is written into the line as `(due 2026-12-01)`; `📅 2026-12-01` is read too. Git blame says when each item was added or ticked. Relay reminds you about items past their date first, then ones due this week, then ones that have waited over a month without a date, and **Coming up** lists the dated items in order. **In the code** lists the project's `TODO`, `FIXME`, `HACK` and `XXX` comments, oldest first, with who added them and when; **Add to list** writes one into the README. For a repository a folder pair syncs into, edits go to the pair's working folder, which syncs them into the repository.
+- **Time** (the clock on the rail): how long you worked on what, without having to remember a timer. Ferry counts it from the saves your pairs sync and your commits (work less than 25 minutes apart is one sitting), split by repository, branch and Jira issue. When you want it exact, start the **timer**: while it runs, Ferry's own count steps aside for that stretch, so nothing is counted twice. If you've been saving for a while with no timer, Relay offers to **start one from when you began**.
+  - **Time on projects:** hours per day, stacked by project, for the last 7, 14 or 30 days; hover a day for its split. **Where it went** shows each project's share.
+  - **Today:** a ribbon of the day from morning to evening, then each stretch of work with its project, time and length. Mark it **billable** (a timer entry by itself; automatic time by project), carry on with it (starts a timer), or remove a timer entry. Step back through earlier days.
+  - **Standup** to copy (the last day you worked, and today so far), a **timesheet** per week with billable hours, and a CSV download.
+  - Totals for today, this week (against this time last week), billable hours and your streak. The timer and its entries are kept in `time.json` in the data folder, and 120 days of syncs in `worklog.jsonl`.
 
 `ferry ui --config work.yaml`, `ferry ui ./scratch ./repo` (pairs added in the browser then last only for the session), `--port 8080` and `--no-open` work as you'd expect. Keep the terminal window open while you sync; the web page talks to that process. The page and its API only answer on `localhost` unless you set `--host` together with `--serve-token`. The same page is also served by `ferry --serve 127.0.0.1:7878` (without adding or removing pairs).
 
@@ -441,6 +446,26 @@ Ideas being considered, roughly in priority order. Checked items are done.
 - [ ] **Encrypted targets** (`--encrypt`) — sync files encrypted with a passphrase or age key, so the target can be an untrusted repo or bucket.
 - [ ] **`ferry snapshot`** — save the current state of a pair as a timestamped tarball in the data folder, a checkpoint before a risky refactor.
 
+### Latest
+
+The newest ideas. Git only knows about commits; Ferry also records every save in between, so these build on what nothing else has.
+
+**Building next**
+
+- [x] **Standup and timesheet** — the **Time** tab on the rail: how long you worked on what, per repository, branch and Jira issue, worked out from the saves your pairs synced and your commits (work less than 25 minutes apart is one sitting), with no timer. Copy the last day you worked and today as a standup, or step through the weeks as a timesheet and download it as CSV. A work log in the data folder keeps 120 days of it. Also a timer that counts exactly where it ran, billable projects and entries, charts per project and day, a ribbon of each day, and "start a timer from when you began".
+- [x] **TODO comments in the code** — `TODO`, `FIXME`, `HACK` and `XXX` comments are listed in the Todo tab under "In the code", aged by git blame ("waiting 8 months"), with "Add to list" to move one into the README list under a group you pick. Relay nudges you about ones over six months old.
+- [x] **Throwaway experiments** — "Try something…" in a pair's ⋯ menu copies every file the pair syncs from the working folder into Ferry's data folder and holds syncing, so nothing reaches the repository. A banner shows what the experiment has changed so far. **Keep it** syncs the result; **Drop it** puts changed and deleted files back and moves new ones aside into the data folder (not deleted), then syncing carries on as if you'd never tried. Files the pair ignores (`node_modules`, build output) are left alone. An experiment survives a restart; working folders over 2 GB aren't copied. A safer stash that also covers files git doesn't track.
+
+**Ideas**
+
+- [ ] **Which save broke it?** — `git bisect` only steps through commits. Ferry can run a test command (such as `npm test`) against each sync since the last commit and show the save where it started failing, with the file and the diff.
+- [ ] **Where was I?** — when you come back to a project, one card shows the files you last touched, your last diff, the branch, any failing check, the next unticked README todo and the Jira issue you're on.
+- [ ] **Forgot a file?** — before committing or pushing: "you changed `api.ts` but not `api.test.ts`; they change together in 92% of commits". Uses the files-that-change-together data Insights already has. A quick, always-on part of "Impact preview" below.
+- [ ] **Time scrubber for a file** — drag a slider through every save of one file since the last commit, see it at each point, and restore any of them. Undo history that survives restarts and works whatever editor you use.
+- [ ] **AI or human?** — mark changes written by AI agents (Claude Code, Copilot and others) separately from yours, and hold them for review before they sync into the repository.
+- [ ] **Hand off unfinished work** — send uncommitted work with a note and the open todo items to another computer or a teammate, over the ssh and cloud targets Ferry already uses, without a "WIP" commit. Goes with "Device handoff" below.
+- [ ] **Change sets across repositories** — one change that spans several repositories (`targets:`) is committed together and opened as linked pull requests, and appears as one change in History.
+
 ### Web app
 
 - [x] **Todo tab** — a new sidebar tab that reads the Todo section of each project's README and turns it into a checklist per project: what's open, what's done, and what was added recently. The mascot keeps you on schedule, nudging you about items that have been open for a while or are past a date you set ("this one's been waiting three weeks"). Ticking an item off updates the README checkbox, so the list stays in the repo and in sync with the app.
@@ -454,7 +479,6 @@ Ideas being considered, roughly in priority order. Checked items are done.
 - [ ] **Changelog from ticks** — ticking an item offers to add a line to `CHANGELOG.md` under the unreleased version, written in the changelog's own format.
 - [ ] **Today view** — the late and due-soon items of every project in one list. Relay gives a short briefing when you open Ferry, and a desktop notification on the day something is due.
 - [ ] **Workload warnings** — give an item a size, such as `(2h)`, and Relay warns when the items due in the same few days add up to more than there's time for ("3 items due Friday add up to 10 h").
-- [ ] **TODO comments in the code** — list `TODO:` and `FIXME` comments, aged by git blame ("in `sync.ts` for 8 months"), with a button to move one into the README list.
 - [ ] **Add from anywhere** — a quick-add box on the tab, "Add a todo" on a line in blame or a diff, and "Make this a follow-up" on a review comment, each writing a line into the README under the group you pick.
 - [ ] **Blocked items and order** — `(after: Stash selected files)` greys an item out until that one is ticked. Dragging items to reorder them rewrites the order in the README.
 - [ ] **Owners and issues** — `@name` on a line assigns it, so teammates see their items after a pull. Items can also be linked both ways with Jira or GitHub issues, keeping their status in step.

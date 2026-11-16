@@ -23,6 +23,7 @@
     { mode: "sync", label: "Folder pairs", icon: "home" },
     { mode: "git", label: "Git", icon: "branch" },
     { mode: "todo", label: "Todo", icon: "todo" },
+    { mode: "time", label: "Time", icon: "clock" },
   ];
 
   let rail: HTMLElement;
@@ -511,6 +512,11 @@
       stroke-dasharray: 1;
       animation: ico-draw 0.45s ease-out 0.12s backwards;
     }
+    // time: the hands sweep once round the dial
+    [data-icon="clock"]:hover :global(svg path) {
+      transform-origin: 12px 12px;
+      animation: ico-sweep 0.7s cubic-bezier(0.5, 0, 0.3, 1);
+    }
     // what's new: a twinkle
     [data-icon="sparkle"]:hover:not(:disabled) :global(svg) {
       animation: ico-twinkle 0.7s ease-in-out;
@@ -579,6 +585,11 @@
   @keyframes ico-dot {
     from {
       transform: scale(0);
+    }
+  }
+  @keyframes ico-sweep {
+    to {
+      transform: rotate(360deg);
     }
   }
   @keyframes ico-twinkle {

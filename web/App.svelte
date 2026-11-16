@@ -8,6 +8,7 @@
   import Git from "./git/Git.svelte";
   import Sync from "./sync/Sync.svelte";
   import Todo from "./todo/Todo.svelte";
+  import Time from "./time/Time.svelte";
   import { app } from "./lib/app.svelte.ts";
   import { notes } from "./lib/notes.svelte.ts";
   import { releases } from "./lib/releases.svelte.ts";
@@ -25,6 +26,8 @@
       <Settings />
     {:else if app.mode === "sync"}
       <Sync />
+    {:else if app.mode === "time"}
+      <Time />
     {:else if app.mode === "todo"}
       <Todo />
     {:else}

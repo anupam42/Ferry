@@ -26,6 +26,8 @@ export interface PairStatus {
   mode: "one-way" | "two-way" | string;
   watcher: boolean;
   user_paused: boolean;
+  /** a throwaway experiment is holding syncing: when it began, what it's for, how many files were copied */
+  experiment?: { since: string; name: string; files: number };
   guard_reason?: string;
   conflicts: string[];
   pending_batch: number;
@@ -52,6 +54,15 @@ export interface JournalEntry {
   path: string;
   to?: string; // rename destination
   backup?: string; // copy of the version that was replaced or deleted
+}
+
+/** GET /pairs/{name}/experiment: what a throwaway experiment has changed so far (null: none under way). */
+export interface ExperimentState {
+  since: string;
+  name: string;
+  added: string[];
+  changed: string[];
+  deleted: string[];
 }
 
 /** One sync (GET /pairs/{name}/history). */
