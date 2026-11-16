@@ -5,13 +5,26 @@
   import Section from "../components/Section.svelte";
   import Seg from "../components/Seg.svelte";
   import { face } from "../lib/api.ts";
-  import { app } from "../lib/app.svelte.ts";
+  import { app, toast } from "../lib/app.svelte.ts";
   import { git } from "../lib/git.svelte.ts";
   import { ms } from "../lib/look.svelte.ts";
   import { relay } from "../lib/relay.svelte.ts";
-  import { dueLabel, isNew, isOverdue, isSoon, isStale, reminder, today, waited } from "../lib/todo.ts";
+  import {
+    dueLabel,
+    inList,
+    isNew,
+    isOldCode,
+    isOverdue,
+    isSoon,
+    isStale,
+    reminder,
+    today,
+    waited,
+  } from "../lib/todo.ts";
   import { todos } from "../lib/todo.svelte.ts";
-  import type { TodoItem } from "../lib/types.ts";
+  import { work } from "../lib/work.svelte.ts";
+  import { duration, timeFor } from "../../src/shared/work.ts";
+  import type { CodeTodo, TodoItem } from "../lib/types.ts";
   import { splitTodo } from "../../src/shared/todo.ts";
   import { fade, slide } from "svelte/transition";
 
@@ -23,17 +36,60 @@
   let loading = $state(true);
   $effect(() => {
     void todos.loadAll().then(() => (loading = false));
+    // the time spent on each item, from the Time tab's timers
+    void work.load(120);
   });
+  const plainTitle = (it: TodoItem) => splitTodo(it.text).title.replace(/[*`_]/g, "").trim();
+  const spent = (it: TodoItem) => (repo ? timeFor(work.blocks, { repo: repo.name, task: plainTitle(it) }) : 0);
+  const tracking = (it: TodoItem) => {
+    const r = work.timer?.running;
+    return !!r && !!repo && r.project === repo.name && r.task.toLowerCase() === plainTitle(it).toLowerCase();
+  };
+  /** Starts a timer for an item (its title is the task, the project the repository), or stops it. */
+  async function track(it: TodoItem) {
+    if (!repo) return;
+    if (tracking(it)) {
+      if (await work.act("stop")) relay.react("happy", 900, { jump: true });
+      return;
+    }
+    if (await work.act("start", { project: repo.name, task: plainTitle(it) })) {
+      toast(`Timing “${plainTitle(it)}”: see it in Time`, { mood: "focused" });
+      relay.react("focused", 900, { jump: true });
+    }
+  }
   // a README edited elsewhere shows up when you come back to the tab
   function refocus() {
-    if (document.visibilityState === "visible" && todos.current) void todos.load(todos.current.id);
+    if (document.visibilityState === "visible" && todos.current) {
+      void todos.load(todos.current.id);
+      void todos.loadCode(todos.current.id);
+    }
   }
+  // TODO comments are read for the project on screen only (a big repository takes a moment)
+  $effect(() => {
+    const id = todos.current?.id;
+    if (id && !todos.code[id] && !todos.codeErrors[id]) void todos.loadCode(id);
+  });
 
   const repo = $derived(todos.current);
   const list = $derived(repo ? todos.lists[repo.id] : undefined);
   const items = $derived(list?.items ?? []);
   const now = $derived(today());
-  const say = $derived(reminder(items, now));
+  const code = $derived(repo ? todos.code[repo.id] : undefined);
+  const codeItems = $derived(code?.items ?? []);
+  const say = $derived(reminder(items, now, Date.now(), codeItems));
+  // where "Add to list" puts a comment: a group of its own unless you pick one of the list's
+  const FROM_CODE = "From the code";
+  let addTo = $state(localStorage.getItem("ferry-todo-add-to") || FROM_CODE);
+  const groupNames = $derived([...new Set([FROM_CODE, ...items.map((i) => i.group).filter(Boolean)])]);
+  async function addCode(c: CodeTodo) {
+    if (!repo) return;
+    const group = groupNames.includes(addTo) ? addTo : FROM_CODE;
+    if (await todos.addCode(repo.id, c, group)) relay.react("happy", 900, { jump: true });
+  }
+  const codeBusy = (c: CodeTodo) => !!repo && !!todos.busy[`${repo.id}:code:${c.file}:${c.line}`];
+  const KIND_TONE: Record<string, string> = { FIXME: "red", HACK: "amber", TODO: "blue", XXX: "violet" };
+  const codeWhen = (c: CodeTodo) =>
+    c.uncommitted ? "not committed yet" : c.since === null ? "" : `${ago(c.since)}${c.by ? ` by ${c.by}` : ""}`;
   // "new" only stands out when most of the list isn't: a README rewritten this week marks nothing
   const markNew = $derived.by(() => {
     const open = items.filter((i) => !i.done);
@@ -154,6 +210,10 @@
         {#if due}<span class="pill due {due.tone}"><Icon name="calendar" size={12} />{due.text}</span>{/if}
         {#if markNew && isNew(it)}<span class="pill blue">new</span>{/if}
         {#if isStale(it)}<span class="pill muted" title="Open for over a month">waiting {waited(it.since!)}</span>{/if}
+        {#if tracking(it)}<span class="pill green" title="A timer is running for this">⏱ on it now</span>
+        {:else if spent(it) >= 1}<span class="pill muted" title="Time tracked on this item"
+            >⏱ {duration(spent(it))}</span
+          >{/if}
       </div>
       {#if l.rest}
         <button
@@ -186,14 +246,25 @@
       {/if}
     </div>
     {#if !it.done}
-      <button
-        type="button"
-        class="date-btn"
-        class:set={!!it.due}
-        aria-label={it.due ? `Change the date (${it.due})` : "Give it a date"}
-        title={it.due ? "Change the date" : "Give it a date"}
-        onclick={() => (dating = dating === it.line ? null : it.line)}><Icon name="calendar" size={17} /></button
-      >
+      <div class="row-acts">
+        <button
+          type="button"
+          class="date-btn"
+          class:set={tracking(it)}
+          aria-label={tracking(it) ? "Stop the timer" : "Track time on this"}
+          title={tracking(it) ? "Stop the timer" : "Track time on this (starts a timer)"}
+          disabled={work.busy}
+          onclick={() => track(it)}><Icon name={tracking(it) ? "stop" : "play"} size={15} /></button
+        >
+        <button
+          type="button"
+          class="date-btn"
+          class:set={!!it.due}
+          aria-label={it.due ? `Change the date (${it.due})` : "Give it a date"}
+          title={it.due ? "Change the date" : "Give it a date"}
+          onclick={() => (dating = dating === it.line ? null : it.line)}><Icon name="calendar" size={17} /></button
+        >
+      </div>
     {/if}
   </li>
 {/snippet}
@@ -318,6 +389,63 @@
             </div>
           {/each}
         {/key}
+      {/if}
+      {#if codeItems.length && (show === "open" || show === "all" || !items.length)}
+        <Section id="todo-code-{repo.id}" title="In the code" count={codeItems.length}>
+          {#snippet extra()}
+            {#if list?.file}
+              <label class="add-to">
+                <span class="muted">Add to</span>
+                <select
+                  value={groupNames.includes(addTo) ? addTo : FROM_CODE}
+                  aria-label="Which group “Add to list” puts a comment in"
+                  onchange={(e) => {
+                    addTo = e.currentTarget.value;
+                    localStorage.setItem("ferry-todo-add-to", addTo);
+                  }}
+                >
+                  {#each groupNames as n (n)}<option value={n}>{n}</option>{/each}
+                </select>
+              </label>
+            {/if}
+          {/snippet}
+          <ul class="items code">
+            {#each codeItems as c (c.file + ":" + c.line)}
+              {@const listed = inList(c, items)}
+              <li class="item" class:busy={codeBusy(c)}>
+                <span class="pill kind {KIND_TONE[c.kind]}">{c.kind}</span>
+                <div class="body">
+                  <div class="title">
+                    <span class="t">{c.text || "(no description)"}</span>
+                    {#if c.who}<span class="pill muted">@{c.who}</span>{/if}
+                    {#if isOldCode(c)}<span class="pill muted" title="Over six months old"
+                        >waiting {waited(c.since!)}</span
+                      >{/if}
+                    {#if listed}<span class="pill green">in the list</span>{/if}
+                  </div>
+                  <div class="meta">
+                    <span class="mono path">{c.file}:{c.line}</span>
+                    {#if codeWhen(c)}<span>· {codeWhen(c)}</span>{/if}
+                  </div>
+                </div>
+                {#if list?.file && !listed}
+                  <button
+                    type="button"
+                    class="btn small ghost"
+                    disabled={codeBusy(c)}
+                    title="Add it to {list.file} under “{groupNames.includes(addTo) ? addTo : FROM_CODE}”"
+                    onclick={() => addCode(c)}>Add to list</button
+                  >
+                {/if}
+              </li>
+            {/each}
+          </ul>
+          {#if code?.truncated}
+            <p class="more muted">Showing the oldest {codeItems.length}. There are more in the code.</p>
+          {/if}
+        </Section>
+      {:else if todos.codeErrors[repo.id] && show !== "done"}
+        <div class="card pad muted">Couldn't read the TODO comments: {todos.codeErrors[repo.id]}</div>
       {/if}
     {/if}
   </div>
@@ -712,6 +840,35 @@
   .body {
     min-width: 0;
   }
+  // TODO comments in the code
+  .items.code .item {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .kind {
+    justify-content: center;
+    font-family: $font-mono;
+    font-size: 11px;
+  }
+  .path {
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .add-to {
+    display: inline-flex;
+    align-items: center;
+    gap: space(2);
+    font-size: 12.5px;
+    select {
+      width: auto;
+      padding: space(1) space(2) + 2;
+      font-size: 12.5px;
+    }
+  }
+  .more {
+    padding: 0 space(4) space(3);
+    font-size: 12.5px;
+  }
   .title {
     display: flex;
     align-items: center;
@@ -796,6 +953,10 @@
       font: inherit;
       font-size: 13px;
     }
+  }
+  .row-acts {
+    display: flex;
+    gap: 2px;
   }
   .date-btn {
     width: 34px;

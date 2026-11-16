@@ -259,6 +259,7 @@ export class ApiServer {
       const action = parts[2]!;
       if (req.method === "GET" && action === "diff") return this.diff(e, url);
       if (req.method === "GET" && action === "history") return json(e.history());
+      if (req.method === "GET" && action === "experiment") return json(e.experimentChanges());
       if (req.method === "GET" && action === "stats") return this.stats(e, url);
       if (req.method === "GET" && action === "plan") {
         try {
@@ -525,6 +526,19 @@ export class ApiServer {
       case "pause":
         e.setPaused(true);
         break;
+      // throwaway experiments: try something in the working folder, then keep it or drop it
+      case "experiment-start":
+      case "experiment-keep":
+      case "experiment-drop": {
+        const b = await this.body(req);
+        const r =
+          action === "experiment-start"
+            ? await e.startExperiment(typeof b.name === "string" ? b.name : "")
+            : action === "experiment-keep"
+              ? await e.keepExperiment()
+              : await e.dropExperiment();
+        return r.error ? text(r.error, 409) : json({ ok: action, ...r });
+      }
       case "resume":
         e.setPaused(false);
         break;

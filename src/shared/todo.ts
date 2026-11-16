@@ -137,3 +137,89 @@ export function splitTodo(text: string): { title: string; rest: string } {
   const m = /^\*\*(.+?)\*\*\s*(?:[—–:-]\s*)?(.*)$/.exec(text);
   return m ? { title: m[1]!, rest: m[2]! } : { title: text, rest: "" };
 }
+
+/** A TODO, FIXME, HACK or XXX comment in a repository's code. */
+export interface CodeTodo {
+  /** the file's path in the repository */
+  file: string;
+  /** 1-based line */
+  line: number;
+  kind: "TODO" | "FIXME" | "HACK" | "XXX";
+  /** what the comment says after the keyword ("" when nothing) */
+  text: string;
+  /** who the comment names, as in TODO(ana): "" for none */
+  who: string;
+  /** when the line last changed (ms), from git blame; null when git doesn't know */
+  since: number | null;
+  by: string;
+  uncommitted: boolean;
+}
+
+export interface CodeTodoList {
+  items: CodeTodo[];
+  /** there were more than the list holds */
+  truncated: boolean;
+}
+
+// The keyword has to be the first word of a comment (`// TODO: …`, `# FIXME …`, `/* HACK */`,
+// `<!-- TODO -->`, `-- XXX`), so "TODO.txt" in a string or "XXX" at the end of a URL isn't one.
+// A comment marker after an unclosed quote is inside a string ("// TODO" in a test) and doesn't
+// count, and neither does a comment that only talks about them ("TODO comments are listed").
+const CODE_TODO =
+  /(?:^|[^"'`\w:/])(?:\/\/+!?|#+|\/\*+!?|<!--|--|;+|^\s*\*+|\{\/\*)\s*@?(TODO|FIXME|HACK|XXX)\b(?:\(([^)]*)\))?\s*([:!.-]?)\s*(.*)$/g;
+const PROSE = /^(?:and|or|comments?|lists?|items?|markers?|keywords?|lines?|tab|section|tags?|is|are|in)\b/i;
+
+/** Inside a string at the end of `code`: an odd number of one kind of quote (escaped ones aside). */
+const inString = (code: string) => {
+  const s = code.replace(/\\./g, "");
+  return ['"', "'", "`"].some((q) => s.split(q).length % 2 === 0);
+};
+
+/** The TODO comment on a line of code, or null when it has none. */
+export function findCodeTodo(line: string): { kind: CodeTodo["kind"]; text: string; who: string } | null {
+  CODE_TODO.lastIndex = 0;
+  for (let m = CODE_TODO.exec(line); m; m = CODE_TODO.exec(line)) {
+    CODE_TODO.lastIndex = m.index + 1; // `(.*)$` ate the rest of the line: look again just after here
+    if (inString(line.slice(0, m.index + 1))) continue;
+    if (!m[2] && !m[3] && PROSE.test(m[4]!)) continue;
+    const text = m[4]!
+      .replace(/\s*(?:\*\/|-->|\*\/\})\s*$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return { kind: m[1] as CodeTodo["kind"], text, who: (m[2] ?? "").trim() };
+  }
+  return null;
+}
+
+/** The README line for a TODO comment moved into the list. */
+export function codeTodoLine(c: { kind: string; text: string; file: string }): string {
+  const text = c.text
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\*\*/g, "")
+    .trim();
+  return text ? `- [ ] **${text}** — a ${c.kind} in \`${c.file}\`` : `- [ ] **${c.kind} in \`${c.file}\`**`;
+}
+
+/**
+ * The README's text with `line` added as the last item of `group` (a group name as parseTodo gives
+ * it). A group the list doesn't have yet starts as a bold line after the list's last item; with no
+ * list at all, a "## Todo" section at the end holds it. Line endings stay as they are.
+ */
+export function insertTodo(text: string, group: string, line: string): string {
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text.split(/\r?\n/);
+  const { items } = parseTodo(text);
+  const inGroup = items.filter((i) => i.group === group);
+  if (inGroup.length) {
+    lines.splice(Math.max(...inGroup.map((i) => i.line)), 0, line);
+    return lines.join(eol);
+  }
+  if (items.length) {
+    const last = items[items.length - 1]!.line;
+    lines.splice(last, 0, ...(group ? ["", `**${group}**`] : []), "", line);
+    return lines.join(eol);
+  }
+  while (lines.length && lines[lines.length - 1] === "") lines.pop();
+  lines.push("", "## Todo", "", ...(group ? [`**${group}**`, ""] : []), line, "");
+  return lines.join(eol);
+}

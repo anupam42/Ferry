@@ -2,6 +2,7 @@
 // what's been read, and the choices about them. The drawer and the rail's badge read this.
 import { api } from "./api.ts";
 import { app, toast } from "./app.svelte.ts";
+import { focus } from "./focus.svelte.ts";
 import type { FerryEvent } from "./events.ts";
 import { describe, important, NOTABLE, type Filter, type NoteAction } from "./notes.ts";
 import { sync } from "./sync.svelte.ts";
@@ -43,8 +44,10 @@ class Notes {
 
   /** A live event: kept if it's notable; a desktop pop-up when it needs you and the tab is hidden. */
   add(ev: FerryEvent): void {
-    if (ev.kind === "error" && ev.pair) toast(`${ev.pair}: ${ev.message || "error"}`, { error: true });
-    if (ev.kind === "commit" && ev.pair) toast(`${ev.pair}: ${ev.message}`, { mood: "party" });
+    // a focus session holds the pop-ups (the event is still listed below)
+    const hold = (ev.kind === "error" || ev.kind === "commit") && !!ev.pair && focus.swallow();
+    if (!hold && ev.kind === "error" && ev.pair) toast(`${ev.pair}: ${ev.message || "error"}`, { error: true });
+    if (!hold && ev.kind === "commit" && ev.pair) toast(`${ev.pair}: ${ev.message}`, { mood: "party" });
     if (ev.kind === "conflict" && ev.held && document.hidden) document.title = "(!) Ferry";
     if (!NOTABLE.has(ev.kind)) return;
     const list = [...this.list, { ...ev, time: ev.time || new Date().toISOString() }];
@@ -54,6 +57,7 @@ class Notes {
     if (
       d &&
       (d.cat === "needs" || d.cat === "errors") &&
+      !(hold || focus.swallow()) &&
       this.prefs.desktop &&
       document.hidden &&
       "Notification" in window &&

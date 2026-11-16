@@ -3,11 +3,11 @@
 //   GET  /git/repos                         repositories: opened directly, and pair targets
 //   POST /git/repos                         {"action": "clone"|"create"|"add", "url", "path"}
 //   POST /git/repos/remove                  {"id"}: forget a repository (nothing is deleted)
-//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|conflict-parts|rewrite-plan|bisect|todo|visibility|file|
+//   GET  /git/{id}/{state|log|commit|commit-diff|diff|branches|stashes|tags|worktrees|prs|issues|insights|conflict|ai-message|files|languages|elsewhere|compare|compare-diff|conflict-parts|rewrite-plan|bisect|todo|code-todos|visibility|file|
 //                  folder|remote-check|undo-timeline|push-check|blame|file-history|search}
 //   POST /git/{id}/{stage|unstage|stage-lines|discard|commit|undo|fetch|pull|push|branch-*|merge|cherry-pick|
 //                   revert|tag-*|stash|stash-apply|stash-drop|worktree-*|resolve|finish|pr-checkout|issue-start|restore|branch-at|
-//                   shape-diff|shape-message|shape-commit|rewrite|bisect-start|bisect-mark|bisect-reset|todo-edit}   (GET /git/{id}/shape: the timeline to shape, see shape.ts)
+//                   shape-diff|shape-message|shape-commit|rewrite|bisect-start|bisect-mark|bisect-reset|todo-edit|code-todo-add}   (GET /git/{id}/shape: the timeline to shape, see shape.ts)
 //
 // When a repository is also the target of a folder pair, actions that change
 // its files (switching branches, pulling, merging…) pause that pair first,
@@ -23,7 +23,14 @@ import * as g from "./gitclient.ts";
 import * as conn from "./integrations.ts";
 import * as reviews from "./reviews.ts";
 import * as shaper from "./shape.ts";
+import * as codeTodo from "./codetodo.ts";
 import * as todo from "./todo.ts";
+import * as work from "./work.ts";
+import * as timer from "./timer.ts";
+import * as calendar from "./calendar.ts";
+import { holdNotifications } from "./notify.ts";
+import { issueKey } from "./shared/work.ts";
+import { dataDir } from "./config.ts";
 import { repoVisibility } from "./visibility.ts";
 import type { RepoVisibility } from "./shared/git.ts";
 import { errMsg } from "./util.ts";
@@ -109,11 +116,96 @@ export class GitApi {
     return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  /**
+   * POST /git/timer/{action}: the Time tab's timer and entries (see timer.ts). Returns the timer's
+   * state, with the calendar's address masked (it can hold a private token).
+   */
+  private async timer(action: string, b: Record<string, unknown>): Promise<timer.TimerState> {
+    const dir = dataDir();
+    const t = await this.timerAction(dir, action, b);
+    // a focus session holds desktop notifications until it ends
+    const r = t.running;
+    holdNotifications(r?.focus ? r.start + r.focus * 60_000 : 0);
+    return shownTimer(t);
+  }
+
+  private async timerAction(dir: string, action: string, b: Record<string, unknown>): Promise<timer.TimerState> {
+    switch (action) {
+      case "start":
+        return timer.startTimer(dir, b);
+      case "stop":
+        return timer.stopTimer(dir, b.at).state;
+      case "edit":
+        return timer.editEntry(dir, b.id, b);
+      case "add":
+        return timer.addEntry(dir, b).state;
+      case "split":
+        return timer.splitEntry(dir, b.id, b.at);
+      case "merge":
+        return timer.mergeEntries(dir, b.ids);
+      case "delete":
+        return timer.deleteEntry(dir, b.id);
+      case "billable":
+        return timer.setBillable(dir, b.project, b.on);
+      case "goals":
+        return timer.setGoals(dir, b);
+      case "rate":
+        return timer.setRate(dir, b.project, b);
+      case "calendar":
+        return timer.setCalendar(dir, b.url);
+      case "jira": {
+        // an entry's time, logged on its issue (named in the request, or found in its task)
+        const e = timer.readTimer(dir).entries.find((x) => x.id === b.id);
+        if (!e) throw new timer.TimerError("that entry isn't there any more");
+        if (e.jira) throw new timer.TimerError(`already logged on ${e.jira.key}`);
+        const key = typeof b.key === "string" && b.key ? b.key.toUpperCase() : issueKey(e.task);
+        if (!key) throw new timer.TimerError("which Jira issue? Put its key (PROJ-12) in the task");
+        const id = await conn.jiraAddWorklog(key, {
+          start: e.start,
+          seconds: (e.end - e.start) / 1000,
+          comment: e.task.replace(key, "").replace(/^[\s:–—-]+/, ""),
+        });
+        return timer.markJira(dir, e.id, { key, id });
+      }
+      default:
+        throw new timer.TimerError(`no timer action called ${action}`);
+    }
+  }
+
+  /** GET /git/work?days=N: syncs, your commits and the timer, for the Time tab (see work.ts). */
+  private async work(q: URLSearchParams): Promise<work.WorkResponse> {
+    const days = Math.min(Math.max(Number(q.get("days")) || 14, 1), work.MAX_WORK_DAYS);
+    const r = await work.workEvents({
+      pairs: this.engines.map((e) => ({
+        name: e.name,
+        id: e.id,
+        dataDir: e.dataDir,
+        target: e.cfg.target,
+        remote: !!(e.cfg.remote || e.cfg.cloud),
+      })),
+      dataDirs: [dataDir()],
+      repos: (await this.list()).map((r) => real(r.path)),
+      since: Date.now() - days * 86_400_000,
+      real,
+    });
+    const t = timer.readTimer(dataDir());
+    // meetings from the calendar, for the same days
+    let meetings: work.WorkResponse["meetings"] = [],
+      calendarError = "";
+    if (t.calendar)
+      try {
+        meetings = await calendar.meetings(t.calendar, Date.now() - days * 86_400_000, Date.now() + 86_400_000);
+      } catch (e) {
+        calendarError = errMsg(e);
+      }
+    return { ...r, timer: shownTimer(t), meetings, calendarError };
+  }
+
   /** Where a repository's README is edited: a folder pair's working copy when it has one (see todo.ts). */
   private readmePlace(root: string, rel: string): todo.Place {
     for (const e of this.engines) {
       if (e.cfg.remote || e.cfg.cloud) continue;
-      const inTarget = path.relative(path.resolve(e.cfg.target), path.join(root, rel));
+      const inTarget = path.relative(real(e.cfg.target), path.join(real(root), rel));
       if (inTarget.startsWith("..") || path.isAbsolute(inTarget)) continue;
       const src = path.join(e.cfg.source, inTarget);
       if (fs.existsSync(src)) return { file: src, via: e.name };
@@ -124,6 +216,9 @@ export class GitApi {
   async handle(req: Request, url: URL, parts: string[]): Promise<Response> {
     try {
       if (parts[1] === "repos") return await this.reposRoute(req, parts);
+      if (parts[1] === "work" && req.method === "GET") return json(await this.work(url.searchParams));
+      if (parts[1] === "timer" && req.method === "POST")
+        return json({ timer: await this.timer(parts[2] ?? "", await body(req)) });
       const repo = (await this.list()).find((r) => r.id === parts[1]);
       if (!repo) return fail("that repository isn't open in Ferry", 404);
       const action = parts[2] ?? "state";
@@ -131,7 +226,11 @@ export class GitApi {
       if (req.method === "POST") return await this.write(repo, action, await body(req));
       return fail("method not allowed", 405);
     } catch (e) {
-      const known = e instanceof g.GitClientError || e instanceof conn.IntegrationError || e instanceof todo.TodoError;
+      const known =
+        e instanceof g.GitClientError ||
+        e instanceof conn.IntegrationError ||
+        e instanceof todo.TodoError ||
+        e instanceof timer.TimerError;
       return json({ error: errMsg(e), code: known ? (e as g.GitClientError).code : "" }, known ? 409 : 500);
     }
   }
@@ -208,6 +307,8 @@ export class GitApi {
         const rel = todo.findReadme(root);
         return json(await todo.readTodo(root, rel, rel ? this.readmePlace(root, rel) : null));
       }
+      case "code-todos":
+        return json(await codeTodo.scanCodeTodos(root));
       case "folder":
         return json(await g.folderEntries(root, q.get("dir")));
       case "undo-timeline":
@@ -333,6 +434,13 @@ export class GitApi {
         todo.editTodo(place.file, b.line, b.raw, { done: b.done, due: b.due });
         return done({ todo: await todo.readTodo(root, rel, place) });
       }
+      case "code-todo-add": {
+        const rel = todo.findReadme(root);
+        if (!rel) throw new todo.TodoError("this repository has no README to add it to");
+        const place = this.readmePlace(root, rel);
+        codeTodo.addCodeTodo(place, b);
+        return done({ todo: await todo.readTodo(root, rel, place) });
+      }
       case "branch-delete-remote":
         return done(await g.deleteRemoteBranch(root, b.name));
       case "merge":
@@ -444,7 +552,7 @@ export class GitApi {
    * (the last JOURNAL_KEEP syncs of each), or null when no pair syncs here.
    */
   private syncDays(root: string): { pairs: string[]; days: Record<string, number>; since: string } | null {
-    const pairs = this.engines.filter((e) => !e.cfg.remote && !e.cfg.cloud && inside(path.resolve(e.cfg.target), root));
+    const pairs = this.engines.filter((e) => !e.cfg.remote && !e.cfg.cloud && inside(real(e.cfg.target), real(root)));
     if (!pairs.length) return null;
     const days: Record<string, number> = {};
     let since = "";
@@ -466,8 +574,7 @@ export class GitApi {
   private pausePairs(root: string): string[] {
     const names: string[] = [];
     for (const e of this.engines) {
-      const t = path.resolve(e.cfg.target);
-      if (e.cfg.remote || e.cfg.cloud || !inside(t, root)) continue;
+      if (e.cfg.remote || e.cfg.cloud || !inside(real(e.cfg.target), real(root))) continue;
       if (!e.getStatus().userPaused) {
         e.setPaused(true);
         names.push(e.name);
@@ -478,6 +585,19 @@ export class GitApi {
 }
 
 const inside = (p: string, root: string) => p === root || p.startsWith(root + path.sep);
+
+/**
+ * A folder's real path, so two spellings of one folder compare equal: a Windows short name
+ * (`C:\PROGRA~1`) and the long one git reports, a symlink and its target, or another
+ * case. A folder that doesn't exist keeps its resolved path.
+ */
+export function real(p: string): string {
+  try {
+    return fs.realpathSync.native(path.resolve(p));
+  } catch {
+    return path.resolve(p);
+  }
+}
 
 async function body(req: Request): Promise<Record<string, unknown>> {
   try {
@@ -494,4 +614,9 @@ function json(v: unknown, status = 200): Response {
 
 function fail(msg: string, status: number): Response {
   return json({ error: msg, code: "" }, status);
+}
+
+/** The timer's state as the web app gets it: the calendar's address masked (it can hold a private token). */
+function shownTimer(t: timer.TimerState): timer.TimerState {
+  return { ...t, calendar: calendar.maskCalendar(t.calendar) };
 }

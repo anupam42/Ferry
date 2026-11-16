@@ -6,6 +6,7 @@
 // names, paths, commit ids, URLs) is validated and always passed as separate
 // arguments, never through a shell, and values that look like options are
 // refused.
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -202,6 +203,7 @@ export async function state(root: string): Promise<RepoState> {
     stashes: 0,
     remotes: [],
     lastCommit: null,
+    stamp: "",
   };
   const parts = out.split("\0");
   for (let i = 0; i < parts.length; i++) {
@@ -260,7 +262,27 @@ export async function state(root: string): Promise<RepoState> {
       : false;
     st.lastCommit = { hash: hash!, subject: subject ?? "", pushed };
   }
+  st.stamp = workTreeStamp(root, out, st.files);
   return st;
+}
+
+/**
+ * A fingerprint of the work tree, so the web app can tell when files changed
+ * without asking for them all again. git's status covers HEAD, the index and
+ * which files differ; each changed file's size and modified time cover a second
+ * edit to a file that was already modified (its status line stays the same).
+ */
+function workTreeStamp(root: string, status: string, files: FileChange[]): string {
+  const h = createHash("sha1").update(status);
+  for (const f of files) {
+    try {
+      const s = fs.statSync(path.join(root, f.path));
+      h.update(`\0${f.path}\0${s.size}\0${s.mtimeMs}`);
+    } catch {
+      h.update(`\0${f.path}\0gone`);
+    }
+  }
+  return h.digest("hex").slice(0, 16);
 }
 
 function change(p: string, xy: string): FileChange {

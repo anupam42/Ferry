@@ -19,6 +19,7 @@ import {
 import { COMMIT, DATE, out, paint, stdinLines, VERSION } from "./cli/common.ts";
 import { cmdCompletion } from "./cli/completion.ts";
 import { cmdRun } from "./cli/run.ts";
+import { cmdTimer } from "./cli/timer.ts";
 import { cmdUI } from "./cli/ui.ts";
 import { SUBCOMMANDS, usage } from "./cli/usage.ts";
 import { ExitError } from "./util.ts";
@@ -65,6 +66,8 @@ async function main(argv: string[]): Promise<void> {
       return cmdRestore(rest);
     case "stats":
       return cmdStats(rest);
+    case "timer":
+      return cmdTimer(rest);
     case "ui":
       return cmdUI(rest);
     case "doctor":

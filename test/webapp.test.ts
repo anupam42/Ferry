@@ -16,7 +16,8 @@ test("the build writes the page, a bundled app and the stylesheet", () => {
   const js = fs.readFileSync(path.join(WEB_OUT, "app.js"), "utf8");
   expect(js).not.toMatch(/^\s*(import|export) /m); // one self-contained bundle
   // what goes over the wire: Svelte compiles away, so this is nearly all the app itself (the old page is ~125 KB gzipped)
-  expect(Bun.gzipSync(js).length).toBeLessThan(200_000);
+  // (raised from 200 KB for the Time tab: timer, focus, invoices, calendar and the rest)
+  expect(Bun.gzipSync(js).length).toBeLessThan(225_000);
 });
 
 test("SCSS tokens become theme variables, accents and backgrounds", () => {

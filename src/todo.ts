@@ -84,14 +84,28 @@ export function editTodo(file: string, line: unknown, raw: unknown, o: { done?: 
   fs.renameSync(tmp, file);
 }
 
-/** When each line of the file last changed, by line number. `contents`: blame this text instead of the work tree's. */
-async function blameLines(
+/**
+ * When each line of the file last changed, by line number. `contents`: blame this text instead
+ * of the work tree's. `lines`: only these lines (one `-L` each), instead of the whole file.
+ */
+export async function blameLines(
   root: string,
   rel: string,
   contents: string | null,
+  lines: number[] = [],
 ): Promise<Map<number, { time: number; author: string; uncommitted: boolean }>> {
   const out = new Map<number, { time: number; author: string; uncommitted: boolean }>();
-  const args = ["git", "-C", root, "blame", "--porcelain", ...(contents ? ["--contents", contents] : []), "--", rel];
+  const args = [
+    "git",
+    "-C",
+    root,
+    "blame",
+    "--porcelain",
+    ...(contents ? ["--contents", contents] : []),
+    ...lines.flatMap((n) => ["-L", `${n},${n}`]),
+    "--",
+    rel,
+  ];
   const p = Bun.spawn(args, { stdout: "pipe", stderr: "ignore", env: { ...process.env, LC_ALL: "C" } });
   const text = await new Response(p.stdout).text();
   if ((await p.exited) !== 0) return out;

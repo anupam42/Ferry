@@ -85,6 +85,17 @@ import {
   type Status,
 } from "./types.ts";
 import { Watcher } from "./watch.ts";
+import { appendWork, headBranch } from "./worklog.ts";
+import {
+  dropExperiment,
+  experimentChanges,
+  experimentDir,
+  keepExperiment,
+  loadExperiment,
+  startExperiment,
+  type Experiment,
+  type ExperimentChanges,
+} from "./experiment.ts";
 
 type Side = 0 | 1;
 const SRC: Side = 0,
@@ -187,6 +198,8 @@ export class Engine {
   private bigSince = 0;
   private approved = false;
   private userPaused = false;
+  /** a throwaway experiment under way: syncing waits until it's kept or dropped */
+  private experiment: Experiment | null = null;
   private guardReason = "";
   private branchErr = "";
   private behindBy = 0;
@@ -419,6 +432,10 @@ export class Engine {
     try {
       await this.do(async () => {
         this.hashes.load(this.hashPath());
+        // an experiment from before a restart keeps holding syncing
+        this.experiment = loadExperiment(this.expDir());
+        if (this.experiment)
+          this.emit({ kind: "paused", msg: "an experiment is under way; syncing waits until you keep it or drop it" });
         this.isGit = await gitx.isRepo(this.gitTarget);
         if (this.cfg.branch !== "") {
           if (!this.isGit) this.warn("branch " + this.cfg.branch + " requested but target is not a git repo");
@@ -639,7 +656,85 @@ export class Engine {
   }
 
   private paused(): boolean {
-    return this.userPaused || this.guardReason !== "" || this.branchErr !== "";
+    return this.userPaused || this.experiment !== null || this.guardReason !== "" || this.branchErr !== "";
+  }
+
+  // ---------- throwaway experiments (see experiment.ts) ----------
+
+  private expDir(): string {
+    return experimentDir(this.dataDir, this.id);
+  }
+
+  /** Copies the working folder and holds syncing until the experiment is kept or dropped. */
+  async startExperiment(name: string): Promise<{ error?: string; files?: number }> {
+    const r = await this.do(async () => {
+      if (this.experiment) return { error: "an experiment is already under way" };
+      try {
+        const snap = this.scan(this.cfg.source, this.buildMatcher());
+        this.experiment = startExperiment(this.expDir(), this.cfg.source, snap, name);
+      } catch (e) {
+        return { error: errMsg(e) };
+      }
+      const n = Object.keys(this.experiment.files).length;
+      this.emit({
+        kind: "paused",
+        msg: `trying something${this.experiment.name ? ": " + this.experiment.name : ""} (copied ${n} files); syncing waits until you keep it or drop it`,
+      });
+      this.publish();
+      return { files: n };
+    });
+    return r ?? { error: "couldn't start the experiment" };
+  }
+
+  /** What the experiment has changed in the working folder so far, or null when there's none. */
+  experimentChanges(): (ExperimentChanges & { since: string; name: string }) | null {
+    const exp = this.experiment;
+    if (!exp) return null;
+    const now = this.scan(this.cfg.source, this.buildMatcher());
+    return { since: exp.since, name: exp.name, ...experimentChanges(this.expDir(), exp, this.cfg.source, now) };
+  }
+
+  /** Ends the experiment and syncs what it did. */
+  async keepExperiment(): Promise<{ error?: string }> {
+    const r = await this.do(async () => {
+      if (!this.experiment) return { error: "no experiment is under way" };
+      keepExperiment(this.expDir());
+      this.experiment = null;
+      this.emit({ kind: "resumed", msg: "kept the experiment; syncing it" });
+      await this.cycle(false, true);
+      this.publish();
+      return {};
+    });
+    return r ?? { error: "couldn't keep the experiment" };
+  }
+
+  /**
+   * Ends the experiment and puts the working folder back as it was: changed and deleted files
+   * come back, and new ones are moved into the data folder (`aside`), not deleted.
+   */
+  async dropExperiment(): Promise<{ error?: string; restored?: number; aside?: string; moved?: number }> {
+    const r = await this.do(async () => {
+      const exp = this.experiment;
+      if (!exp) return { error: "no experiment is under way" };
+      const aside = path.join(this.dataDir, this.id, "dropped", fmtStamp(new Date(), 0, 0));
+      const now = this.scan(this.cfg.source, this.buildMatcher());
+      const d = dropExperiment(this.expDir(), exp, this.cfg.source, now, aside);
+      if (d.problems.length)
+        return { error: `couldn't put everything back, so the experiment is still on: ${d.problems.join("; ")}` };
+      this.experiment = null;
+      this.emit({
+        kind: "resumed",
+        msg: `dropped the experiment: ${d.changed.length + d.deleted.length} file(s) put back, ${d.added.length} new one(s) moved aside`,
+      });
+      await this.cycle(false, true);
+      this.publish();
+      return {
+        restored: d.changed.length + d.deleted.length,
+        moved: d.added.length,
+        ...(d.added.length ? { aside } : {}),
+      };
+    });
+    return r ?? { error: "couldn't drop the experiment" };
   }
 
   // ---------- planning ----------
@@ -1946,6 +2041,19 @@ export class Engine {
     if (this.cfg.remote || this.cfg.cloud) b.remote = this.cfg.remote || this.cfg.cloud;
     this.journalN++;
     appendBatch(journalPath(this.dataDir, this.id), b, this.journalN % 50 === 1);
+    // the work log counts edits made in the working folder (what was written into the target);
+    // what a two-way pair copies back from the target came from a pull or a checkout there
+    const written = entries.filter((en) => en.side === "target");
+    if (written.length)
+      appendWork(this.dataDir, {
+        time: b.time,
+        pair: this.cfg.name,
+        pair_id: this.id,
+        target: this.cfg.target,
+        branch: this.cfg.remote || this.cfg.cloud ? "" : headBranch(this.cfg.target) || (this.status.branch ?? ""),
+        files: written.length,
+        paths: [...new Set(written.map((en) => en.to ?? en.path))].slice(0, 5),
+      });
   }
 
   /** This pair's batches, newest first. */
@@ -2103,6 +2211,9 @@ export class Engine {
   private publish(): void {
     const st = this.status;
     st.userPaused = this.userPaused;
+    st.experiment = this.experiment
+      ? { since: this.experiment.since, name: this.experiment.name, files: Object.keys(this.experiment.files).length }
+      : null;
     st.guardReason = this.branchErr !== "" ? this.branchErr : this.guardReason;
     st.conflicts = sortedKeys(this.conflicts);
     st.watcher = this.watcherKind;
@@ -2441,6 +2552,7 @@ export function statusJSON(s: Status): Record<string, unknown> {
   if (s.remote) o.remote = s.remote;
   Object.assign(o, { mode: s.mode, watcher: s.watcher, user_paused: s.userPaused });
   if (s.guardReason) o.guard_reason = s.guardReason;
+  if (s.experiment) o.experiment = s.experiment;
   Object.assign(o, {
     conflicts: s.conflicts,
     pending_batch: s.pendingBatch,

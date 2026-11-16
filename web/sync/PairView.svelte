@@ -6,6 +6,7 @@
   import { short, sync, type View } from "../lib/sync.svelte.ts";
   import type { PairStatus } from "../lib/types.ts";
   import CommandBar from "./CommandBar.svelte";
+  import ExperimentBanner from "./ExperimentBanner.svelte";
   import ActivityView from "./ActivityView.svelte";
   import CommitView from "./CommitView.svelte";
   import FilesView from "./FilesView.svelte";
@@ -68,6 +69,7 @@
           </div>{/if}
       </div>
     </div>
+    {#if p.experiment}<ExperimentBanner {p} />{/if}
     <div class="body">
       {#if sync.view === "files"}<FilesView {p} />
       {:else if sync.view === "git"}<CommitView {p} />

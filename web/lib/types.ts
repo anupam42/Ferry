@@ -4,6 +4,7 @@ export type { SettingsResponse as Settings } from "../../src/shared/settings.ts"
 export type {
   Batch,
   ChangedFile,
+  ExperimentState,
   FileDiff,
   FolderListing,
   JournalEntry,
@@ -32,7 +33,7 @@ export interface Connection {
 }
 export type Connections = Record<"gitlab" | "azure" | "jira", Connection>;
 
-export type Mode = "sync" | "git" | "todo" | "settings";
+export type Mode = "sync" | "git" | "todo" | "time" | "settings";
 
 /** One event from Ferry's live stream (GET /events) */
 export interface FerryEvent {
@@ -93,4 +94,4 @@ export type {
 } from "../../src/shared/git.ts";
 export type { ChangeItem, ChangeKind, Health, LatestRelease, Release, ReleaseInfo } from "../../src/shared/release.ts";
 export type { Language, LanguageShare } from "../../src/shared/languages.ts";
-export type { TodoItem, TodoList } from "../../src/shared/todo.ts";
+export type { CodeTodo, CodeTodoList, TodoItem, TodoList } from "../../src/shared/todo.ts";

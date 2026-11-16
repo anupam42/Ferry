@@ -7,6 +7,8 @@
   import { git } from "../lib/git.svelte.ts";
   import type { PullRequestList } from "../lib/types.ts";
   import NeedsConnection from "./NeedsConnection.svelte";
+  import { work } from "../lib/work.svelte.ts";
+  import { duration, timeFor } from "../../src/shared/work.ts";
 
   let res = $state<PullRequestList | null>(null);
   let error = $state<{ msg: string; code: string } | null>(null);
@@ -17,6 +19,11 @@
       (e) => (error = { msg: (e as Error).message, code: e instanceof ApiError ? e.code : "" }),
     );
   });
+  // the time spent on each pull request's branch (from the Time tab)
+  $effect(() => {
+    void work.load(120);
+  });
+  const timeOn = (branch: string) => (git.current ? timeFor(work.blocks, { repo: git.current.name, branch }) : 0);
   const fixable = $derived(!!error && ["no-cli", "not-connected", "auth"].includes(error.code));
   const REVIEW: Record<string, [string, string]> = {
     APPROVED: ["approved", "green"],
@@ -50,7 +57,8 @@
               <td class="file"
                 >#{p.number}
                 {p.title}{#if p.draft}<span class="pill draft">draft</span>{/if}<small
-                  >{p.branch} → {p.base} · {p.author} · {ago(p.updated)}</small
+                  >{p.branch} → {p.base} · {p.author} · {ago(p.updated)}{#if timeOn(p.branch) >= 1}
+                    · <span title="Time worked on this branch">⏱ {duration(timeOn(p.branch))}</span>{/if}</small
                 ></td
               >
               <td class="state">

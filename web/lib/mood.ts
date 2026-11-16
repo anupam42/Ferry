@@ -47,6 +47,14 @@ export function mood(p: PairStatus, lastError?: { at: number; msg: string }, now
       tone: "amber",
       label: "waiting for you",
     };
+  if (p.experiment)
+    return {
+      face: "wink",
+      say: p.experiment.name ? `Trying something: ${p.experiment.name}.` : "Trying something.",
+      hint: "Change anything in the working folder. Nothing reaches the target until you keep it, and dropping it puts everything back.",
+      tone: "blue",
+      label: "trying something",
+    };
   if (p.user_paused)
     return {
       face: "sleepy",

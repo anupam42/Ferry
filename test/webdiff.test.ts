@@ -125,6 +125,7 @@ describe("Relay's mood for a repository", () => {
     stashes: 0,
     remotes: ["origin"],
     lastCommit: null,
+    stamp: "",
     name: "r",
     pairs: [],
     standalone: true,
