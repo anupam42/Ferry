@@ -489,6 +489,48 @@ export async function jiraStartProgress(key: unknown): Promise<string> {
   return pick.to?.name ?? pick.name;
 }
 
+/** Jira's time format for a worklog's start: 2026-11-16T09:00:00.000+0530 (local time with its offset). */
+export function jiraStarted(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number, w = 2) => String(Math.abs(n)).padStart(w, "0");
+  const off = -d.getTimezoneOffset();
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}` +
+    `${off < 0 ? "-" : "+"}${p(Math.floor(Math.abs(off) / 60))}${p(Math.abs(off) % 60)}`
+  );
+}
+
+/** Logs time on an issue (a worklog), as Jira's "Log work" does. Returns the worklog's id. */
+export async function jiraAddWorklog(
+  key: unknown,
+  o: { start: number; seconds: number; comment: string },
+): Promise<string> {
+  const c = creds().jira;
+  if (!c) throw new IntegrationError("connect Jira first (Connections, on the left)", "not-connected");
+  if (typeof key !== "string" || !KEY.test(key)) throw new IntegrationError("that isn't a Jira issue key");
+  if (o.seconds < 60) throw new IntegrationError("Jira takes worklogs of a minute or more");
+  const body = {
+    started: jiraStarted(o.start),
+    timeSpentSeconds: Math.round(o.seconds / 60) * 60,
+    ...(o.comment
+      ? {
+          comment: {
+            type: "doc",
+            version: 1,
+            content: [{ type: "paragraph", content: [{ type: "text", text: o.comment.slice(0, 500) }] }],
+          },
+        }
+      : {}),
+  };
+  const r = await jiraPost<{ id: string }>(c, `/rest/api/3/issue/${key}/worklog`, body).catch((e) =>
+    // Jira Server and Data Center: API 2 takes a plain-text comment
+    e instanceof IntegrationError && e.code === "404"
+      ? jiraPost<{ id: string }>(c, `/rest/api/2/issue/${key}/worklog`, { ...body, comment: o.comment || undefined })
+      : Promise.reject(e),
+  );
+  return String(r.id ?? "");
+}
+
 /** A branch name for an issue: "PROJ-123-fix-the-login-button". */
 export function branchForIssue(key: string, summary: string): string {
   const slug = summary

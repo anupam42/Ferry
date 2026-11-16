@@ -28,7 +28,8 @@
       { "command": "ferry.undo", "title": "Undo Last Sync", "category": "Ferry" },
       { "command": "ferry.history", "title": "Show Sync History", "category": "Ferry" },
       { "command": "ferry.plan", "title": "Preview Changes (Plan)", "category": "Ferry" },
-      { "command": "ferry.doctor", "title": "Run Doctor", "category": "Ferry" }
+      { "command": "ferry.doctor", "title": "Run Doctor", "category": "Ferry" },
+      { "command": "ferry.timerToggle", "title": "Start or Stop the Timer", "category": "Ferry" }
     ],
     "configuration": {
       "title": "Ferry",

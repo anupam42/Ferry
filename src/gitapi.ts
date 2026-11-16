@@ -27,6 +27,9 @@ import * as codeTodo from "./codetodo.ts";
 import * as todo from "./todo.ts";
 import * as work from "./work.ts";
 import * as timer from "./timer.ts";
+import * as calendar from "./calendar.ts";
+import { holdNotifications } from "./notify.ts";
+import { issueKey } from "./shared/work.ts";
 import { dataDir } from "./config.ts";
 import { repoVisibility } from "./visibility.ts";
 import type { RepoVisibility } from "./shared/git.ts";
@@ -113,20 +116,57 @@ export class GitApi {
     return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  /** POST /git/timer/{start|stop|edit|delete|billable}: the Time tab's timer (see timer.ts); returns its state. */
-  private timer(action: string, b: Record<string, unknown>): timer.TimerState {
+  /**
+   * POST /git/timer/{action}: the Time tab's timer and entries (see timer.ts). Returns the timer's
+   * state, with the calendar's address masked (it can hold a private token).
+   */
+  private async timer(action: string, b: Record<string, unknown>): Promise<timer.TimerState> {
     const dir = dataDir();
+    const t = await this.timerAction(dir, action, b);
+    // a focus session holds desktop notifications until it ends
+    const r = t.running;
+    holdNotifications(r?.focus ? r.start + r.focus * 60_000 : 0);
+    return shownTimer(t);
+  }
+
+  private async timerAction(dir: string, action: string, b: Record<string, unknown>): Promise<timer.TimerState> {
     switch (action) {
       case "start":
         return timer.startTimer(dir, b);
       case "stop":
-        return timer.stopTimer(dir).state;
+        return timer.stopTimer(dir, b.at).state;
       case "edit":
         return timer.editEntry(dir, b.id, b);
+      case "add":
+        return timer.addEntry(dir, b).state;
+      case "split":
+        return timer.splitEntry(dir, b.id, b.at);
+      case "merge":
+        return timer.mergeEntries(dir, b.ids);
       case "delete":
         return timer.deleteEntry(dir, b.id);
       case "billable":
         return timer.setBillable(dir, b.project, b.on);
+      case "goals":
+        return timer.setGoals(dir, b);
+      case "rate":
+        return timer.setRate(dir, b.project, b);
+      case "calendar":
+        return timer.setCalendar(dir, b.url);
+      case "jira": {
+        // an entry's time, logged on its issue (named in the request, or found in its task)
+        const e = timer.readTimer(dir).entries.find((x) => x.id === b.id);
+        if (!e) throw new timer.TimerError("that entry isn't there any more");
+        if (e.jira) throw new timer.TimerError(`already logged on ${e.jira.key}`);
+        const key = typeof b.key === "string" && b.key ? b.key.toUpperCase() : issueKey(e.task);
+        if (!key) throw new timer.TimerError("which Jira issue? Put its key (PROJ-12) in the task");
+        const id = await conn.jiraAddWorklog(key, {
+          start: e.start,
+          seconds: (e.end - e.start) / 1000,
+          comment: e.task.replace(key, "").replace(/^[\s:–—-]+/, ""),
+        });
+        return timer.markJira(dir, e.id, { key, id });
+      }
       default:
         throw new timer.TimerError(`no timer action called ${action}`);
     }
@@ -148,7 +188,17 @@ export class GitApi {
       since: Date.now() - days * 86_400_000,
       real,
     });
-    return { ...r, timer: timer.readTimer(dataDir()) };
+    const t = timer.readTimer(dataDir());
+    // meetings from the calendar, for the same days
+    let meetings: work.WorkResponse["meetings"] = [],
+      calendarError = "";
+    if (t.calendar)
+      try {
+        meetings = await calendar.meetings(t.calendar, Date.now() - days * 86_400_000, Date.now() + 86_400_000);
+      } catch (e) {
+        calendarError = errMsg(e);
+      }
+    return { ...r, timer: shownTimer(t), meetings, calendarError };
   }
 
   /** Where a repository's README is edited: a folder pair's working copy when it has one (see todo.ts). */
@@ -168,7 +218,7 @@ export class GitApi {
       if (parts[1] === "repos") return await this.reposRoute(req, parts);
       if (parts[1] === "work" && req.method === "GET") return json(await this.work(url.searchParams));
       if (parts[1] === "timer" && req.method === "POST")
-        return json({ timer: this.timer(parts[2] ?? "", await body(req)) });
+        return json({ timer: await this.timer(parts[2] ?? "", await body(req)) });
       const repo = (await this.list()).find((r) => r.id === parts[1]);
       if (!repo) return fail("that repository isn't open in Ferry", 404);
       const action = parts[2] ?? "state";
@@ -564,4 +614,9 @@ function json(v: unknown, status = 200): Response {
 
 function fail(msg: string, status: number): Response {
   return json({ error: msg, code: "" }, status);
+}
+
+/** The timer's state as the web app gets it: the calendar's address masked (it can hold a private token). */
+function shownTimer(t: timer.TimerState): timer.TimerState {
+  return { ...t, calendar: calendar.maskCalendar(t.calendar) };
 }

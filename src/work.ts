@@ -33,7 +33,7 @@ export async function workEvents(o: {
   repos: string[];
   since: number;
   real: (p: string) => string;
-}): Promise<Omit<WorkResponse, "timer">> {
+}): Promise<Omit<WorkResponse, "timer" | "meetings" | "calendarError">> {
   const events: WorkEvent[] = [];
   const nameOf = (target: string, pair: string) => {
     const t = o.real(target);

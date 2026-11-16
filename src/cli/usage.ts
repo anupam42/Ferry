@@ -13,6 +13,7 @@ export const SUBCOMMANDS = [
   "undo",
   "restore",
   "stats",
+  "timer",
   "ui",
   "backups",
   "doctor",
@@ -41,6 +42,7 @@ Usage:
   ferry undo [--pair NAME] [--batch ID] [--yes]   undo the last sync batch
   ferry restore --at "2h ago" [--pair NAME] [--dry-run]   roll pairs back to a moment
   ferry stats [--pair NAME] [--since 7d] [--json]    what was synced, busiest days, top files
+  ferry timer [start [task] [--project P] [--focus 25] | stop | today] [--json]   the Time tab's timer
   ferry ui [--config file | <source> <target>] [--port 7878]   open the web app in your browser
   ferry backups list    <source> <target> [file]
   ferry backups restore <source> <target> <file> [--version N] [--to path]

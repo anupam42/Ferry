@@ -14,7 +14,10 @@ import {
   type Kind,
   type Status,
 } from "../engine/types.ts";
+import { dataDir } from "../config.ts";
 import * as gitx from "../gitx.ts";
+import { clock, type RunningTimer } from "../shared/work.ts";
+import { readTimer } from "../timer.ts";
 import { execInteractive, isMac, isWindows, startDetached, which } from "../proc.ts";
 import { comparingArt, type ArtStyle } from "../relayart.ts";
 import { errMsg, fmtClock, fmtDateTime } from "../util.ts";
@@ -606,9 +609,22 @@ export class Dashboard {
 
   private headerView(w: number): string {
     const t = theme();
-    const left = t.title.render("⇄ ferry") + t.muted.render(" " + this.version);
+    let left = t.title.render("⇄ ferry") + t.muted.render(" " + this.version);
+    // the Time tab's timer, when one is running (ferry timer start, or the web app)
+    const run = this.timerNow();
+    if (run) {
+      const label = ` ⏱ ${clock(Date.now() - run.start)} ${run.task || run.project}${run.focus ? " · focus" : ""}`;
+      left += t.muted.render(truncate(label, Math.max(0, w - 60)));
+    }
     const right = t.muted.render(`${this.engines.length} pair(s) · ? help · q quit`);
     return left + " ".repeat(Math.max(1, w - width(left) - width(right) - 1)) + right;
+  }
+
+  private timerCache: { at: number; run: RunningTimer | null } = { at: 0, run: null };
+  /** The running timer, read from the data folder at most once a second. */
+  private timerNow(): RunningTimer | null {
+    if (Date.now() - this.timerCache.at > 1000) this.timerCache = { at: Date.now(), run: readTimer(dataDir()).running };
+    return this.timerCache.run;
   }
 
   private pairsView(w: number): string[] {

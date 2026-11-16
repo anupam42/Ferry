@@ -26,7 +26,7 @@ export interface WorkEvent {
   subject?: string;
 }
 
-/** Time a timer counted (see timer.ts). */
+/** Time a timer counted, or that you added or pinned yourself (see timer.ts). */
 export interface TimeEntry {
   id: string;
   start: number;
@@ -34,21 +34,62 @@ export interface TimeEntry {
   project: string;
   task: string;
   billable: boolean;
+  /** where it came from when a timer didn't make it: a pinned automatic block, a meeting, or typed in */
+  from?: "auto" | "meeting" | "added";
+  /** a focus session's planned length, in minutes */
+  focus?: number;
+  /** sent to Jira as a worklog */
+  jira?: { key: string; id: string; at: number };
+}
+
+export interface RunningTimer {
+  start: number;
+  project: string;
+  task: string;
+  billable: boolean;
+  /** a focus session: its length in minutes (notifications wait until it's over) */
+  focus?: number;
+  /** "keep the idle time" was answered at this time (ms): don't ask again for the gap before it */
+  idleOk?: number;
+}
+
+/** What a project's time is worth, and who pays for it. */
+export interface Rate {
+  /** per hour */
+  rate: number;
+  currency: string;
+  client: string;
 }
 
 export interface TimerState {
-  running: { start: number; project: string; task: string; billable: boolean } | null;
+  running: RunningTimer | null;
   entries: TimeEntry[];
   /** projects whose time is billable (their automatic time, and new timers for them) */
   billable: Record<string, boolean>;
+  /** targets in minutes: 0 for none */
+  goals: { day: number; week: number };
+  rates: Record<string, Rate>;
+  /** a calendar's ICS address, for meetings next to your work ("" for none) */
+  calendar: string;
+}
+
+/** A meeting from the calendar. */
+export interface Meeting {
+  start: number;
+  end: number;
+  title: string;
 }
 
 export interface WorkResponse {
   events: WorkEvent[];
   /** the oldest day the work log has (YYYY-MM-DD), "" when it's empty */
   since: string;
-  /** the timer, its entries and which projects are billable */
+  /** the timer, its entries, billable projects, goals, rates and the calendar's address */
   timer: TimerState;
+  /** meetings in the same days, when a calendar is set */
+  meetings: Meeting[];
+  /** why the calendar couldn't be read ("" when it could, or there's none) */
+  calendarError: string;
 }
 
 /** A stretch of work on one thing: worked out from saves and commits, or counted by a timer. */
@@ -443,4 +484,152 @@ export function suggestTimer(
   if (!last || now - last.end > GAP_MIN * MIN) return null;
   const minutes = (now - last.start) / MIN;
   return minutes >= minMinutes ? { since: Math.round(last.start), repo: last.repo, minutes } : null;
+}
+
+/** No saves in the timer's project for this long while it runs: ask about the idle time. */
+export const IDLE_MIN = 20;
+
+/**
+ * The idle stretch of a running timer: you saved in its project during the timer and then stopped
+ * for IDLE_MIN or more. `since` is the last save. Null when there's nothing to ask (no timer, still
+ * saving, a timer for something you don't save in, such as a call, or "keep it" already answered).
+ */
+export function idleSince(
+  events: WorkEvent[],
+  timer: TimerState | null,
+  now = Date.now(),
+): { since: number; minutes: number } | null {
+  const r = timer?.running;
+  if (!r) return null;
+  let last = -Infinity;
+  for (const e of events) if (e.repo === r.project && e.t >= r.start && e.t <= now) last = Math.max(last, e.t);
+  if (last === -Infinity) return null;
+  const from = Math.max(last, r.idleOk ?? 0);
+  if (now - from < IDLE_MIN * MIN) return null;
+  return { since: last, minutes: (now - last) / MIN };
+}
+
+/** A focus session's state: how far through it is (0-1), and when it ends. Null for a plain timer. */
+export function focusState(
+  timer: TimerState | null,
+  now = Date.now(),
+): { ends: number; done: boolean; progress: number } | null {
+  const r = timer?.running;
+  if (!r?.focus) return null;
+  const ends = r.start + r.focus * MIN;
+  return { ends, done: now >= ends, progress: Math.min(1, (now - r.start) / (r.focus * MIN)) };
+}
+
+export interface Recap {
+  monday: string;
+  minutes: number;
+  /** the week before */
+  before: number;
+  billable: number;
+  /** days with any work */
+  worked: number;
+  best: { day: string; minutes: number } | null;
+  projects: { name: string; minutes: number }[];
+  /** the issues worked on most */
+  issues: { key: string; minutes: number }[];
+}
+
+/** A week in numbers, for Relay's Monday recap. */
+export function weeklyRecap(days: WorkDay[], monday: string): Recap {
+  const week = weekDays(monday);
+  const prev = weekDays(lastDays(monday, 8)[0]!);
+  const inWeek = days.filter((d) => week.includes(d.day));
+  const projects = new Map<string, number>();
+  const issues = new Map<string, number>();
+  for (const d of inWeek)
+    for (const l of d.lines) {
+      projects.set(l.repo, (projects.get(l.repo) ?? 0) + l.minutes);
+      if (l.issue) issues.set(l.issue, (issues.get(l.issue) ?? 0) + l.minutes);
+    }
+  const sorted = <K extends string>(m: Map<string, number>, k: K) =>
+    [...m.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([n, minutes]) => ({ [k]: n, minutes }) as Record<K, string> & { minutes: number });
+  const best = inWeek.reduce<WorkDay | null>((b, d) => (!b || d.minutes > b.minutes ? d : b), null);
+  return {
+    monday,
+    minutes: inWeek.reduce((n, d) => n + d.minutes, 0),
+    before: days.filter((d) => prev.includes(d.day)).reduce((n, d) => n + d.minutes, 0),
+    billable: inWeek.reduce((n, d) => n + d.billable, 0),
+    worked: inWeek.filter((d) => d.minutes > 0).length,
+    best: best ? { day: best.day, minutes: best.minutes } : null,
+    projects: sorted(projects, "name").slice(0, 5),
+    issues: sorted(issues, "key").slice(0, 3),
+  };
+}
+
+export interface InvoiceRow {
+  project: string;
+  minutes: number;
+  rate: number;
+  currency: string;
+  amount: number;
+}
+
+/**
+ * The billable time between two days (YYYY-MM-DD, both included) for a client (or, with no
+ * client, every project that has a rate), priced at each project's rate. Hours are rounded to
+ * the quarter, as most invoices are.
+ */
+export function invoice(
+  days: WorkDay[],
+  rates: Record<string, Rate>,
+  o: { from: string; to: string; client: string },
+): { rows: InvoiceRow[]; totals: Record<string, number>; minutes: number } {
+  const by = new Map<string, number>();
+  for (const d of days) {
+    if (d.day < o.from || d.day > o.to) continue;
+    for (const l of d.lines) if (l.billable) by.set(l.repo, (by.get(l.repo) ?? 0) + l.billable);
+  }
+  const rows: InvoiceRow[] = [];
+  for (const [project, minutes] of by) {
+    const r = rates[project];
+    if (!r || (o.client && r.client !== o.client)) continue;
+    const hours = Math.round((minutes / 60) * 4) / 4;
+    rows.push({ project, minutes, rate: r.rate, currency: r.currency, amount: Math.round(hours * r.rate * 100) / 100 });
+  }
+  rows.sort((a, b) => b.amount - a.amount || a.project.localeCompare(b.project));
+  const totals: Record<string, number> = {};
+  for (const r of rows) totals[r.currency] = Math.round(((totals[r.currency] ?? 0) + r.amount) * 100) / 100;
+  return { rows, totals, minutes: rows.reduce((n, r) => n + r.minutes, 0) };
+}
+
+/** An invoice as CSV. */
+export function invoiceCsv(inv: { rows: InvoiceRow[]; totals: Record<string, number> }): string {
+  const cell = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+  return (
+    [
+      "Project,Hours,Rate,Currency,Amount",
+      ...inv.rows.map((r) =>
+        [
+          cell(r.project),
+          (Math.round((r.minutes / 60) * 4) / 4).toFixed(2),
+          r.rate.toFixed(2),
+          r.currency,
+          r.amount.toFixed(2),
+        ].join(","),
+      ),
+      ...Object.entries(inv.totals).map(([c, v]) => `Total,,,${c},${v.toFixed(2)}`),
+    ].join("\n") + "\n"
+  );
+}
+
+/**
+ * The time spent on one thing, across every block: a project's branch (a pull request's, say) or a
+ * timer task (a todo item's). Matching is by repository plus branch or task.
+ */
+export function timeFor(all: Block[], o: { repo: string; branch?: string; task?: string }): number {
+  return all
+    .filter(
+      (b) =>
+        b.repo === o.repo &&
+        ((o.branch !== undefined && b.kind === "auto" && b.branch === o.branch) ||
+          (o.task !== undefined && b.task.toLowerCase() === o.task.toLowerCase())),
+    )
+    .reduce((n, b) => n + b.minutes, 0);
 }

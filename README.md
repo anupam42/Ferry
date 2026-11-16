@@ -119,7 +119,15 @@ The web app does what the terminal dashboard does, with buttons instead of keys:
   - **Time on projects:** hours per day, stacked by project, for the last 7, 14 or 30 days; hover a day for its split. **Where it went** shows each project's share.
   - **Today:** a ribbon of the day from morning to evening, then each stretch of work with its project, time and length. Mark it **billable** (a timer entry by itself; automatic time by project), carry on with it (starts a timer), or remove a timer entry. Step back through earlier days.
   - **Standup** to copy (the last day you worked, and today so far), a **timesheet** per week with billable hours, and a CSV download.
-  - Totals for today, this week (against this time last week), billable hours and your streak. The timer and its entries are kept in `time.json` in the data folder, and 120 days of syncs in `worklog.jsonl`.
+  - Totals for today, this week (against this time last week), billable hours and your streak, with progress rings once you **set goals** for a day and a week.
+  - **Focus sessions** of 25 or 50 minutes count down in a ring, hold Ferry's notifications (in the page and on the desktop) and chime when they're over; the ones that waited are summed up.
+  - **Idle time:** when a timer runs but the saves in its project stopped 20 minutes ago, Relay asks: keep it, drop it and carry on, or stop at your last save.
+  - **Edit anything:** change a block's task, project, times or billable flag, split it, join it with the one before, or add time you forgot. An automatic block you change is pinned as an entry. **Log on PROJ-12** sends an entry to Jira as a worklog (once Jira is connected), and marks it so it isn't sent twice.
+  - **Meetings:** paste a calendar's ICS address (Google's secret iCal address, Outlook's published calendar) and its meetings show on the day's ribbon and in the list, recurring ones included, to **log** as time. The address is kept in the data folder and only shown masked.
+  - **Rates & invoices:** an hourly rate, currency and client per project, and an invoice for a client and a month (billable hours rounded to the quarter, priced) as CSV or a page to print or save as PDF.
+  - **Your week:** on the first visit of a week, Relay recaps the last one: hours against the week before, the busiest day, where the time went and the issues worked on.
+  - In the **Todo** tab each item has a ▶ to time it and shows the time spent; in **Git**, each pull request shows the time worked on its branch.
+  - The timer is in the terminal too (`ferry timer start "task" [--focus 25]`, `ferry timer stop`, `ferry timer today`), in the dashboard's top line, and in VS Code's status bar (click it to start or stop). It's all kept in `time.json` in the data folder, and 120 days of syncs in `worklog.jsonl`.
 
 `ferry ui --config work.yaml`, `ferry ui ./scratch ./repo` (pairs added in the browser then last only for the session), `--port 8080` and `--no-open` work as you'd expect. Keep the terminal window open while you sync; the web page talks to that process. The page and its API only answer on `localhost` unless you set `--host` together with `--serve-token`. The same page is also served by `ferry --serve 127.0.0.1:7878` (without adding or removing pairs).
 
@@ -314,6 +322,7 @@ No admin rights are needed. Logs go to the ferry data folder. `ferry status` sho
 | `ferry undo [--pair NAME] [--batch ID] [--yes]` | reverse a sync pass |
 | `ferry restore --at "2h ago" [--pair NAME] [--dry-run] [--yes]` | go back to how things were at a moment |
 | `ferry stats [--pair NAME] [--since 7d] [--json]` | totals, busiest days, most-changed files |
+| `ferry timer [start [task] [--project P] [--billable] [--focus 25] \| stop \| today] [--json]` | the Time tab's timer: what's running, start (a focus session with `--focus`), stop, today's time |
 | `ferry ui [--config file \| <source> <target>] [--port 7878] [--no-open]` | the web app |
 | `ferry backups list\|restore\|prune …` | stored versions |
 | `ferry doctor [--config file \| <source> <target>]` | check the setup |

@@ -11,6 +11,10 @@
   import TimerCard from "./TimerCard.svelte";
   import Timesheet from "./Timesheet.svelte";
   import Tracker from "./Tracker.svelte";
+  import CalendarCard from "./CalendarCard.svelte";
+  import Invoice from "./Invoice.svelte";
+  import RecapCard from "./RecapCard.svelte";
+  import { askFields } from "../lib/app.svelte.ts";
 
   /**
    * Time: how long you worked on what. Ferry counts it from your saves and commits without being
@@ -66,6 +70,25 @@
     }
     return n;
   });
+  const goals = $derived(work.timer?.goals ?? { day: 0, week: 0 });
+  let recapOpen = $state(false);
+  async function setGoals() {
+    const v = await askFields({
+      mood: "excited",
+      title: "Set your goals",
+      text: "Hours you'd like to work. Leave one empty for no goal.",
+      yes: "Save goals",
+      no: "Cancel",
+      primary: "yes",
+      fields: [
+        { name: "day", label: "A day (hours)", value: goals.day ? String(goals.day / 60) : "", placeholder: "6" },
+        { name: "week", label: "A week (hours)", value: goals.week ? String(goals.week / 60) : "", placeholder: "30" },
+      ],
+    });
+    if (!v) return;
+    const h = (x: unknown) => Math.round((parseFloat(String(x ?? "").replace(",", ".")) || 0) * 60);
+    await work.act("goals", { day: h(v.day), week: h(v.week) });
+  }
   const dateLine = $derived(
     new Date(now + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }),
   );
@@ -73,12 +96,36 @@
 
 <svelte:document onvisibilitychange={refocus} />
 
+{#snippet ring(p: number, label: string)}
+  {@const R = 20}
+  {@const C = 2 * Math.PI * R}
+  <svg class="goal" class:done={p >= 1} viewBox="0 0 50 50" width="50" height="50" role="img" aria-label={label}>
+    <circle cx="25" cy="25" r={R} class="g-track" />
+    <circle
+      cx="25"
+      cy="25"
+      r={R}
+      class="g-fill"
+      stroke-dasharray="{C * Math.min(1, p)} {C}"
+      transform="rotate(-90 25 25)"
+    />
+    <text x="25" y="29" text-anchor="middle">{Math.min(999, Math.round(p * 100))}%</text>
+  </svg>
+{/snippet}
+
 <div class="time">
   <header class="top">
     <div>
       <h1>Time</h1>
       <p class="muted">{dateLine} · counted from your saves and commits, or a timer</p>
     </div>
+    <div class="grow"></div>
+    {#if work.data}
+      <button type="button" class="btn small ghost" onclick={() => (recapOpen = !recapOpen)}>Last week</button>
+      <button type="button" class="btn small ghost" onclick={setGoals}
+        >{goals.day || goals.week ? "Goals" : "Set goals"}</button
+      >
+    {/if}
     <Seg
       options={RANGES}
       value={range}
@@ -96,18 +143,43 @@
   {:else if work.error && !work.data}
     <div class="card pad muted">Couldn't read your time: {work.error}</div>
   {:else}
+    <RecapCard bind:open={recapOpen} />
     <section class="stats" aria-label="Totals">
-      <div class="card stat">
-        <span class="k">Today</span><b>{duration(dayMin(now))}</b>
-        <small>{work.timer?.running ? "a timer is running" : "so far"}</small>
+      <div class="card stat" class:has-goal={!!goals.day}>
+        <div class="txt">
+          <span class="k">Today</span><b>{duration(dayMin(now))}</b>
+          <small
+            >{goals.day
+              ? dayMin(now) >= goals.day
+                ? "goal reached 🎉"
+                : `${duration(goals.day - dayMin(now))} to your goal`
+              : work.timer?.running
+                ? "a timer is running"
+                : "so far"}</small
+          >
+        </div>
+        {#if goals.day}{@render ring(
+            dayMin(now) / goals.day,
+            `${Math.round((dayMin(now) / goals.day) * 100)}% of today's goal`,
+          )}{/if}
       </div>
-      <div class="card stat">
-        <span class="k">This week</span><b>{duration(weekMin)}</b>
-        <small
-          >{lastWeekMin
-            ? `${weekMin >= lastWeekMin ? "▲" : "▼"} ${duration(Math.abs(weekMin - lastWeekMin))} vs this time last week`
-            : "the first week Ferry counted"}</small
-        >
+      <div class="card stat" class:has-goal={!!goals.week}>
+        <div class="txt">
+          <span class="k">This week</span><b>{duration(weekMin)}</b>
+          <small
+            >{goals.week
+              ? weekMin >= goals.week
+                ? "weekly goal reached"
+                : `${duration(goals.week - weekMin)} to go this week`
+              : lastWeekMin
+                ? `${weekMin >= lastWeekMin ? "▲" : "▼"} ${duration(Math.abs(weekMin - lastWeekMin))} vs this time last week`
+                : "the first week Ferry counted"}</small
+          >
+        </div>
+        {#if goals.week}{@render ring(
+            weekMin / goals.week,
+            `${Math.round((weekMin / goals.week) * 100)}% of this week's goal`,
+          )}{/if}
       </div>
       <div class="card stat">
         <span class="k">Billable this week</span><b>{duration(weekBill)}</b>
@@ -128,9 +200,11 @@
         <TimerCard />
         <Donut projects={chart.projects} label="the last {range} days" />
         <StandupCard />
+        <CalendarCard />
       </div>
     </div>
     <Timesheet />
+    <Invoice />
   {/if}
 </div>
 
@@ -168,7 +242,7 @@
   .top {
     display: flex;
     align-items: flex-end;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: space(3);
     flex-wrap: wrap;
     h1 {
@@ -207,6 +281,47 @@
       font-size: 12px;
       color: var(--faint);
     }
+    .txt {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+    &.has-goal {
+      flex-direction: row;
+      align-items: center;
+      gap: space(3);
+    }
+  }
+  // a goal's progress ring
+  .goal {
+    flex: none;
+    text {
+      font-size: 11px;
+      font-weight: $weight-bold;
+      fill: var(--text);
+    }
+  }
+  .g-track {
+    fill: none;
+    stroke: var(--card2);
+    stroke-width: 5;
+  }
+  .g-fill {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 5;
+    stroke-linecap: round;
+    @include motion {
+      transition: stroke-dasharray $duration-slow $ease-out;
+    }
+  }
+  .goal.done .g-fill {
+    stroke: var(--green);
+  }
+  .grow {
+    flex: 1;
   }
   .grid {
     display: grid;

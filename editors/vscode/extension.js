@@ -13,6 +13,9 @@ let output;
 let pollTimer;
 let eventsReq;
 let lastPairs = [];
+let timerItem;
+let timerState = { running: false };
+let timerTick;
 
 function cfg() {
   return vscode.workspace.getConfiguration('ferry');
@@ -148,6 +151,7 @@ function onEvent(ev) {
 // ---------- status bar ----------
 
 async function refresh() {
+  refreshTimer();
   const pairs = await readStatus();
   if (pairs === null) {
     statusItem.text = '$(circle-slash) Ferry';
@@ -175,6 +179,60 @@ async function refresh() {
   statusItem.command = conflicts > 0 ? 'ferry.showConflicts' : 'ferry.showPairs';
   statusItem.show();
   if (running.length > 0) subscribeEvents();
+}
+
+// ---------- the Time tab's timer ----------
+
+function two(n) {
+  return String(n).padStart(2, '0');
+}
+
+function showTimer() {
+  const t = timerState;
+  if (!t.running) {
+    timerItem.text = '$(watch) Start timer';
+    timerItem.tooltip = 'Ferry: start a timer for this project (Ferry also counts your saves without one)';
+    timerItem.backgroundColor = undefined;
+    timerItem.show();
+    return;
+  }
+  const secs = Math.max(0, Math.round((Date.now() - Date.parse(t.start)) / 1000));
+  const left = t.focus_minutes ? t.focus_minutes * 60 - secs : null;
+  const shown = left !== null && left > 0 ? left : secs;
+  const clock = `${two(Math.floor(shown / 3600))}:${two(Math.floor(shown / 60) % 60)}:${two(shown % 60)}`;
+  timerItem.text = `${left !== null ? '$(target)' : '$(watch)'} ${clock}${t.task ? ' ' + t.task : ''}`;
+  timerItem.tooltip = `Ferry: ${left !== null ? (left > 0 ? 'focus session, time left' : 'focus session is over') : 'timing'} ${t.task || ''} on ${t.project}${t.billable ? ' (billable)' : ''}. Click to stop.`;
+  timerItem.backgroundColor = left !== null && left <= 0 ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
+  timerItem.show();
+}
+
+async function refreshTimer() {
+  try {
+    timerState = JSON.parse(await ferry(['timer', '--json'])) || { running: false };
+  } catch (e) {
+    timerItem.hide();
+    return;
+  }
+  showTimer();
+}
+
+async function toggleTimer() {
+  try {
+    if (timerState.running) {
+      await ferry(['timer', 'stop']);
+      vscode.window.setStatusBarMessage('Ferry: timer stopped', 3000);
+    } else {
+      const task = await vscode.window.showInputBox({
+        prompt: 'What are you working on?',
+        placeHolder: 'Fixing the login bug (PROJ-12)',
+      });
+      if (task === undefined) return;
+      await ferry(['timer', 'start', ...(task ? [task] : [])]);
+    }
+  } catch (e) {
+    vscode.window.showErrorMessage('Ferry timer: ' + e.message);
+  }
+  refreshTimer();
 }
 
 async function pickPair(runningOnly) {
@@ -324,6 +382,9 @@ async function plan() {
 function activate(context) {
   output = vscode.window.createOutputChannel('Ferry');
   statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
+  timerItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 49);
+  timerItem.command = 'ferry.timerToggle';
+  timerTick = setInterval(() => timerState.running && showTimer(), 1000);
   const reg = (id, fn) => context.subscriptions.push(vscode.commands.registerCommand(id, fn));
   reg('ferry.showPairs', showPairs);
   reg('ferry.showConflicts', showConflicts);
@@ -337,7 +398,8 @@ function activate(context) {
   reg('ferry.history', () => runToOutput(['history', '-n', '30'], 'history'));
   reg('ferry.plan', plan);
   reg('ferry.doctor', () => runToOutput(['doctor'], 'doctor'));
-  context.subscriptions.push(statusItem, output);
+  reg('ferry.timerToggle', toggleTimer);
+  context.subscriptions.push(statusItem, timerItem, output);
 
   const schedule = () => {
     clearInterval(pollTimer);
@@ -357,6 +419,7 @@ function activate(context) {
 
 function deactivate() {
   clearInterval(pollTimer);
+  clearInterval(timerTick);
   if (eventsReq) eventsReq.destroy();
 }
 

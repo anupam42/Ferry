@@ -25,12 +25,20 @@ const ev = (o: Partial<WorkEvent> & { t: number }): WorkEvent => ({
   paths: ["src/a.ts"],
   ...o,
 });
-const timer = (o: Partial<TimerState> = {}): TimerState => ({ running: null, entries: [], billable: {}, ...o });
+const timer = (o: Partial<TimerState> = {}): TimerState => ({
+  running: null,
+  entries: [],
+  billable: {},
+  goals: { day: 0, week: 0 },
+  rates: {},
+  calendar: "",
+  ...o,
+});
 
 describe("timer", () => {
   test("start, stop, edit, delete and billable projects, kept in the data folder", () => {
     const dir = tempDir();
-    expect(readTimer(dir)).toEqual({ running: null, entries: [], billable: {} });
+    expect(readTimer(dir)).toEqual(timer());
     expect(() => startTimer(dir, {})).toThrow("which project");
 
     setBillable(dir, "client-site", true);

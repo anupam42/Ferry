@@ -23,6 +23,16 @@ How an entry is written:
 - **Try something, then keep it or drop it**: "Try something…" in a folder pair's menu copies the working folder and holds syncing while you experiment. Keep it and it syncs; drop it and every file goes back as it was, with new files moved aside instead of deleted. [try: pairs]
 - **Time, a tab of its own**: how long you worked on each repository, branch and Jira issue, counted from the saves Ferry synced and your commits, with no timer to forget. Charts per project and day, a ribbon of today, a standup to copy and a weekly timesheet with a CSV download.
 - **A timer, when you want it exact**: start and stop it in the Time tab, mark work billable, and carry on with anything from earlier. While it runs, Ferry's own count steps aside so nothing is counted twice, and if you forgot to start it, Relay offers to start it from when you began.
+- **Focus sessions**: 25 or 50 minutes counting down in a ring, with notifications held until it's over and a chime at the end.
+- **Idle time**: when the saves stop while a timer runs, Relay asks whether to keep the time, drop it, or stop at your last save.
+- **Edit, split and join time**: change any block's task, project, times or billable flag, split it, join it with the one before, or add time you forgot.
+- **Goals**: a daily and weekly target, with progress rings next to the totals.
+- **Rates and invoices**: an hourly rate and client per project, and an invoice per client and month as CSV or a page to print.
+- **Jira worklogs**: send an entry's time to its issue in one click.
+- **Meetings from your calendar**: paste an ICS address and meetings show next to your work, ready to log.
+- **Your week**: Relay's Monday recap of last week.
+- **Time per todo item and pull request**: time a todo item from the Todo tab, and see the time on each pull request's branch.
+- **`ferry timer`**: start, stop and check the timer from a terminal; it also shows in the dashboard and in VS Code's status bar.
 - **TODO comments in the Todo tab**: `TODO`, `FIXME`, `HACK` and `XXX` comments in a project's code are listed under "In the code", oldest first, with who wrote them and when. "Add to list" moves one into the README's list, and Relay reminds you about ones older than six months.
 - **Undo anything**: every commit, switch, reset, rebase, merge and pull in one timeline. Go back to any of them, make a branch there, or bring back a branch you deleted. Going back can be undone too. [try: git-undo]
 - **Checks before you push**: secrets, `.env` files, conflict markers, very large files and leftover `console.log` calls are caught before they leave your machine. Serious ones need a press-and-hold to push anyway.

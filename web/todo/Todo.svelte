@@ -5,7 +5,7 @@
   import Section from "../components/Section.svelte";
   import Seg from "../components/Seg.svelte";
   import { face } from "../lib/api.ts";
-  import { app } from "../lib/app.svelte.ts";
+  import { app, toast } from "../lib/app.svelte.ts";
   import { git } from "../lib/git.svelte.ts";
   import { ms } from "../lib/look.svelte.ts";
   import { relay } from "../lib/relay.svelte.ts";
@@ -22,6 +22,8 @@
     waited,
   } from "../lib/todo.ts";
   import { todos } from "../lib/todo.svelte.ts";
+  import { work } from "../lib/work.svelte.ts";
+  import { duration, timeFor } from "../../src/shared/work.ts";
   import type { CodeTodo, TodoItem } from "../lib/types.ts";
   import { splitTodo } from "../../src/shared/todo.ts";
   import { fade, slide } from "svelte/transition";
@@ -34,7 +36,27 @@
   let loading = $state(true);
   $effect(() => {
     void todos.loadAll().then(() => (loading = false));
+    // the time spent on each item, from the Time tab's timers
+    void work.load(120);
   });
+  const plainTitle = (it: TodoItem) => splitTodo(it.text).title.replace(/[*`_]/g, "").trim();
+  const spent = (it: TodoItem) => (repo ? timeFor(work.blocks, { repo: repo.name, task: plainTitle(it) }) : 0);
+  const tracking = (it: TodoItem) => {
+    const r = work.timer?.running;
+    return !!r && !!repo && r.project === repo.name && r.task.toLowerCase() === plainTitle(it).toLowerCase();
+  };
+  /** Starts a timer for an item (its title is the task, the project the repository), or stops it. */
+  async function track(it: TodoItem) {
+    if (!repo) return;
+    if (tracking(it)) {
+      if (await work.act("stop")) relay.react("happy", 900, { jump: true });
+      return;
+    }
+    if (await work.act("start", { project: repo.name, task: plainTitle(it) })) {
+      toast(`Timing “${plainTitle(it)}”: see it in Time`, { mood: "focused" });
+      relay.react("focused", 900, { jump: true });
+    }
+  }
   // a README edited elsewhere shows up when you come back to the tab
   function refocus() {
     if (document.visibilityState === "visible" && todos.current) {
@@ -188,6 +210,10 @@
         {#if due}<span class="pill due {due.tone}"><Icon name="calendar" size={12} />{due.text}</span>{/if}
         {#if markNew && isNew(it)}<span class="pill blue">new</span>{/if}
         {#if isStale(it)}<span class="pill muted" title="Open for over a month">waiting {waited(it.since!)}</span>{/if}
+        {#if tracking(it)}<span class="pill green" title="A timer is running for this">⏱ on it now</span>
+        {:else if spent(it) >= 1}<span class="pill muted" title="Time tracked on this item"
+            >⏱ {duration(spent(it))}</span
+          >{/if}
       </div>
       {#if l.rest}
         <button
@@ -220,14 +246,25 @@
       {/if}
     </div>
     {#if !it.done}
-      <button
-        type="button"
-        class="date-btn"
-        class:set={!!it.due}
-        aria-label={it.due ? `Change the date (${it.due})` : "Give it a date"}
-        title={it.due ? "Change the date" : "Give it a date"}
-        onclick={() => (dating = dating === it.line ? null : it.line)}><Icon name="calendar" size={17} /></button
-      >
+      <div class="row-acts">
+        <button
+          type="button"
+          class="date-btn"
+          class:set={tracking(it)}
+          aria-label={tracking(it) ? "Stop the timer" : "Track time on this"}
+          title={tracking(it) ? "Stop the timer" : "Track time on this (starts a timer)"}
+          disabled={work.busy}
+          onclick={() => track(it)}><Icon name={tracking(it) ? "stop" : "play"} size={15} /></button
+        >
+        <button
+          type="button"
+          class="date-btn"
+          class:set={!!it.due}
+          aria-label={it.due ? `Change the date (${it.due})` : "Give it a date"}
+          title={it.due ? "Change the date" : "Give it a date"}
+          onclick={() => (dating = dating === it.line ? null : it.line)}><Icon name="calendar" size={17} /></button
+        >
+      </div>
     {/if}
   </li>
 {/snippet}
@@ -916,6 +953,10 @@
       font: inherit;
       font-size: 13px;
     }
+  }
+  .row-acts {
+    display: flex;
+    gap: 2px;
   }
   .date-btn {
     width: 34px;
