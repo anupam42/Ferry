@@ -2,6 +2,11 @@
 @use "mixins" as *;
 
 * { box-sizing: border-box; }
+
+// the sidebar's notch around the current page (Rail.svelte): registered so it can glide between items
+@property --tab-x { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --tab-y { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --tab-h { syntax: "<length>"; inherits: true; initial-value: 0px; }
 html, body { margin: 0; min-height: 100%; }
 body {
   font: #{fs(md)}/1.5 $font-sans;

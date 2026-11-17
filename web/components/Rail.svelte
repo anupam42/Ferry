@@ -44,6 +44,30 @@
     ),
   );
 
+  // The current page sits in a notch cut out of the rail, open to the page beside it. The notch is a
+  // mask on the rail's background, placed over the current item's button; only a vertical rail has one.
+  const NOTCH_PAD = 5;
+  let notch = $state<{ x: number; y: number; h: number } | null>(null);
+  function measure() {
+    if (!rail) return;
+    const b = rail.querySelector<HTMLElement>('.btn-rail[aria-current="page"]');
+    if (!b || getComputedStyle(rail).flexDirection !== "column") {
+      notch = null;
+      return;
+    }
+    notch = { x: b.offsetLeft - NOTCH_PAD, y: b.offsetTop - NOTCH_PAD, h: b.offsetHeight + 2 * NOTCH_PAD };
+  }
+  $effect(() => {
+    void [app.mode, shownSize, look.get("railpos")];
+    const f = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(f);
+  });
+  $effect(() => {
+    const ro = new ResizeObserver(measure);
+    ro.observe(rail);
+    return () => ro.disconnect();
+  });
+
   // Relay reacting for a moment (hover, click, live events): a quick face, a jump, a ring
   let home: HTMLButtonElement;
   const shownFace = $derived(relay.mood || railFace);
@@ -202,7 +226,16 @@
   }
 </script>
 
-<nav class="rail" bind:this={rail} data-size={shownSize} aria-label="Ferry">
+<nav
+  class="rail"
+  bind:this={rail}
+  data-size={shownSize}
+  class:notched={!!notch}
+  style:--tab-x={notch ? notch.x + "px" : null}
+  style:--tab-y={notch ? notch.y + "px" : null}
+  style:--tab-h={notch ? notch.h + "px" : null}
+  aria-label="Ferry"
+>
   <button
     class="home"
     bind:this={home}
@@ -297,15 +330,80 @@
     align-items: center;
     gap: space(3) + 2;
     padding: space(4) 0;
-    background: var(--rail);
-    backdrop-filter: blur(16px);
     border-radius: $radius-xl + 6;
-    box-shadow: var(--shadow);
+    // a drop shadow follows the notch; a box shadow would stop in a straight line across it
+    --rail-shade: rgba(9, 35, 72, 0.14);
+    filter: drop-shadow(0 8px 14px var(--rail-shade));
     overflow-y: auto;
     @include hide-scrollbar;
+    // the rail's surface is its own layer, so a notch can be cut out of it (see .notched)
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      border-radius: inherit;
+      background: linear-gradient(170deg, var(--accent), var(--accent-2));
+      pointer-events: none;
+    }
     > * {
       flex: none;
     }
+  }
+
+  // The notch: the whole surface, minus a tab around the current item that's open on the right, with
+  // its left end rounded and the rail curving into it above and below. The pieces (a circle for the
+  // round end, the straight part, the curve above and below) are added together first, overlapping a
+  // little so no seam shows between them; then the full surface (the top layer) XORs that shape out.
+  .rail.notched {
+    --tab-r: 14px;
+    &::before {
+      --half: calc(var(--tab-h) / 2);
+      mask-image:
+        linear-gradient(#000 0 0),
+        radial-gradient(circle var(--half) at 50% 50%, #000 calc(100% - 0.75px), transparent),
+        linear-gradient(#000 0 0), radial-gradient(circle var(--tab-r) at 0 0, transparent calc(100% - 0.75px), #000),
+        radial-gradient(circle var(--tab-r) at 0 100%, transparent calc(100% - 0.75px), #000);
+      mask-size:
+        100% 100%,
+        var(--tab-h) var(--tab-h),
+        calc(100% - var(--tab-x) - var(--half) + 1px) var(--tab-h),
+        var(--tab-r) calc(var(--tab-r) + 1px),
+        var(--tab-r) calc(var(--tab-r) + 1px);
+      mask-position:
+        0 0,
+        left var(--tab-x) top var(--tab-y),
+        right 0 top var(--tab-y),
+        right 0 top calc(var(--tab-y) - var(--tab-r)),
+        right 0 top calc(var(--tab-y) + var(--tab-h) - 1px);
+      mask-repeat: no-repeat;
+      mask-composite: exclude, add, add, add, add;
+      @include motion {
+        transition:
+          --tab-x 0.4s cubic-bezier(0.3, 1.2, 0.4, 1),
+          --tab-y 0.4s cubic-bezier(0.3, 1.2, 0.4, 1),
+          --tab-h 0.4s cubic-bezier(0.3, 1.2, 0.4, 1);
+      }
+    }
+    // in the notch the page shows through, and the current item is just its icon in the accent colour
+    .btn-rail.on[aria-current="page"] {
+      background: transparent;
+      box-shadow: none;
+      color: var(--accent);
+      transform: none;
+      font-weight: $weight-heavy;
+    }
+  }
+  // wide, without a notch (across the top): the current page is a white chip
+  .rail[data-size="wide"]:not(.notched) .btn-rail.on[aria-current="page"] {
+    background: var(--card-solid);
+  }
+  :global([data-theme="dark"]) .rail {
+    --rail-shade: rgba(0, 0, 0, 0.4);
+  }
+  // resizing: the notch follows at once
+  :global(.rail-dragging) .rail.notched::before {
+    transition: none;
   }
   .grow {
     flex: 1;
@@ -400,18 +498,27 @@
     position: relative;
     display: grid;
     place-items: center;
-    background: var(--pill);
-    color: var(--text);
-    box-shadow: 0 2px 8px rgba(9, 35, 72, 0.06);
+    // on the coloured rail: plain white icons, a soft white wash on hover and while a panel is open
+    background: transparent;
+    color: #fff;
     @include motion {
-      transition: transform $duration-fast;
+      transition:
+        transform $duration-fast,
+        background $duration-fast,
+        color $duration-base;
     }
     &:hover {
       transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.16);
     }
     &.on {
-      @include brand-gradient;
-      color: #fff;
+      background: rgba(255, 255, 255, 0.22);
+    }
+    // the current page without a notch (sidebar across the top, or a phone): a white chip
+    &.on[aria-current="page"] {
+      background: var(--card-solid);
+      color: var(--accent);
+      box-shadow: 0 4px 12px rgba(9, 35, 72, 0.18);
     }
     &:disabled {
       opacity: 0.5;
@@ -434,9 +541,9 @@
     font-weight: $weight-heavy;
     display: grid;
     place-items: center;
-    border: 2px solid var(--rail);
+    border: 2px solid color-mix(in srgb, var(--accent) 70%, var(--accent-2));
   }
-  // a new version: a solid dot with a crisp ring the colour of the button, and now and then a
+  // a new version: a white dot with a crisp ring the colour of the rail, and now and then a
   // thin ring that pings outwards (a soft glow looked blurry at this size)
   .new-dot {
     position: absolute;
@@ -445,28 +552,20 @@
     width: 11px;
     height: 11px;
     border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 2.5px var(--pill);
+    background: #fff;
+    box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--accent) 80%, var(--accent-2));
     &::after {
       content: "";
       position: absolute;
       inset: 0;
       border-radius: 50%;
-      border: 1.5px solid var(--accent);
+      border: 1.5px solid #fff;
       opacity: 0;
     }
     @include motion {
       &::after {
         animation: ping 3.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
       }
-    }
-  }
-  // on a highlighted (gradient) button: a white dot with a ring that blends into the gradient
-  .btn-rail.on .new-dot {
-    background: #fff;
-    box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--accent) 80%, var(--accent-2));
-    &::after {
-      border-color: #fff;
     }
   }
   @keyframes ping {
@@ -691,7 +790,7 @@
       bottom: 10px;
       width: 4px;
       border-radius: $radius-pill;
-      background: var(--faint);
+      background: rgba(255, 255, 255, 0.7);
       opacity: 0;
       transition:
         opacity $duration-fast,
@@ -701,7 +800,7 @@
     &:hover::before,
     &:focus-visible::before {
       opacity: 1;
-      background: var(--accent);
+      background: #fff;
       top: 0;
       bottom: 0;
     }
@@ -714,15 +813,12 @@
     cursor: ew-resize !important;
     user-select: none;
   }
-  // while resizing: no blur to recompute each frame (only the fixed background is behind it, so it looks the same)
-  :global(.rail-dragging) .rail {
-    backdrop-filter: none;
-  }
 
   // the sizes are on the rail itself (data-size), so it can show where it'll land while you drag
   // thin: small icons
   .rail[data-size="thin"] {
     padding: space(3) 0;
+    --tab-r: 10px;
     gap: space(2) + 2;
     border-radius: $radius-xl;
     .btn-rail {
@@ -741,6 +837,7 @@
   // wide: icons and names
   .rail[data-size="wide"] {
     align-items: stretch;
+    --tab-r: 12px;
     padding: space(4) space(3);
     gap: space(2);
     .label {
@@ -762,11 +859,10 @@
       background: transparent;
       &:hover {
         transform: none;
-        background: var(--pill);
+        background: rgba(255, 255, 255, 0.16);
       }
       &.on {
-        @include brand-gradient;
-        box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent);
+        background: rgba(255, 255, 255, 0.22);
       }
     }
     .home {
